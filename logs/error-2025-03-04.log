@@ -210,3 +210,10 @@
 2025-03-04 11:51:16 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
 2025-03-04 11:51:18 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
 2025-03-04 11:51:20 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 14:46:37 [ERROR]: Error publishing to RabbitMQ Channel closed
+2025-03-04 14:48:30 [ERROR]: Error publishing to RabbitMQ Channel closed

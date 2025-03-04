@@ -213,3 +213,100 @@
 2025-03-04 11:51:16 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
 2025-03-04 11:51:18 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
 2025-03-04 11:51:20 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [INFO]: RabbitMQ Connected
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:40:30 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-04 13:43:28 [INFO]: Redis Client Connected
+2025-03-04 13:43:28 [INFO]: RabbitMQ Connected
+2025-03-04 13:51:16 [INFO]: Redis Client Connected
+2025-03-04 13:51:16 [INFO]: RabbitMQ Connected
+2025-03-04 14:03:19 [INFO]: Redis Client Connected
+2025-03-04 14:03:19 [INFO]: RabbitMQ Connected
+2025-03-04 14:03:22 [INFO]: Redis Client Connected
+2025-03-04 14:03:22 [INFO]: RabbitMQ Connected
+2025-03-04 14:03:29 [INFO]: Redis Client Connected
+2025-03-04 14:03:29 [INFO]: RabbitMQ Connected
+2025-03-04 14:03:53 [INFO]: Redis Client Connected
+2025-03-04 14:03:53 [INFO]: RabbitMQ Connected
+2025-03-04 14:10:00 [INFO]: Redis Client Connected
+2025-03-04 14:10:00 [INFO]: RabbitMQ Connected
+2025-03-04 14:10:00 [INFO]: Shutting down...
+2025-03-04 14:10:10 [INFO]: Redis Client Connected
+2025-03-04 14:10:10 [INFO]: RabbitMQ Connected
+2025-03-04 14:11:04 [INFO]: Redis Client Connected
+2025-03-04 14:11:05 [INFO]: RabbitMQ Connected
+2025-03-04 14:11:45 [INFO]: Redis Client Connected
+2025-03-04 14:11:45 [INFO]: RabbitMQ Connected
+2025-03-04 14:12:42 [INFO]: Redis Client Connected
+2025-03-04 14:12:42 [INFO]: RabbitMQ Connected
+2025-03-04 14:14:45 [INFO]: Redis Client Connected
+2025-03-04 14:14:45 [INFO]: RabbitMQ Connected
+2025-03-04 14:14:49 [INFO]: Redis Client Connected
+2025-03-04 14:14:49 [INFO]: RabbitMQ Connected
+2025-03-04 14:16:18 [INFO]: Redis Client Connected
+2025-03-04 14:16:18 [INFO]: RabbitMQ Connected
+2025-03-04 14:18:47 [INFO]: Redis Client Connected
+2025-03-04 14:18:47 [INFO]: RabbitMQ Connected
+2025-03-04 14:18:50 [INFO]: Redis Client Connected
+2025-03-04 14:18:50 [INFO]: RabbitMQ Connected
+2025-03-04 14:21:34 [INFO]: Redis Client Connected
+2025-03-04 14:21:34 [INFO]: RabbitMQ Connected
+2025-03-04 14:21:42 [INFO]: Redis Client Connected
+2025-03-04 14:21:42 [INFO]: RabbitMQ Connected
+2025-03-04 14:21:46 [INFO]: Redis Client Connected
+2025-03-04 14:21:46 [INFO]: RabbitMQ Connected
+2025-03-04 14:21:50 [INFO]: Redis Client Connected
+2025-03-04 14:21:50 [INFO]: RabbitMQ Connected
+2025-03-04 14:22:26 [INFO]: Redis Client Connected
+2025-03-04 14:22:26 [INFO]: RabbitMQ Connected
+2025-03-04 14:23:02 [INFO]: Redis Client Connected
+2025-03-04 14:23:02 [INFO]: RabbitMQ Connected
+2025-03-04 14:26:56 [INFO]: Redis Client Connected
+2025-03-04 14:26:56 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:01 [INFO]: Redis Client Connected
+2025-03-04 14:27:01 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:07 [INFO]: Redis Client Connected
+2025-03-04 14:27:07 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:21 [INFO]: Redis Client Connected
+2025-03-04 14:27:21 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:27 [INFO]: Redis Client Connected
+2025-03-04 14:27:27 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:39 [INFO]: Redis Client Connected
+2025-03-04 14:27:39 [INFO]: RabbitMQ Connected
+2025-03-04 14:27:45 [INFO]: Redis Client Connected
+2025-03-04 14:27:45 [INFO]: RabbitMQ Connected
+2025-03-04 14:28:49 [INFO]: Message published to RabbitMQ
+2025-03-04 14:30:42 [INFO]: Redis Client Connected
+2025-03-04 14:30:42 [INFO]: RabbitMQ Connected
+2025-03-04 14:31:36 [INFO]: Redis Client Connected
+2025-03-04 14:31:36 [INFO]: RabbitMQ Connected
+2025-03-04 14:31:39 [INFO]: Redis Client Connected
+2025-03-04 14:31:39 [INFO]: RabbitMQ Connected
+2025-03-04 14:32:12 [INFO]: Redis Client Connected
+2025-03-04 14:32:12 [INFO]: RabbitMQ Connected
+2025-03-04 14:39:09 [INFO]: Redis Client Connected
+2025-03-04 14:39:10 [INFO]: RabbitMQ Connected
+2025-03-04 14:39:52 [INFO]: Message published to RabbitMQ
+2025-03-04 14:41:55 [INFO]: Consumer waiting for messages in client_operations queue
+2025-03-04 14:41:55 [INFO]: Processing message: CREATE for clientId: 16
+2025-03-04 14:41:55 [INFO]: Processing client creation for clientId: 16
+2025-03-04 14:41:56 [INFO]: Client creation processing completed for clientId: 16
+2025-03-04 14:41:56 [INFO]: Message processed successfully
+2025-03-04 14:41:56 [INFO]: Processing message: CREATE for clientId: 18
+2025-03-04 14:41:56 [INFO]: Processing client creation for clientId: 18
+2025-03-04 14:41:56 [INFO]: Client creation processing completed for clientId: 18
+2025-03-04 14:41:56 [INFO]: Message processed successfully
+2025-03-04 14:46:22 [INFO]: Consumer waiting for messages in client_operations queue
+2025-03-04 14:46:37 [ERROR]: Error publishing to RabbitMQ Channel closed
+2025-03-04 14:48:30 [ERROR]: Error publishing to RabbitMQ Channel closed
+2025-03-04 14:59:12 [INFO]: Redis Client Connected
+2025-03-04 14:59:12 [INFO]: RabbitMQ Connected
+2025-03-04 15:16:16 [INFO]: Redis Client Connected
+2025-03-04 15:16:16 [INFO]: RabbitMQ Connected
+2025-03-04 15:16:22 [INFO]: Redis Client Connected
+2025-03-04 15:16:22 [INFO]: RabbitMQ Connected
+2025-03-04 15:16:40 [INFO]: Redis Client Connected
+2025-03-04 15:16:40 [INFO]: RabbitMQ Connected

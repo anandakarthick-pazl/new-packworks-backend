@@ -6,12 +6,12 @@ const Address = sequelize.define(
   "Address",
   {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
     client_id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
         model: Client,
@@ -58,11 +58,12 @@ const Address = sequelize.define(
     },
   },
   {
+    tableName: 'addresses',
     timestamps: true,
   }
 );
 // Define the relationship
 Client.hasMany(Address, { foreignKey: "client_id", as: "addresses" });
-Address.belongsTo(Client, { foreignKey: "client_id", as: "client" });
+Address.belongsTo(Client, { foreignKey: "client_id", as: "clients" });
 
 export default Address;

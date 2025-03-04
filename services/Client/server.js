@@ -127,7 +127,7 @@ v1Router.post("/clients", async (req, res) => {
       data: {
         client: newClient,
         addresses: createdAddresses,
-      },
+      },  
     });
 
     res.status(201).json({

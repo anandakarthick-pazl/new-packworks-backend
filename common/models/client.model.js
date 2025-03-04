@@ -6,16 +6,16 @@
     "Client",
     {
       client_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true,
       },
       company_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         references: {
           model: Company,
-          key: "company_id",
+          key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
@@ -97,6 +97,7 @@
       },
     },
     {
+      tableName: 'clients',
       timestamps: false,
     }
   );
