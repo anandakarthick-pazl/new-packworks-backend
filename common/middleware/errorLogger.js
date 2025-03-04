@@ -7,8 +7,8 @@ export const logRequestResponse = async (req, res, next) => {
     const { method, url, body, headers, user } = req;
     const userId = user?.id || 1; // Provide a fallback userId
     const startTime = Date.now();
-    let logId;
-    requestBody = JSON.stringify(body);
+    var logId;
+    var requestBody = JSON.stringify(body);
     try {
         const log = await apiLog.create({
             userId,
@@ -23,7 +23,7 @@ export const logRequestResponse = async (req, res, next) => {
             statusCode: 200,
             requestHeaders: JSON.stringify(headers),
         });
-        logId = apiLog.id;
+        logId = log.id;
     } catch (error) {
         console.error('Failed to log request:', error);
     }

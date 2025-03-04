@@ -178,7 +178,7 @@ app.post("/login", authenticateStaticToken, validateLogin, async (req, res) => {
 });
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
-app.get("/health", authenticateStaticToken, (req, res) => {
+app.get("/health", (req, res) => {
     res.json({ status: "Service is running", timestamp: new Date() });
 });
 
