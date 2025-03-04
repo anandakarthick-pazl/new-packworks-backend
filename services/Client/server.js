@@ -6,82 +6,20 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import Redis from "ioredis";
-import amqp from "amqplib";
+
+// Import the Redis and RabbitMQ configurations
+import redisClient, { clearClientCache } from "../../common/helper/redis.js";
+import {
+  publishToQueue,
+  rabbitChannel,
+  closeRabbitMQConnection,
+} from "../../common/helper/rabbitmq.js";
 
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
-
-// Redis Configuration
-const redisClient = new Redis({
-  host: process.env.REDIS_HOST || "localhost",
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || "",
-});
-
-redisClient.on("error", (err) => {
-  logger.error("Redis Client Error", err);
-});
-
-redisClient.on("connect", () => {
-  logger.info("Redis Client Connected");
-});
-
-// RabbitMQ Configuration
-let rabbitChannel = null;
-const QUEUE_NAME = "client_operations";
-
-async function connectRabbitMQ() {
-  try {
-    const connection = await amqp.connect(
-      process.env.RABBITMQ_URL || "amqp://localhost"
-    );
-    rabbitChannel = await connection.createChannel();
-    await rabbitChannel.assertQueue(QUEUE_NAME, { durable: true });
-    logger.info("RabbitMQ Connected");
-  } catch (error) {
-    logger.error("RabbitMQ Connection Error", error);
-    setTimeout(connectRabbitMQ, 5000); // Retry after 5 seconds
-  }
-}
-
-connectRabbitMQ();
-
-// Helper function to publish message to RabbitMQ
-async function publishToQueue(message) {
-  try {
-    if (rabbitChannel) {
-      rabbitChannel.sendToQueue(
-        QUEUE_NAME,
-        Buffer.from(JSON.stringify(message)),
-        {
-          persistent: true,
-        }
-      );
-      logger.info("Message published to RabbitMQ");
-    } else {
-      logger.error("RabbitMQ channel not available");
-    }
-  } catch (error) {
-    logger.error("Error publishing to RabbitMQ", error);
-  }
-}
-
-// Helper function to clear Redis cache
-async function clearClientCache() {
-  try {
-    const keys = await redisClient.keys("client:*");
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-      logger.info("Client cache cleared");
-    }
-  } catch (error) {
-    logger.error("Error clearing Redis cache", error);
-  }
-}
 
 const v1Router = Router();
 
@@ -127,7 +65,7 @@ v1Router.post("/clients", async (req, res) => {
       data: {
         client: newClient,
         addresses: createdAddresses,
-      },  
+      },
     });
 
     res.status(201).json({
@@ -345,13 +283,11 @@ app.get("/health", (req, res) => {
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
 
-  // Close Redis connection
+  // Close Redis connection using the exported function
   await redisClient.quit();
 
-  // Close RabbitMQ connection
-  if (rabbitChannel) {
-    await rabbitChannel.close();
-  }
+  // Close RabbitMQ connection using the exported function
+  await closeRabbitMQConnection();
 
   process.exit(0);
 });
