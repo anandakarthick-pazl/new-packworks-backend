@@ -1,0 +1,10 @@
+2025-03-03 10:58:48 [ERROR]: Client Create Error: notNull Violation: Client.company_id cannot be null
+2025-03-03 12:27:40 [ERROR]: Client Fetch Error: Op is not defined
+2025-03-03 12:27:46 [ERROR]: Client Fetch Error: Op is not defined
+2025-03-03 12:29:04 [ERROR]: Client Fetch Error: Op is not defined
+2025-03-03 12:29:55 [ERROR]: Client Fetch Error: Op is not defined
+2025-03-03 17:52:00 [ERROR]: Client Fetch Error: Address is associated to Client using an alias. You've included an alias (addresses), but it does not match the alias(es) defined in your association (Addresses).
+2025-03-03 18:13:28 [ERROR]: Client Update Error: Validation error
+2025-03-03 18:13:59 [ERROR]: Client Update Error: Validation error
+2025-03-03 18:14:11 [ERROR]: Client Update Error: Validation error
+2025-03-03 18:15:04 [ERROR]: Client Update Error: Validation error
