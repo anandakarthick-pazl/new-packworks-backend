@@ -19,13 +19,13 @@ const app = express();
 app.use(json());
 app.use(cors());
 
-const v1Router = Router();
-v1Router.use(logRequestResponse)
+// const v1Router = Router();
+app.use(logRequestResponse)
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
 // 🔹 Create a Company (POST)
-v1Router.post("/register", validateRegister, authenticateJWT, async (req, res) => {
+app.post("/register", validateRegister, authenticateJWT, async (req, res) => {
     try {
         logger.info("🔵 Registering a new user : " + req.body);
         const { name, email, password, mobile } = req.body;
@@ -113,7 +113,7 @@ v1Router.post("/register", validateRegister, authenticateJWT, async (req, res) =
     }
 });
 
-v1Router.post("/login", authenticateStaticToken, validateLogin, async (req, res) => {
+app.post("/login", authenticateStaticToken, validateLogin, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -183,7 +183,7 @@ app.get("/health", authenticateStaticToken, (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/v1", v1Router);
+// app.use("/v1", v1Router);
 
 await db.sequelize.sync();
 const PORT = 3002;

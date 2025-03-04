@@ -17,14 +17,14 @@ const app = express();
 app.use(json());
 app.use(cors());
 
-const v1Router = Router();
+// const v1Router = Router();
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 // ✅ Secure all API routes with JWT middleware
-v1Router.use(authenticateStaticToken);
-v1Router.use(logRequestResponse)
+app.use(authenticateStaticToken);
+app.use(logRequestResponse)
 // 🔹 Create a Company (POST)
-v1Router.post("/companies", validateCompany, async (req, res) => {
+app.post("/companies", validateCompany, async (req, res) => {
     const transaction = await sequelize.transaction(); // Start a transaction
 
     try {
@@ -111,7 +111,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
 });
 
 // 🔹 Get All Companies (GET)
-v1Router.get("/companies", async (req, res) => {
+app.get("/companies", async (req, res) => {
     try {
         const companies = await Company.findAll();
         return res.status(200).json({
@@ -142,7 +142,7 @@ v1Router.get("/companies", async (req, res) => {
 });
 
 // 🔹 Get a Single Company by ID (GET)
-v1Router.get("/companies/:id", async (req, res) => {
+app.get("/companies/:id", async (req, res) => {
     try {
         const company = await Company.findByPk(req.params.id);
         if (!company) {
@@ -182,7 +182,7 @@ v1Router.get("/companies/:id", async (req, res) => {
 });
 
 // 🔹 Update a Company (PUT)
-v1Router.put("/companies/:id", validateCompany, async (req, res) => {
+app.put("/companies/:id", validateCompany, async (req, res) => {
     try {
         const company = await Company.findByPk(req.params.id);
         if (!company) {
@@ -225,7 +225,7 @@ v1Router.put("/companies/:id", validateCompany, async (req, res) => {
 });
 
 // 🔹 Delete a Company (DELETE)
-v1Router.delete("/companies/:id", async (req, res) => {
+app.delete("/companies/:id", async (req, res) => {
     try {
         const company = await Company.findByPk(req.params.id);
         if (!company) {
@@ -263,7 +263,7 @@ app.get("/health", authenticateStaticToken, (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/v1", v1Router);
+// app.use("/v1", v1Router);
 
 await db.sequelize.sync();
 const PORT = 3001;
