@@ -20,7 +20,7 @@ app.use(json());
 app.use(cors());
 
 const v1Router = Router();
-v1Router.use(logRequestResponse)
+app.use(logRequestResponse)
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
@@ -178,12 +178,12 @@ v1Router.post("/login", authenticateStaticToken, validateLogin, async (req, res)
 });
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
-app.get("/health", authenticateStaticToken, (req, res) => {
+v1Router.get("/health", (req, res) => {
     res.json({ status: "Service is running", timestamp: new Date() });
 });
 
 // Use Version 1 Router
-app.use("/v1", v1Router);
+app.use("/api", v1Router);
 
 await db.sequelize.sync();
 const PORT = 3002;

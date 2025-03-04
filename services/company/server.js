@@ -21,8 +21,8 @@ const v1Router = Router();
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 // ✅ Secure all API routes with JWT middleware
-v1Router.use(authenticateStaticToken);
-v1Router.use(logRequestResponse)
+app.use(authenticateStaticToken);
+app.use(logRequestResponse)
 // 🔹 Create a Company (POST)
 v1Router.post("/companies", validateCompany, async (req, res) => {
     const transaction = await sequelize.transaction(); // Start a transaction
@@ -258,12 +258,12 @@ v1Router.delete("/companies/:id", async (req, res) => {
 });
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
-app.get("/health", authenticateStaticToken, (req, res) => {
+v1Router.get("/health", authenticateStaticToken, (req, res) => {
     res.json({ status: "Service is running", timestamp: new Date() });
 });
 
 // Use Version 1 Router
-app.use("/v1", v1Router);
+app.use("/api", v1Router);
 
 await db.sequelize.sync();
 const PORT = 3001;

@@ -1,28 +1,28 @@
 module.exports = {
-  apps: [
-    {
-      name: "Company-Service",
-      script: "node services/company/server.js",
-      watch: false,
-      env: {
-        PORT: 3001,
-      },
-    },
-    {
-      name: "User-Service",
-      script: "node services/user-service/server.js",
-      watch: false,
-      env: {
-        PORT: 3002,
-      },
-    },
-    {
-      name: "Client-Service",
-      script: "node services/Client/server.js",
-      watch: false,
-      env: {
-        PORT: 3003,
-      },
-    },
-  ],
+    apps: [
+        {
+            name: "Company-Service",
+            script: "./services/company/server.js",  // ✅ Corrected path
+            watch: false,
+            env: {
+                PORT: 3001
+            },
+        },
+        {
+            name: "User-Service",
+            script: "./services/user-service/server.js",  // ✅ Corrected path
+            watch: false,
+            env: {
+                PORT: 3002
+            },
+        },
+        {
+          name: "Client-Service",
+          script: "./services/client/server.js",  // ✅ Corrected path
+          watch: false,
+          env: {
+              PORT: 3002
+          },
+      }
+    ]
 };
