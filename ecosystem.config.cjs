@@ -2,7 +2,7 @@ module.exports = {
     apps: [
         {
             name: "Company-Service",
-            script: "node services/company/server.js",
+            script: "./services/company/server.js",  // ✅ Corrected path
             watch: false,
             env: {
                 PORT: 3001
@@ -10,7 +10,7 @@ module.exports = {
         },
         {
             name: "User-Service",
-            script: "node services/user-service/server.js",
+            script: "./services/user-service/server.js",  // ✅ Corrected path
             watch: false,
             env: {
                 PORT: 3002
