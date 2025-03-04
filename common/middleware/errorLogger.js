@@ -8,7 +8,7 @@ export const logRequestResponse = async (req, res, next) => {
     const userId = user?.id || 1; // Provide a fallback userId
     const startTime = Date.now();
     var logId;
-    var requestBody = JSON.stringify(body);
+    var requestBody = JSON.stringify(body) || '';
     try {
         const log = await apiLog.create({
             userId,
@@ -45,7 +45,7 @@ export const logRequestResponse = async (req, res, next) => {
 
             if (res.statusCode === 500) {
                 await sendEmail(process.env.ERROR_EMAIL, `${process.env.APP_Name} Application Error Notification`, `An error occurred in the application:\n\nUser: ${userId}\nMethod: ${method}\nURL: ${url}\nResponse: ${data}`);
-               
+
             }
         } catch (error) {
             console.error('Failed to update response log:', error);
