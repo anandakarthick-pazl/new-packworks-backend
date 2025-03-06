@@ -20,6 +20,10 @@
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+      client_ref_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
       customer_type: {
         type: DataTypes.ENUM("Business", "Individual"),
         allowNull: false,
@@ -94,6 +98,14 @@
       },
       facebook: {
         type: DataTypes.STRING,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
       },
     },
     {

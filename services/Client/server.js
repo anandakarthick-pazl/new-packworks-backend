@@ -1,7 +1,6 @@
 import express, { json, Router } from "express";
 import cors from "cors";
 import db from "../../common/models/index.js";
-import { authenticateJWT } from "../../common/middleware/auth.js";
 import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
@@ -14,6 +13,7 @@ import {
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
+import { validateClient } from "../../common/inputvalidation/validationClient.js";
 
 dotenv.config();
 
@@ -82,7 +82,7 @@ v1Router.post("/clients", async (req, res) => {
 });
 
 // 🔹 Get All Clients (GET) with Addresses
-v1Router.get("/clients", authenticateJWT, async (req, res) => {
+v1Router.get("/clients", async (req, res) => {
   try {
     let { page = 1, limit = 10, search } = req.query;
     page = parseInt(page);
@@ -136,7 +136,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get a Single Client by ID with Addresses (GET)
-v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/clients/:id", async (req, res) => {
   try {
     const clientId = req.params.id;
     const cacheKey = `client:${clientId}`;
@@ -171,7 +171,7 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Update a Client and Addresses (PUT)
-v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/clients/:id", async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
@@ -193,9 +193,11 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
       fields: Object.keys(clientData),
     });
 
+    let updatedAddresses = [];
+
     // Handle Addresses
     if (addresses && addresses.length > 0) {
-      await Promise.all(
+      updatedAddresses = await Promise.all(
         addresses.map(async (address) => {
           if (address.address_id) {
             // Update existing address
@@ -203,9 +205,12 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
               where: { address_id: address.address_id },
               transaction: t,
             });
+            return await Address.findByPk(address.address_id, {
+              transaction: t,
+            });
           } else {
             // Create new address
-            await Address.create(
+            return await Address.create(
               { ...address, client_id: client.client_id },
               { transaction: t }
             );
@@ -222,7 +227,8 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
     return res.status(200).json({
       status: true,
       message: "Client and Addresses updated successfully",
-      data: client,
+      client: client,
+      addresses: updatedAddresses,
     });
   } catch (error) {
     await t.rollback();
@@ -232,7 +238,7 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Delete a Client and Its Addresses (DELETE)
-v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/clients/:id", async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const clientId = req.params.id;

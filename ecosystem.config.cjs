@@ -23,6 +23,14 @@ module.exports = {
           env: {
               PORT: 3002
           },
-      }
+      },
+      {
+        name: "Sku-Service",
+        script: "./services/sku/server.js",  // ✅ Corrected path
+        watch: false,
+        env: {
+            PORT: 3003
+        },
+    },
     ]
 };
