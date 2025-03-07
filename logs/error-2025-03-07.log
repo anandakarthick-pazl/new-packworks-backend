@@ -1,0 +1,29 @@
+2025-03-07 11:50:10 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:10 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:10 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:10 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:10 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:11 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:11 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:11 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:12 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:12 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:13 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:13 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:14 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:14 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:15 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:16 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:17 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:18 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:18 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:19 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:20 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:21 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:23 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 11:50:24 [ERROR]: Redis Client Error connect ECONNREFUSED 127.0.0.1:6379
+2025-03-07 17:44:59 [ERROR]: Error deleting sales order: WorkOrder is associated to SalesOrder using an alias. You've included an alias (workOrders), but it does not match the alias(es) defined in your association (WorkOrders).
+2025-03-07 17:56:36 [ERROR]: Error creating sales order: sku is not defined
+2025-03-07 17:57:50 [ERROR]: Error fetching sales orders: Unknown column 'SalesOrder.createdAt' in 'order clause'
+2025-03-07 17:58:16 [ERROR]: Error fetching sales orders: Unknown column 'SalesOrder.createdAt' in 'order clause'
+2025-03-07 18:07:19 [ERROR]: Error fetching sales orders: Unknown column 'workOrders.created_at' in 'field list'

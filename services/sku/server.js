@@ -11,6 +11,7 @@ import {
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
+import { cli } from "winston/lib/winston/config/index.js";
 
 dotenv.config();
 
@@ -45,25 +46,118 @@ v1Router.post("/skuDetails", async (req, res) => {
 });
 
 // 🔹 Get All SKUs (GET)
+// 🔹 Get All SKUs with Multi-field Search and Pagination (GET)
+// 🔹 Get All SKUs with Multi-field Search, Pagination and Redis Caching (GET)
 v1Router.get("/skuDetails", async (req, res) => {
   try {
-    const skus = await Sku.findAll();
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      sku_name,
+      client,
+      ply,
+    } = req.query;
+
+    // Create a cache key based on the query parameters
+    const cacheKey = `skuDetails_${page}_${limit}_${search}_${sku_name || ""}_${
+      client || ""
+    }_${ply || ""}`;
+
+    // Try to get data from Redis cache first
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      logger.info(`Cache hit for ${cacheKey}`);
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
+    logger.info(`Cache miss for ${cacheKey}`);
+    const offset = (page - 1) * limit;
+
+    // Build the where condition for search
+    let whereCondition = {};
+
+    // Handle specific field searches if provided
+    if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+    if (client) whereCondition.client = { [Op.like]: `%${client}%` };
+    if (ply)
+      whereCondition.ply = { [Op.like]: `%${ply}%` };
+
+    // Handle generic search across multiple fields if no specific fields are provided
+    if (search && Object.keys(whereCondition).length === 0) {
+      whereCondition = {
+        [Op.or]: [
+          { sku_name: { [Op.like]: `%${search}%` } },
+          { client: { [Op.like]: `%${search}%` } },
+          { ply: { [Op.like]: `%${search}%` } },
+        ],
+      };
+    }
+
+    // Get total count for pagination metadata
+    const totalCount = await Sku.count({
+      where: whereCondition,
+    });
+
+    // Fetch skus with pagination and search
+    const skus = await Sku.findAll({
+      where: whereCondition,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
 
     // Ensure sku_values is parsed as JSON
     const formattedSkus = skus.map((sku) => ({
       ...sku.toJSON(),
-      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null, // Fix JSON parsing
+      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
     }));
 
-    res.status(200).json(formattedSkus);
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const responseData = {
+      data: formattedSkus,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: parseInt(page),
+        pageSize: parseInt(limit),
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    };
+
+    // Store the result in Redis cache with expiration time (e.g., 1 hour)
+    await redisClient.set(cacheKey, JSON.stringify(responseData), {
+      EX: 3600, // Cache expiry time in seconds (1 hour)
+    });
+
+    res.status(200).json(responseData);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    logger.error("Error fetching SKUs:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
-// 🔹 Get SKU by ID (GET)
+// 🔹 Get SKU by ID with Redis caching (GET)
 v1Router.get("/skuDetails/:id", async (req, res) => {
   try {
+    const cacheKey = `skuDetail_${req.params.id}`;
+
+    // Try to get data from Redis cache first
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      logger.info(`Cache hit for ${cacheKey}`);
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
+    logger.info(`Cache miss for ${cacheKey}`);
+
     const sku = await Sku.findByPk(req.params.id);
 
     if (!sku) {
@@ -76,9 +170,18 @@ v1Router.get("/skuDetails/:id", async (req, res) => {
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
     };
 
+    // Store in Redis cache
+    await redisClient.set(cacheKey, JSON.stringify(formattedSku), {
+      EX: 3600, // Cache expiry time in seconds (1 hour)
+    });
+
     res.status(200).json(formattedSku);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    logger.error("Error fetching SKU by ID:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -166,7 +269,7 @@ process.on("SIGINT", async () => {
 // Use Version 1 Router
 app.use("/v1", v1Router);
 await db.sequelize.sync();
-const PORT = 3004;
+const PORT = 3003;
 app.listen(PORT, () => {
   console.log(`SKU Service running on port ${PORT}`);
 });
