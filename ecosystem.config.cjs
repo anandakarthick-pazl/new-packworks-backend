@@ -21,7 +21,7 @@ module.exports = {
       script: "./services/client/server.js", // ✅ Corrected path
       watch: false,
       env: {
-        PORT: 3002,
+        PORT: 3003,
       },
     },
     {
@@ -29,7 +29,7 @@ module.exports = {
       script: "./services/sku/server.js", // ✅ Corrected path
       watch: false,
       env: {
-        PORT: 3003,
+        PORT: 3004,
       },
     },
     {
@@ -37,7 +37,15 @@ module.exports = {
       script: "./services/salesOrder/server.js", // ✅ Corrected path
       watch: false,
       env: {
-        PORT: 3004,
+        PORT: 3005,
+      },
+    },
+    {
+      name: "WorkOrder-Service",
+      script: "./services/workOrder/server.js", // ✅ Corrected path
+      watch: false,
+      env: {
+        PORT: 3006,
       },
     },
   ],

@@ -10,7 +10,8 @@
     "user": "nodemon services/user-service/server.js",
     "client": "nodemon services/Client/server.js",
     "sku": "nodemon services/sku/server.js",
-    "sales": "nodemon services/salesOrder/server.js"
+    "sales": "nodemon services/salesOrder/server.js",
+    "work": "nodemon services/workOrder/server.js"
   },
   "keywords": [],
   "author": "",

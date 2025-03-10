@@ -12,6 +12,7 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { cli } from "winston/lib/winston/config/index.js";
+import { authenticateJWT } from "../../common/middleware/auth.js";
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ const Sku = db.Sku;
 const SkuType = db.SkuType;
 
 // 🔹 Create a SKU (POST)
-v1Router.post("/skuDetails", async (req, res) => {
+v1Router.post("/skuDetails",authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const newSku = await Sku.create(req.body, { transaction: t });
@@ -48,7 +49,7 @@ v1Router.post("/skuDetails", async (req, res) => {
 // 🔹 Get All SKUs (GET)
 // 🔹 Get All SKUs with Multi-field Search and Pagination (GET)
 // 🔹 Get All SKUs with Multi-field Search, Pagination and Redis Caching (GET)
-v1Router.get("/skuDetails", async (req, res) => {
+v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
@@ -144,7 +145,7 @@ v1Router.get("/skuDetails", async (req, res) => {
 });
 
 // 🔹 Get SKU by ID with Redis caching (GET)
-v1Router.get("/skuDetails/:id", async (req, res) => {
+v1Router.get("/skuDetails/:id",authenticateJWT, async (req, res) => {
   try {
     const cacheKey = `skuDetail_${req.params.id}`;
 
@@ -186,7 +187,7 @@ v1Router.get("/skuDetails/:id", async (req, res) => {
 });
 
 // 🔹 Update SKU (PUT)
-v1Router.put("/skuDetails/:id", async (req, res) => {
+v1Router.put("/skuDetails/:id",authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const updatedSku = await Sku.update(req.body, {
@@ -213,7 +214,7 @@ v1Router.put("/skuDetails/:id", async (req, res) => {
 });
 
 // 🔹 Delete SKU (DELETE)
-v1Router.delete("/skuDetails/:id", async (req, res) => {
+v1Router.delete("/skuDetails/:id",authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const deletedSku = await Sku.destroy({
@@ -239,7 +240,7 @@ v1Router.delete("/skuDetails/:id", async (req, res) => {
 
 // sku type
 
-v1Router.get("/skuType", async (req, res) => {
+v1Router.get("/skuType", authenticateJWT,async (req, res) => {
   try {
     const skuTypes = await SkuType.findAll();
     res.status(200).json(skuTypes);
@@ -269,7 +270,7 @@ process.on("SIGINT", async () => {
 // Use Version 1 Router
 app.use("/v1", v1Router);
 await db.sequelize.sync();
-const PORT = 3003;
+const PORT = 3004;
 app.listen(PORT, () => {
   console.log(`SKU Service running on port ${PORT}`);
 });

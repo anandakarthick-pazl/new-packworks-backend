@@ -11,6 +11,7 @@ import {
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
+import { authenticateJWT } from "../../common/middleware/auth.js";
 
 dotenv.config();
 
@@ -37,7 +38,7 @@ const QUEUES = {
 };
 
 // POST create new sales order - enhanced to return all data
-v1Router.post("/salesOrder", async (req, res) => {
+v1Router.post("/salesOrder",authenticateJWT, async (req, res) => {
   const { salesDetails, workDetails } = req.body;
 
   if (!salesDetails || !workDetails || !Array.isArray(workDetails)) {
@@ -50,6 +51,8 @@ v1Router.post("/salesOrder", async (req, res) => {
     // Create Sales Order
     const newSalesOrder = await SalesOrder.create(
       {
+        company_id: salesDetails.company_id,
+        client_id: salesDetails.client_id,
         estimated: salesDetails.estimated,
         client: salesDetails.client,
         credit_period: salesDetails.credit_period,
@@ -62,6 +65,8 @@ v1Router.post("/salesOrder", async (req, res) => {
 
     // Insert Work Orders
     const workOrders = workDetails.map((work) => ({
+      company_id: work.company_id,
+      client_id: work.client_id,
       sales_order_id: newSalesOrder.id,
       manufacture: work.manufacture,
       sku_name: work.sku_name || null,
@@ -110,7 +115,7 @@ v1Router.post("/salesOrder", async (req, res) => {
 });
 
 // GET all sales orders with pagination and filtering
-v1Router.get("/salesOrder", async (req, res) => {
+v1Router.get("/salesOrder",authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, client, confirmation } = req.query;
     const offset = (page - 1) * limit;
@@ -142,7 +147,7 @@ v1Router.get("/salesOrder", async (req, res) => {
           as: "workOrders",
         },
       ],
-      // order: [["created_at", "DESC"]], 
+      // order: [["created_at", "DESC"]],
     });
 
     // Transform data
@@ -184,7 +189,7 @@ v1Router.get("/salesOrder", async (req, res) => {
 });
 
 // GET single sales order by ID
-v1Router.get("/salesOrder/:id", async (req, res) => {
+v1Router.get("/salesOrder/:id",authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -228,7 +233,7 @@ v1Router.get("/salesOrder/:id", async (req, res) => {
 });
 
 // PUT update existing sales order
-v1Router.put("/salesOrder/:id", async (req, res) => {
+v1Router.put("/salesOrder/:id",authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { salesDetails, workDetails } = req.body;
 
@@ -250,6 +255,8 @@ v1Router.put("/salesOrder/:id", async (req, res) => {
     // Update Sales Order
     await salesOrder.update(
       {
+        company_id: salesDetails.company_id,
+        client_id: salesDetails.client_id,
         estimated: salesDetails.estimated,
         client: salesDetails.client,
         credit_period: salesDetails.credit_period,
@@ -269,6 +276,8 @@ v1Router.put("/salesOrder/:id", async (req, res) => {
     // Insert new Work Orders
     const workOrders = workDetails.map((work) => ({
       sales_order_id: id,
+      company_id: work.company_id,
+      client_id: work.client_id,
       manufacture: work.manufacture,
       sku_name: work.sku_name || null,
       sku_version: work.sku_version || null,
@@ -317,7 +326,7 @@ v1Router.put("/salesOrder/:id", async (req, res) => {
 });
 
 // DELETE sales order
-v1Router.delete("/salesOrder/:id", async (req, res) => {
+v1Router.delete("/salesOrder/:id",authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const transaction = await SalesOrder.sequelize.transaction();
 
@@ -390,7 +399,7 @@ process.on("SIGINT", async () => {
 // Use Version 1 Router
 app.use("/v1", v1Router);
 await db.sequelize.sync();
-const PORT = 3004;
+const PORT = 3005;
 app.listen(PORT, () => {
   console.log(`Sales order Service running on port ${PORT}`);
 });

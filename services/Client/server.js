@@ -14,6 +14,7 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { validateClient } from "../../common/inputvalidation/validationClient.js";
+import { authenticateJWT } from "../../common/middleware/auth.js";
 
 dotenv.config();
 
@@ -27,7 +28,7 @@ const Client = db.Client;
 const Address = db.ClientAddress;
 
 // 🔹 Create a Client (POST)
-v1Router.post("/clients", async (req, res) => {
+v1Router.post("/clients", authenticateJWT,async (req, res) => {
   const t = await sequelize.transaction(); // Start transaction
 
   try {
@@ -82,7 +83,7 @@ v1Router.post("/clients", async (req, res) => {
 });
 
 // 🔹 Get All Clients (GET) with Addresses
-v1Router.get("/clients", async (req, res) => {
+v1Router.get("/clients",authenticateJWT, async (req, res) => {
   try {
     let { page = 1, limit = 10, search } = req.query;
     page = parseInt(page);
@@ -136,7 +137,7 @@ v1Router.get("/clients", async (req, res) => {
 });
 
 // 🔹 Get a Single Client by ID with Addresses (GET)
-v1Router.get("/clients/:id", async (req, res) => {
+v1Router.get("/clients/:id",authenticateJWT, async (req, res) => {
   try {
     const clientId = req.params.id;
     const cacheKey = `client:${clientId}`;
@@ -238,7 +239,7 @@ v1Router.put("/clients/:id", async (req, res) => {
 });
 
 // 🔹 Delete a Client and Its Addresses (DELETE)
-v1Router.delete("/clients/:id", async (req, res) => {
+v1Router.delete("/clients/:id",authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const clientId = req.params.id;

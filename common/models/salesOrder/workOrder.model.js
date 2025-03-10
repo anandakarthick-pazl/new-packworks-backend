@@ -1,6 +1,8 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import SalesOrder from "./salesOrder.model.js";
+import Company from "../company.model.js";
+import Client from "../client.model.js";
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -16,6 +18,26 @@ const WorkOrder = sequelize.define(
       references: {
         model: SalesOrder,
         key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
+    },
+    company_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
+    },
+    client_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Client,
+        key: "client_id",
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
@@ -78,10 +100,12 @@ const WorkOrder = sequelize.define(
 );
 
 SalesOrder.hasMany(WorkOrder, {
-  foreignKey: "sales_order_id", as: "workOrders"
+  foreignKey: "sales_order_id",
+  as: "workOrders",
 });
 WorkOrder.belongsTo(SalesOrder, {
-  foreignKey: "sales_order_id", as: "salesOrder"
+  foreignKey: "sales_order_id",
+  as: "salesOrder",
 });
 
 export default WorkOrder;
