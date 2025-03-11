@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-logs/
-=======
 .env
->>>>>>> fbfcf1abaa64cac72f51c05133b605cbc7266e54
+logs/
+node_modules/
