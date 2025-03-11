@@ -1,0 +1,76 @@
+2025-03-06 15:45:20 [INFO]: Redis Client Connected
+2025-03-06 15:45:20 [INFO]: RabbitMQ Connected
+2025-03-06 17:06:31 [INFO]: Redis Client Connected
+2025-03-06 17:06:31 [INFO]: RabbitMQ Connected
+2025-03-06 17:10:51 [INFO]: Redis Client Connected
+2025-03-06 17:10:51 [INFO]: RabbitMQ Connected
+2025-03-06 17:11:35 [INFO]: Redis Client Connected
+2025-03-06 17:11:35 [INFO]: RabbitMQ Connected
+2025-03-06 17:11:43 [INFO]: Redis Client Connected
+2025-03-06 17:11:43 [INFO]: RabbitMQ Connected
+2025-03-06 17:11:44 [INFO]: Redis Client Connected
+2025-03-06 17:11:44 [INFO]: RabbitMQ Connected
+2025-03-06 17:11:48 [INFO]: Redis Client Connected
+2025-03-06 17:11:48 [INFO]: RabbitMQ Connected
+2025-03-06 17:12:09 [INFO]: Redis Client Connected
+2025-03-06 17:12:09 [INFO]: RabbitMQ Connected
+2025-03-06 17:12:18 [INFO]: Redis Client Connected
+2025-03-06 17:12:18 [INFO]: RabbitMQ Connected
+2025-03-06 17:12:30 [INFO]: Redis Client Connected
+2025-03-06 17:12:30 [INFO]: RabbitMQ Connected
+2025-03-06 17:12:34 [INFO]: Redis Client Connected
+2025-03-06 17:12:34 [INFO]: RabbitMQ Connected
+2025-03-06 17:12:35 [INFO]: Redis Client Connected
+2025-03-06 17:12:35 [INFO]: RabbitMQ Connected
+2025-03-06 17:13:34 [INFO]: Redis Client Connected
+2025-03-06 17:13:34 [INFO]: RabbitMQ Connected
+2025-03-06 17:13:36 [INFO]: Redis Client Connected
+2025-03-06 17:13:36 [INFO]: RabbitMQ Connected
+2025-03-06 17:14:59 [INFO]: Redis Client Connected
+2025-03-06 17:14:59 [INFO]: RabbitMQ Connected
+2025-03-06 17:18:00 [INFO]: Redis Client Connected
+2025-03-06 17:18:00 [INFO]: RabbitMQ Connected
+2025-03-06 17:18:23 [INFO]: Redis Client Connected
+2025-03-06 17:18:23 [INFO]: RabbitMQ Connected
+2025-03-06 17:18:31 [INFO]: Cache miss for skuDetails_1_5_Test SKU___
+2025-03-06 17:18:31 [ERROR]: Error fetching SKUs: Unknown column 'SKU.sku_code' in 'where clause'
+2025-03-06 17:19:03 [INFO]: Redis Client Connected
+2025-03-06 17:19:03 [INFO]: RabbitMQ Connected
+2025-03-06 17:19:06 [INFO]: Redis Client Connected
+2025-03-06 17:19:06 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:28 [INFO]: Redis Client Connected
+2025-03-06 17:20:28 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:29 [INFO]: Redis Client Connected
+2025-03-06 17:20:29 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:35 [INFO]: Redis Client Connected
+2025-03-06 17:20:35 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:37 [INFO]: Redis Client Connected
+2025-03-06 17:20:37 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:44 [INFO]: Redis Client Connected
+2025-03-06 17:20:44 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:49 [INFO]: Redis Client Connected
+2025-03-06 17:20:49 [INFO]: RabbitMQ Connected
+2025-03-06 17:20:52 [INFO]: Redis Client Connected
+2025-03-06 17:20:52 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:23 [INFO]: Redis Client Connected
+2025-03-06 17:21:24 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:31 [INFO]: Redis Client Connected
+2025-03-06 17:21:31 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:42 [INFO]: Redis Client Connected
+2025-03-06 17:21:42 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:45 [INFO]: Redis Client Connected
+2025-03-06 17:21:45 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:48 [INFO]: Redis Client Connected
+2025-03-06 17:21:48 [INFO]: RabbitMQ Connected
+2025-03-06 17:21:56 [INFO]: Redis Client Connected
+2025-03-06 17:21:56 [INFO]: RabbitMQ Connected
+2025-03-06 17:22:15 [INFO]: Cache miss for skuDetails_1_5_Test SKU___
+2025-03-06 17:22:15 [ERROR]: Error fetching SKUs: ERR syntax error
+2025-03-06 17:22:55 [INFO]: Cache miss for skuDetail_1
+2025-03-06 17:22:55 [ERROR]: Error fetching SKU by ID: ERR syntax error
+2025-03-06 17:23:22 [INFO]: Cache miss for skuDetail_1
+2025-03-06 17:23:22 [ERROR]: Error fetching SKU by ID: ERR syntax error
+2025-03-06 17:24:05 [INFO]: Redis Client Connected
+2025-03-06 17:24:05 [INFO]: RabbitMQ Connected
+2025-03-06 18:05:13 [INFO]: Redis Client Connected
+2025-03-06 18:05:13 [INFO]: RabbitMQ Connected

@@ -1,0 +1,16 @@
+2025-03-10 14:08:05 [ERROR]: Error creating sales order: notNull Violation: SalesOrder.company_id cannot be null,
+notNull Violation: SalesOrder.client_id cannot be null
+2025-03-10 14:13:47 [ERROR]: Error creating sales order: notNull Violation: SalesOrder.company_id cannot be null,
+notNull Violation: SalesOrder.client_id cannot be null
+2025-03-10 14:14:52 [ERROR]: Error creating sales order: notNull Violation: SalesOrder.company_id cannot be null,
+notNull Violation: SalesOrder.client_id cannot be null
+2025-03-10 14:18:39 [ERROR]: Error creating sales order: notNull Violation: SalesOrder.company_id cannot be null,
+notNull Violation: SalesOrder.client_id cannot be null
+2025-03-10 14:20:49 [ERROR]: Error creating sales order: notNull Violation: SalesOrder.company_id cannot be null,
+notNull Violation: SalesOrder.client_id cannot be null
+2025-03-10 15:17:26 [ERROR]: Error creating work order: Cannot add or update a child row: a foreign key constraint fails (`packworks`.`work_order`, CONSTRAINT `work_order_ibfk_1` FOREIGN KEY (`sales_order_id`) REFERENCES `sales_order` (`id`) ON DELETE CASCADE)
+2025-03-10 15:18:31 [ERROR]: Error creating work order: CACHE_KEYS is not defined
+2025-03-10 17:00:49 [ERROR]: Error creating work order: notNull Violation: WorkOrder.sales_order_id cannot be null,
+notNull Violation: WorkOrder.company_id cannot be null,
+notNull Violation: WorkOrder.client_id cannot be null,
+notNull Violation: WorkOrder.manufacture cannot be null

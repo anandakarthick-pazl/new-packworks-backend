@@ -1,4 +1,4 @@
-import { Sequelize, DataTypes } from 'sequelize';
+import { DataTypes } from 'sequelize';
 import  sequelize from '../database/database.js';
 import Company from './company.model.js';
 
