@@ -18,7 +18,7 @@ module.exports = {
     },
     {
       name: "Client-Service",
-      script: "./services/client/server.js", // ✅ Corrected path
+      script: "./services/Client/server.js", // ✅ Corrected path
       watch: false,
       env: {
         PORT: 3003,
