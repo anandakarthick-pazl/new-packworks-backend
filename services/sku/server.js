@@ -46,9 +46,6 @@ v1Router.post("/skuDetails",authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Get All SKUs (GET)
-// 🔹 Get All SKUs with Multi-field Search and Pagination (GET)
-// 🔹 Get All SKUs with Multi-field Search, Pagination and Redis Caching (GET)
 v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
   try {
     const {
@@ -268,7 +265,7 @@ process.on("SIGINT", async () => {
 });
 
 // Use Version 1 Router
-app.use("/v1", v1Router);
+app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3004;
 app.listen(PORT, () => {
