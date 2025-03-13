@@ -2,6 +2,7 @@ import { DataTypes, Sequelize } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
+import User from "../user.model.js";
 
 const Sku = sequelize.define(
   "SKU",
@@ -59,6 +60,27 @@ const Sku = sequelize.define(
       type: Sequelize.JSON, // or Sequelize.JSONB
       allowNull: true,
     },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "sku",
@@ -71,5 +93,10 @@ Sku.belongsTo(Company, { foreignKey: "company_id" });
 
 Client.hasMany(Sku, { foreignKey: "client_id" });
 Sku.belongsTo(Client, { foreignKey: "client_id" });
+
+User.hasMany(Sku, { foreignKey: "created_by" });
+User.hasMany(Sku, { foreignKey: "updated_by" });
+Sku.belongsTo(User, { foreignKey: "created_by" });
+Sku.belongsTo(User, { foreignKey: "updated_by" });
 
 export default Sku;

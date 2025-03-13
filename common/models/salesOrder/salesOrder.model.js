@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
+import User from "../user.model.js";
 
 // OrderDetails Model
 const SalesOrder = sequelize.define(
@@ -66,12 +67,38 @@ const SalesOrder = sequelize.define(
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "sales_order",
     timestamps: false,
   }
 );
+
+User.hasMany(SalesOrder, { foreignKey: "created_by" });
+User.hasMany(SalesOrder, { foreignKey: "updated_by" });
+SalesOrder.belongsTo(User, { foreignKey: "created_by" });
+SalesOrder.belongsTo(User, { foreignKey: "updated_by" });
 
 
 export default SalesOrder;

@@ -1,6 +1,7 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
+import User from "../user.model.js";
 
 const SkuType = sequelize.define(
   "SkuType",
@@ -32,6 +33,27 @@ const SkuType = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "sku_type",
@@ -42,5 +64,10 @@ const SkuType = sequelize.define(
 // Correcting the association
 Company.hasMany(SkuType, { foreignKey: "company_id" });
 SkuType.belongsTo(Company, { foreignKey: "company_id" });
+
+User.hasMany(SkuType, { foreignKey: "created_by" });
+User.hasMany(SkuType, { foreignKey: "updated_by" });
+SkuType.belongsTo(User, { foreignKey: "created_by" });
+SkuType.belongsTo(User, { foreignKey: "updated_by" });
 
 export default SkuType;

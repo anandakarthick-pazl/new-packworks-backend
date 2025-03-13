@@ -48,5 +48,13 @@ module.exports = {
         PORT: 3006,
       },
     },
+    {
+      name: "machine-Service",
+      script: "./services/machine/server.js", // ✅ Corrected path
+      watch: false,
+      env: {
+        PORT: 3007,
+      },
+    },
   ],
 };

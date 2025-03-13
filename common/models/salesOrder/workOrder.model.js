@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import SalesOrder from "./salesOrder.model.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
+import User from "../user.model.js";
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -92,6 +93,27 @@ const WorkOrder = sequelize.define(
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "work_order",
@@ -107,5 +129,16 @@ WorkOrder.belongsTo(SalesOrder, {
   foreignKey: "sales_order_id",
   as: "salesOrder",
 });
+
+Company.hasMany(WorkOrder, { foreignKey: "company_id" });
+WorkOrder.belongsTo(Company, { foreignKey: "company_id" });
+
+Client.hasMany(WorkOrder, { foreignKey: "client_id" });
+WorkOrder.belongsTo(Client, { foreignKey: "client_id" });
+
+User.hasMany(WorkOrder, { foreignKey: "created_by" });
+User.hasMany(WorkOrder, { foreignKey: "updated_by" });
+WorkOrder.belongsTo(User, { foreignKey: "created_by" });
+WorkOrder.belongsTo(User, { foreignKey: "updated_by" });
 
 export default WorkOrder;

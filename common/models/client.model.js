@@ -1,6 +1,7 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
+import User from "./user.model.js";
 
 const Client = sequelize.define(
   "Client",
@@ -107,6 +108,27 @@ const Client = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active"
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
   },
   {
     tableName: "clients",
@@ -117,5 +139,10 @@ const Client = sequelize.define(
 // Define the relationship
 Company.hasMany(Client, { foreignKey: "company_id" });
 Client.belongsTo(Company, { foreignKey: "company_id" });
+
+User.hasMany(Client, { foreignKey: "created_by" });
+User.hasMany(Client, { foreignKey: "updated_by" });
+Client.belongsTo(User, { foreignKey: "created_by" });
+Client.belongsTo(User, { foreignKey: "updated_by" });
 
 export default Client;

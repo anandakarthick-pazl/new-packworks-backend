@@ -9,8 +9,11 @@ import SkuType from './skuModel/skuType.model.js';
 import Sku from './skuModel/sku.model.js';
 import SalesOrder from './salesOrder/salesOrder.model.js';
 import WorkOrder from './salesOrder/workOrder.model.js';
+import Machine from './machine/machine.model.js';
+import MachineProcessName from './machine/processName.model.js';
+import MachineProcessField from './machine/processField.model.js';
 
 
-const db = { sequelize, User, Company,UserAuth,apiLog,Client,ClientAddress,SkuType,Sku,SalesOrder,WorkOrder };
+const db = { sequelize, User, Company,UserAuth,apiLog,Client,ClientAddress,SkuType,Sku,SalesOrder,WorkOrder,Machine,MachineProcessName,MachineProcessField };
 
 export default db;
