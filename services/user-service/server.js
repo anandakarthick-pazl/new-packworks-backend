@@ -183,7 +183,7 @@ v1Router.get("/health", (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/api", v1Router);
+app.use("/api/user", v1Router);
 
 await db.sequelize.sync();
 const PORT = 3002;
