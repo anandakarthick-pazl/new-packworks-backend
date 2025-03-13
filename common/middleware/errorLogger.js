@@ -44,7 +44,7 @@ export const logRequestResponse = async (req, res, next) => {
             );
 
             if (res.statusCode === 500) {
-                await sendEmail(process.env.ERROR_EMAIL, `${process.env.APP_Name} Application Error Notification`, `An error occurred in the application:\n\nUser: ${userId}\nMethod: ${method}\nURL: ${url}\nResponse: ${data}`);
+                await sendEmail("ananda.s@pazl.info", `${process.env.APP_Name} Application Error Notification`, `An error occurred in the application:\n\nUser: ${userId}\nMethod: ${method}\nURL: ${url}\nResponse: ${data}`);
 
             }
         } catch (error) {
@@ -69,7 +69,7 @@ export const logRequestResponse = async (req, res, next) => {
                     { where: { id: logId } }
                 );
 
-                await sendEmail(process.env.ERROR_EMAIL, `${process.env.APP_Name} Application Error Notification`, `An error occurred in the application:\n\nUser: ${userId}\nMethod: ${method}\nURL: ${url}\nError: ${errorMessage}\nStack Trace:\n${stackTrace}`);
+                await sendEmail("ananda.s@pazl.info", `${process.env.APP_Name} Application Error Notification`, `An error occurred in the application:\n\nUser: ${userId}\nMethod: ${method}\nURL: ${url}\nError: ${errorMessage}\nStack Trace:\n${stackTrace}`);
             } catch (error) {
                 console.error('Failed to update error log or enqueue email:', error);
             }
