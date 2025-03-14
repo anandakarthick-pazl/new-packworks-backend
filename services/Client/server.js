@@ -125,16 +125,16 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
     const { count, rows: clients } = await Client.findAndCountAll({
       where: whereClause,
       include: [
-        { model: Address, as: "addresses" }, // Include addresses
+        { model: Address, as: "addresses" },
         {
           model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
+          as: "creator_client",
+          attributes: ["id", "name", "email"],
         },
         {
           model: User,
-          as: "updater",
-          attributes: ["id", "username", "email"],
+          as: "updater_client", 
+          attributes: ["id", "name", "email"],
         },
       ],
       limit,
@@ -178,13 +178,13 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         { model: Address, as: "addresses" }, // Include addresses
         {
           model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
+          as: "creator_client",
+          attributes: ["id", "name", "email"],
         },
         {
           model: User,
-          as: "updater",
-          attributes: ["id", "username", "email"],
+          as: "updater_client",
+          attributes: ["id", "name", "email"],
         },
       ],
     });

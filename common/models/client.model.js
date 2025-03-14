@@ -21,9 +21,15 @@ const Client = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+
     client_ref_id: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    entity_type: {
+      type: DataTypes.ENUM("Client", "Vendor"),
+      allowNull: false,
+      defaultValue: "Client",
     },
     customer_type: {
       type: DataTypes.ENUM("Business", "Individual"),
@@ -111,7 +117,7 @@ const Client = sequelize.define(
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
-      defaultValue: "active"
+      defaultValue: "active",
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -140,9 +146,9 @@ const Client = sequelize.define(
 Company.hasMany(Client, { foreignKey: "company_id" });
 Client.belongsTo(Company, { foreignKey: "company_id" });
 
-User.hasMany(Client, { foreignKey: "created_by" });
-User.hasMany(Client, { foreignKey: "updated_by" });
-Client.belongsTo(User, { foreignKey: "created_by" });
-Client.belongsTo(User, { foreignKey: "updated_by" });
+User.hasMany(Client, { foreignKey: "created_by", as: "created_clients" });
+Client.belongsTo(User, { foreignKey: "created_by", as: "creator_client" });
 
+User.hasMany(Client, { foreignKey: "updated_by", as: "updated_clients" });
+Client.belongsTo(User, { foreignKey: "updated_by", as: "updater_client" });
 export default Client;
