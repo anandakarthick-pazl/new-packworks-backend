@@ -338,61 +338,61 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Hard Delete a Client and Its Addresses (for admin purposes)
-v1Router.delete("/clients/:id/hard", authenticateJWT, async (req, res) => {
-  // Check if user has admin privileges
-  if (!req.user.isAdmin) {
-    return res.status(403).json({
-      status: false,
-      message: "Only administrators can perform hard delete operations",
-    });
-  }
+// // 🔹 Hard Delete a Client and Its Addresses (for admin purposes)
+// v1Router.delete("/clients/:id/hard", authenticateJWT, async (req, res) => {
+//   // Check if user has admin privileges
+//   if (!req.user.isAdmin) {
+//     return res.status(403).json({
+//       status: false,
+//       message: "Only administrators can perform hard delete operations",
+//     });
+//   }
 
-  const t = await sequelize.transaction();
-  try {
-    const clientId = req.params.id;
-    const client = await Client.findByPk(clientId, { transaction: t });
-    if (!client) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ status: false, message: "Client not found" });
-    }
+//   const t = await sequelize.transaction();
+//   try {
+//     const clientId = req.params.id;
+//     const client = await Client.findByPk(clientId, { transaction: t });
+//     if (!client) {
+//       await t.rollback();
+//       return res
+//         .status(404)
+//         .json({ status: false, message: "Client not found" });
+//     }
 
-    // Delete addresses first (assuming client_id is the foreign key in addresses)
-    await Address.destroy({
-      where: { client_id: client.client_id },
-      transaction: t,
-    });
+//     // Delete addresses first (assuming client_id is the foreign key in addresses)
+//     await Address.destroy({
+//       where: { client_id: client.client_id },
+//       transaction: t,
+//     });
 
-    // Delete client
-    await client.destroy({ transaction: t });
+//     // Delete client
+//     await client.destroy({ transaction: t });
 
-    await t.commit();
+//     await t.commit();
 
-    // Clear Redis cache after successful deletion
-    await clearClientCache();
+//     // Clear Redis cache after successful deletion
+//     await clearClientCache();
 
-    // Publish message to RabbitMQ
-    await publishToQueue({
-      operation: "HARD_DELETE",
-      clientId: clientId,
-      timestamp: new Date(),
-      data: {
-        message: "Client and related addresses permanently deleted",
-      },
-    });
+//     // Publish message to RabbitMQ
+//     await publishToQueue({
+//       operation: "HARD_DELETE",
+//       clientId: clientId,
+//       timestamp: new Date(),
+//       data: {
+//         message: "Client and related addresses permanently deleted",
+//       },
+//     });
 
-    return res.status(200).json({
-      status: true,
-      message: "Client and related Addresses permanently deleted successfully",
-    });
-  } catch (error) {
-    await t.rollback();
-    logger.error("Client Hard Delete Error:", error);
-    return res.status(500).json({ status: false, message: error.message });
-  }
-});
+//     return res.status(200).json({
+//       status: true,
+//       message: "Client and related Addresses permanently deleted successfully",
+//     });
+//   } catch (error) {
+//     await t.rollback();
+//     logger.error("Client Hard Delete Error:", error);
+//     return res.status(500).json({ status: false, message: error.message });
+//   }
+// });
 
 // 🔹 Restore a Soft-Deleted Client
 v1Router.post("/clients/:id/restore", authenticateJWT, async (req, res) => {

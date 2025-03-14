@@ -89,8 +89,8 @@ Client.hasMany(Address, { foreignKey: "client_id", as: "addresses" });
 Address.belongsTo(Client, { foreignKey: "client_id", as: "clients" });
 
 User.hasMany(Address, { foreignKey: "created_by", as: "address_creater" });
-Address.belongsTo(User, { foreignKey: "created_by", as: "creater" }); 
-              
+Address.belongsTo(User, { foreignKey: "created_by", as: "creater" });
+
 User.hasMany(Address, { foreignKey: "updated_by", as: "address_updater" });
 Address.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
