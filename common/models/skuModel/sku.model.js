@@ -94,9 +94,8 @@ Sku.belongsTo(Company, { foreignKey: "company_id" });
 Client.hasMany(Sku, { foreignKey: "client_id" });
 Sku.belongsTo(Client, { foreignKey: "client_id" });
 
-User.hasMany(Sku, { foreignKey: "created_by" });
-User.hasMany(Sku, { foreignKey: "updated_by" });
-Sku.belongsTo(User, { foreignKey: "created_by" });
-Sku.belongsTo(User, { foreignKey: "updated_by" });
+// Better naming for associations to prevent conflicts
+Sku.belongsTo(User, { foreignKey: "created_by", as: "sku_creator" });
+Sku.belongsTo(User, { foreignKey: "updated_by", as: "sku_updater" });
 
 export default Sku;

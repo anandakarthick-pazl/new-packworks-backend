@@ -65,9 +65,8 @@ const SkuType = sequelize.define(
 Company.hasMany(SkuType, { foreignKey: "company_id" });
 SkuType.belongsTo(Company, { foreignKey: "company_id" });
 
-User.hasMany(SkuType, { foreignKey: "created_by" });
-User.hasMany(SkuType, { foreignKey: "updated_by" });
-SkuType.belongsTo(User, { foreignKey: "created_by" });
-SkuType.belongsTo(User, { foreignKey: "updated_by" });
+// Better naming for associations to prevent conflicts
+SkuType.belongsTo(User, { foreignKey: "created_by", as: "creator_sku_types" });
+SkuType.belongsTo(User, { foreignKey: "updated_by", as: "updater_sku_types" });
 
 export default SkuType;
