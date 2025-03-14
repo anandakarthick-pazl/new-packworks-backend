@@ -155,7 +155,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       },
     };
 
-    await redisClient.set(cacheKey, JSON.stringify(responseData), 'EX', 3600);
+    await redisClient.set(cacheKey, JSON.stringify(responseData), "EX", 3600);
 
     res.status(200).json(responseData);
   } catch (error) {
@@ -210,7 +210,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
     };
 
     // Store in Redis cache
-    await redisClient.set(cacheKey, JSON.stringify(formattedSku), 'EX', 3600);
+    await redisClient.set(cacheKey, JSON.stringify(formattedSku), "EX", 3600);
 
     res.status(200).json(formattedSku);
   } catch (error) {
@@ -294,29 +294,29 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Hard Delete SKU (for admin purposes if needed)
-v1Router.delete("/sku-details/:id/hard", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    const deletedSku = await Sku.destroy({
-      where: { id: req.params.id },
-      transaction: t,
-    });
-    if (!deletedSku) return res.status(404).json({ message: "SKU not found" });
-    await t.commit();
-    await clearClientCache();
-    await publishToQueue({
-      operation: "HARD_DELETE",
-      skuId: req.params.id,
-      timestamp: new Date(),
-    });
-    res.status(200).json({ message: "SKU permanently deleted successfully" });
-  } catch (error) {
-    await t.rollback();
-    res
-      .status(500)
-      .json({ message: "Error deleting SKU", error: error.message });
-  }
-});
+// v1Router.delete("/sku-details/:id/hard", authenticateJWT, async (req, res) => {
+//   const t = await sequelize.transaction();
+//   try {
+//     const deletedSku = await Sku.destroy({
+//       where: { id: req.params.id },
+//       transaction: t,
+//     });
+//     if (!deletedSku) return res.status(404).json({ message: "SKU not found" });
+//     await t.commit();
+//     await clearClientCache();
+//     await publishToQueue({
+//       operation: "HARD_DELETE",
+//       skuId: req.params.id,
+//       timestamp: new Date(),
+//     });
+//     res.status(200).json({ message: "SKU permanently deleted successfully" });
+//   } catch (error) {
+//     await t.rollback();
+//     res
+//       .status(500)
+//       .json({ message: "Error deleting SKU", error: error.message });
+//   }
+// });
 
 // 🔹 Get all SKU Types
 v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
@@ -328,13 +328,13 @@ v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
       include: [
         {
           model: db.User,
-          as: "creator",
+          as: "creator_sku_types",
           attributes: ["id", "name"],
           required: false,
         },
         {
           model: db.User,
-          as: "updater",
+          as: "updater_sku_types",
           attributes: ["id", "name"],
           required: false,
         },
@@ -376,21 +376,42 @@ v1Router.post("/sku-type", authenticateJWT, async (req, res) => {
 v1Router.put("/sku-type/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const skuTypeData = {
-      ...req.body,
-      updated_by: req.user.id,
-    };
+    const { sku_type } = req.body; // Extract only sku_type
 
-    const updatedSkuType = await SkuType.update(skuTypeData, {
+    if (!sku_type) {
+      return res.status(400).json({ message: "sku_type is required" });
+    }
+
+    const updatedSkuType = await SkuType.update(
+      {
+        sku_type,
+        updated_at: new Date(),
+        updated_by: req.user.id,
+      },
+      {
+        where: { id: req.params.id },
+        transaction: t,
+      }
+    );
+
+    if (!updatedSkuType[0]) {
+      await t.rollback();
+      return res
+        .status(404)
+        .json({ message: "SKU Type not found or no changes made" });
+    }
+
+    // Fetch the updated record after update
+    const updatedRecord = await SkuType.findOne({
       where: { id: req.params.id },
       transaction: t,
     });
 
-    if (!updatedSkuType[0])
-      return res.status(404).json({ message: "SKU Type not found" });
-
     await t.commit();
-    res.status(200).json({ message: "SKU Type updated successfully" });
+    res.status(200).json({
+      message: "SKU Type updated successfully",
+      updated_sku_type: updatedRecord,
+    });
   } catch (error) {
     await t.rollback();
     res
