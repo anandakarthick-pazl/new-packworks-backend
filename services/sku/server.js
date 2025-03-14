@@ -11,7 +11,6 @@ import {
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
-import { cli } from "winston/lib/winston/config/index.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 
 dotenv.config();
@@ -25,10 +24,18 @@ const Sku = db.Sku;
 const SkuType = db.SkuType;
 
 // 🔹 Create a SKU (POST)
-v1Router.post("/skuDetails",authenticateJWT, async (req, res) => {
+v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const newSku = await Sku.create(req.body, { transaction: t });
+    // Add created_by and updated_by from the authenticated user
+    const skuData = {
+      ...req.body,
+      created_by: req.user.id,
+      updated_by: req.user.id,
+      status: "active",
+    };
+
+    const newSku = await Sku.create(skuData, { transaction: t });
     await t.commit();
     await clearClientCache();
     await publishToQueue({
@@ -46,7 +53,7 @@ v1Router.post("/skuDetails",authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
+v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
@@ -55,12 +62,13 @@ v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
       sku_name,
       client,
       ply,
+      status = "active",
     } = req.query;
 
     // Create a cache key based on the query parameters
-    const cacheKey = `skuDetails_${page}_${limit}_${search}_${sku_name || ""}_${
-      client || ""
-    }_${ply || ""}`;
+    const cacheKey = `sku-details_${page}_${limit}_${search}_${
+      sku_name || ""
+    }_${client || ""}_${ply || ""}_${status}`;
 
     // Try to get data from Redis cache first
     const cachedData = await redisClient.get(cacheKey);
@@ -74,21 +82,28 @@ v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Build the where condition for search
-    let whereCondition = {};
+    let whereCondition = {
+      status: status, // Only return records with the requested status
+    };
 
     // Handle specific field searches if provided
     if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
     if (client) whereCondition.client = { [Op.like]: `%${client}%` };
-    if (ply)
-      whereCondition.ply = { [Op.like]: `%${ply}%` };
+    if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
 
     // Handle generic search across multiple fields if no specific fields are provided
-    if (search && Object.keys(whereCondition).length === 0) {
+    if (search && Object.keys(whereCondition).length === 1) {
+      // Only status is set
       whereCondition = {
-        [Op.or]: [
-          { sku_name: { [Op.like]: `%${search}%` } },
-          { client: { [Op.like]: `%${search}%` } },
-          { ply: { [Op.like]: `%${search}%` } },
+        [Op.and]: [
+          { status: status },
+          {
+            [Op.or]: [
+              { sku_name: { [Op.like]: `%${search}%` } },
+              { client: { [Op.like]: `%${search}%` } },
+              { ply: { [Op.like]: `%${search}%` } },
+            ],
+          },
         ],
       };
     }
@@ -103,6 +118,20 @@ v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
       where: whereCondition,
       limit: parseInt(limit),
       offset: parseInt(offset),
+      include: [
+        {
+          model: db.User,
+          as: "sku_creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "sku_updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
     });
 
     // Ensure sku_values is parsed as JSON
@@ -126,10 +155,7 @@ v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
       },
     };
 
-    // Store the result in Redis cache with expiration time (e.g., 1 hour)
-    await redisClient.set(cacheKey, JSON.stringify(responseData), {
-      EX: 3600, // Cache expiry time in seconds (1 hour)
-    });
+    await redisClient.set(cacheKey, JSON.stringify(responseData), 'EX', 3600);
 
     res.status(200).json(responseData);
   } catch (error) {
@@ -142,7 +168,7 @@ v1Router.get("/skuDetails",authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get SKU by ID with Redis caching (GET)
-v1Router.get("/skuDetails/:id",authenticateJWT, async (req, res) => {
+v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   try {
     const cacheKey = `skuDetail_${req.params.id}`;
 
@@ -156,7 +182,22 @@ v1Router.get("/skuDetails/:id",authenticateJWT, async (req, res) => {
 
     logger.info(`Cache miss for ${cacheKey}`);
 
-    const sku = await Sku.findByPk(req.params.id);
+    const sku = await Sku.findByPk(req.params.id, {
+      include: [
+        {
+          model: db.User,
+          as: "sku_creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "sku_updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
 
     if (!sku) {
       return res.status(404).json({ message: "SKU not found" });
@@ -169,9 +210,7 @@ v1Router.get("/skuDetails/:id",authenticateJWT, async (req, res) => {
     };
 
     // Store in Redis cache
-    await redisClient.set(cacheKey, JSON.stringify(formattedSku), {
-      EX: 3600, // Cache expiry time in seconds (1 hour)
-    });
+    await redisClient.set(cacheKey, JSON.stringify(formattedSku), 'EX', 3600);
 
     res.status(200).json(formattedSku);
   } catch (error) {
@@ -184,22 +223,30 @@ v1Router.get("/skuDetails/:id",authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Update SKU (PUT)
-v1Router.put("/skuDetails/:id",authenticateJWT, async (req, res) => {
+v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const updatedSku = await Sku.update(req.body, {
+    // Add updated_by from the authenticated user
+    const skuData = {
+      ...req.body,
+      updated_by: req.user.id,
+    };
+
+    const updatedSku = await Sku.update(skuData, {
       where: { id: req.params.id },
       transaction: t,
     });
+
     if (!updatedSku[0])
       return res.status(404).json({ message: "SKU not found" });
+
     await t.commit();
     await clearClientCache();
     await publishToQueue({
       operation: "UPDATE",
       skuId: req.params.id,
       timestamp: new Date(),
-      data: req.body,
+      data: skuData,
     });
     res.status(200).json({ message: "SKU updated successfully" });
   } catch (error) {
@@ -210,8 +257,44 @@ v1Router.put("/skuDetails/:id",authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Delete SKU (DELETE)
-v1Router.delete("/skuDetails/:id",authenticateJWT, async (req, res) => {
+// 🔹 Soft Delete SKU (DELETE) - changes status to inactive
+v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    // Update status to inactive instead of deleting
+    const updatedSku = await Sku.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+      },
+      {
+        where: { id: req.params.id },
+        transaction: t,
+      }
+    );
+
+    if (!updatedSku[0])
+      return res.status(404).json({ message: "SKU not found" });
+
+    await t.commit();
+    await clearClientCache();
+    await publishToQueue({
+      operation: "SOFT_DELETE",
+      skuId: req.params.id,
+      timestamp: new Date(),
+      data: { status: "inactive" },
+    });
+    res.status(200).json({ message: "SKU marked as inactive successfully" });
+  } catch (error) {
+    await t.rollback();
+    res
+      .status(500)
+      .json({ message: "Error deactivating SKU", error: error.message });
+  }
+});
+
+// 🔹 Hard Delete SKU (for admin purposes if needed)
+v1Router.delete("/sku-details/:id/hard", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const deletedSku = await Sku.destroy({
@@ -222,11 +305,11 @@ v1Router.delete("/skuDetails/:id",authenticateJWT, async (req, res) => {
     await t.commit();
     await clearClientCache();
     await publishToQueue({
-      operation: "DELETE",
+      operation: "HARD_DELETE",
       skuId: req.params.id,
       timestamp: new Date(),
     });
-    res.status(200).json({ message: "SKU deleted successfully" });
+    res.status(200).json({ message: "SKU permanently deleted successfully" });
   } catch (error) {
     await t.rollback();
     res
@@ -235,14 +318,114 @@ v1Router.delete("/skuDetails/:id",authenticateJWT, async (req, res) => {
   }
 });
 
-// sku type
-
-v1Router.get("/skuType", authenticateJWT,async (req, res) => {
+// 🔹 Get all SKU Types
+v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
   try {
-    const skuTypes = await SkuType.findAll();
+    const { status = "active" } = req.query;
+
+    const skuTypes = await SkuType.findAll({
+      where: { status: status },
+      include: [
+        {
+          model: db.User,
+          as: "creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
     res.status(200).json(skuTypes);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// 🔹 Create SKU Type
+v1Router.post("/sku-type", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const skuTypeData = {
+      ...req.body,
+      created_by: req.user.id,
+      updated_by: req.user.id,
+      status: "active",
+    };
+
+    const newSkuType = await SkuType.create(skuTypeData, { transaction: t });
+    await t.commit();
+    res
+      .status(201)
+      .json({ message: "SKU Type created successfully", skuType: newSkuType });
+  } catch (error) {
+    await t.rollback();
+    res
+      .status(500)
+      .json({ message: "Error creating SKU Type", error: error.message });
+  }
+});
+
+// 🔹 Update SKU Type
+v1Router.put("/sku-type/:id", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const skuTypeData = {
+      ...req.body,
+      updated_by: req.user.id,
+    };
+
+    const updatedSkuType = await SkuType.update(skuTypeData, {
+      where: { id: req.params.id },
+      transaction: t,
+    });
+
+    if (!updatedSkuType[0])
+      return res.status(404).json({ message: "SKU Type not found" });
+
+    await t.commit();
+    res.status(200).json({ message: "SKU Type updated successfully" });
+  } catch (error) {
+    await t.rollback();
+    res
+      .status(500)
+      .json({ message: "Error updating SKU Type", error: error.message });
+  }
+});
+
+// 🔹 Soft Delete SKU Type
+v1Router.delete("/sku-type/:id", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const updatedSkuType = await SkuType.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+      },
+      {
+        where: { id: req.params.id },
+        transaction: t,
+      }
+    );
+
+    if (!updatedSkuType[0])
+      return res.status(404).json({ message: "SKU Type not found" });
+
+    await t.commit();
+    res
+      .status(200)
+      .json({ message: "SKU Type marked as inactive successfully" });
+  } catch (error) {
+    await t.rollback();
+    res
+      .status(500)
+      .json({ message: "Error deactivating SKU Type", error: error.message });
   }
 });
 
