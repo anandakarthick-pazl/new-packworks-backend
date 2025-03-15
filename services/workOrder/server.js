@@ -45,11 +45,19 @@ const WORK_ORDER_QUEUES = {
 };
 
 // POST create new work order
-v1Router.post("/workOrder", authenticateJWT, async (req, res) => {
+v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   const workDetails = req.body;
 
   if (!workDetails) {
     return res.status(400).json({ message: "Invalid input data" });
+  }
+
+  // Validate required fields
+  if (!workDetails.created_by || !workDetails.updated_by) {
+    return res.status(400).json({
+      message:
+        "Missing required fields: created_by and updated_by are required",
+    });
   }
 
   try {
@@ -71,6 +79,9 @@ v1Router.post("/workOrder", authenticateJWT, async (req, res) => {
         workDetails.manufacture === "outsource"
           ? workDetails.outsource_name
           : null,
+      status: workDetails.status || "active", 
+      created_by: workDetails.created_by,
+      updated_by: workDetails.updated_by,
     });
 
     // Clear cache
@@ -102,7 +113,7 @@ v1Router.post("/workOrder", authenticateJWT, async (req, res) => {
 });
 
 // GET all work orders with pagination and filtering
-v1Router.get("/workOrder", authenticateJWT, async (req, res) => {
+v1Router.get("/work-order", authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
@@ -111,6 +122,7 @@ v1Router.get("/workOrder", authenticateJWT, async (req, res) => {
       manufacture,
       client_id,
       sales_order_id,
+      status = "active", // Default to showing only active work orders
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -120,7 +132,7 @@ v1Router.get("/workOrder", authenticateJWT, async (req, res) => {
       WORK_ORDER_CACHE_KEYS.WORK_ORDER_LIST
     }:${page}:${limit}:${sku_name || ""}:${manufacture || ""}:${
       client_id || ""
-    }:${sales_order_id || ""}`;
+    }:${sales_order_id || ""}:${status || ""}`;
 
     const cachedData = await redisClient.get(cacheKey);
 
@@ -134,6 +146,11 @@ v1Router.get("/workOrder", authenticateJWT, async (req, res) => {
     if (manufacture) where.manufacture = manufacture;
     if (client_id) where.client_id = client_id;
     if (sales_order_id) where.sales_order_id = sales_order_id;
+
+    // Filter by status - allow "all" to return both active and inactive records
+    if (status && status !== "all") {
+      where.status = status;
+    }
 
     // Fetch data from database
     const { count, rows } = await WorkOrder.findAndCountAll({
@@ -165,7 +182,7 @@ v1Router.get("/workOrder", authenticateJWT, async (req, res) => {
 });
 
 // GET single work order by ID
-v1Router.get("/workOrder/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -187,7 +204,7 @@ v1Router.get("/workOrder/:id", authenticateJWT, async (req, res) => {
     const result = workOrder.get({ plain: true });
 
     // Cache the result
-    await redisClient.set(cacheKey, JSON.stringify(result), "EX", 300); // Cache for 5 minutes
+    await redisClient.set(cacheKey, JSON.stringify(result)); 
 
     res.json(result);
   } catch (error) {
@@ -199,12 +216,19 @@ v1Router.get("/workOrder/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing work order
-v1Router.put("/workOrder/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const workDetails = req.body;
 
   if (!workDetails) {
     return res.status(400).json({ message: "Invalid input data" });
+  }
+
+  // Validate updated_by field
+  if (!workDetails.updated_by) {
+    return res.status(400).json({
+      message: "Missing required field: updated_by is required",
+    });
   }
 
   try {
@@ -231,10 +255,13 @@ v1Router.put("/workOrder/:id", authenticateJWT, async (req, res) => {
       acceptable_excess_units: workDetails.acceptable_excess_units || null,
       planned_start_date: workDetails.planned_start_date || null,
       planned_end_date: workDetails.planned_end_date || null,
-      outsource_name:
-        workDetails.manufacture === "outsource"
-          ? workDetails.outsource_name
-          : null,
+      outsource_name:workDetails.outsource_name || null,
+        // workDetails.manufacture === "outsource"
+        //   ? workDetails.outsource_name
+        //   : null,
+      status: workDetails.status || workOrder.status, // Keep existing status if not provided
+      updated_by: workDetails.updated_by,
+      updated_at: sequelize.updated_at,
     });
 
     // Clear caches
@@ -275,9 +302,17 @@ v1Router.put("/workOrder/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// DELETE work order
-v1Router.delete("/workOrder/:id", authenticateJWT, async (req, res) => {
+// DELETE work order (soft delete)
+v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
+  const { updated_by } = req.body;
+
+  // Validate updated_by field
+  if (!updated_by) {
+    return res.status(400).json({
+      message: "Missing required field: updated_by is required",
+    });
+  }
 
   try {
     // Find the work order
@@ -291,8 +326,12 @@ v1Router.delete("/workOrder/:id", authenticateJWT, async (req, res) => {
     const workOrderData = workOrder.get({ plain: true });
     const salesOrderId = workOrder.sales_order_id;
 
-    // Delete work order
-    await workOrder.destroy();
+    // Soft delete - update status to inactive
+    await workOrder.update({
+      status: "inactive",
+      updated_by: updated_by,
+      updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
+    });
 
     // Clear caches
     await clearClientCache(`${WORK_ORDER_CACHE_KEYS.WORK_ORDER_LIST}:*`);
@@ -303,15 +342,18 @@ v1Router.delete("/workOrder/:id", authenticateJWT, async (req, res) => {
       await clearClientCache(`${CACHE_KEYS.SALES_ORDER_DETAIL}${salesOrderId}`);
     }
 
-    // Send to RabbitMQ
-    await publishToQueue(WORK_ORDER_QUEUES.WORK_ORDER_DELETED, workOrderData);
+    // Send to RabbitMQ - include the fact this was a soft delete
+    await publishToQueue(WORK_ORDER_QUEUES.WORK_ORDER_DELETED, {
+      ...workOrder.get({ plain: true }),
+      soft_deleted: true,
+    });
 
     res.json({
-      message: "Work Order deleted successfully",
-      data: workOrderData,
+      message: "Work Order successfully marked as inactive",
+      data: workOrder.get({ plain: true }),
     });
   } catch (error) {
-    logger.error("Error deleting work order:", error);
+    logger.error("Error soft deleting work order:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -320,23 +362,32 @@ v1Router.delete("/workOrder/:id", authenticateJWT, async (req, res) => {
 
 // GET work orders by sales order ID
 v1Router.get(
-  "/salesOrder/:salesOrderId/workOrders",
+  "/sales-order/:sales-orderId/work-orders",
   authenticateJWT,
   async (req, res) => {
     try {
       const { salesOrderId } = req.params;
+      const { status = "active" } = req.query; // Default to showing only active work orders
 
       // Try to get from cache first
-      const cacheKey = `sales_order:${salesOrderId}:workorders`;
+      const cacheKey = `sales_order:${salesOrderId}:workorders:${status}`;
       const cachedData = await redisClient.get(cacheKey);
 
       if (cachedData) {
         return res.json(JSON.parse(cachedData));
       }
 
+      // Build where clause
+      const where = { sales_order_id: salesOrderId };
+
+      // Filter by status unless "all" is specified
+      if (status && status !== "all") {
+        where.status = status;
+      }
+
       // Fetch from database
       const workOrders = await WorkOrder.findAll({
-        where: { sales_order_id: salesOrderId },
+        where,
         order: [["created_at", "DESC"]],
       });
 
@@ -356,11 +407,19 @@ v1Router.get(
 );
 
 // Bulk update work orders status
-v1Router.patch("/workOrder/bulkUpdate", authenticateJWT, async (req, res) => {
-  const { ids, status, status_reason } = req.body;
+v1Router.patch("/work-order/bulk-update", authenticateJWT, async (req, res) => {
+  const { ids, status, status_reason, updated_by } = req.body;
 
-  if (!ids || !Array.isArray(ids) || ids.length === 0 || !status) {
-    return res.status(400).json({ message: "Invalid input data" });
+  if (
+    !ids ||
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    !status ||
+    !updated_by
+  ) {
+    return res.status(400).json({
+      message: "Invalid input data. ids, status, and updated_by are required",
+    });
   }
 
   const transaction = await WorkOrder.sequelize.transaction();
@@ -371,6 +430,7 @@ v1Router.patch("/workOrder/bulkUpdate", authenticateJWT, async (req, res) => {
       {
         status,
         status_reason: status_reason || null,
+        updated_by,
         updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
       },
       {
@@ -407,7 +467,7 @@ v1Router.patch("/workOrder/bulkUpdate", authenticateJWT, async (req, res) => {
     // Clear affected sales order caches
     for (const salesOrderId of salesOrderIds) {
       await clearClientCache(`${CACHE_KEYS.SALES_ORDER_DETAIL}${salesOrderId}`);
-      await clearClientCache(`sales_order:${salesOrderId}:workorders`);
+      await clearClientCache(`sales_order:${salesOrderId}:workorders:*`);
     }
 
     // Send to RabbitMQ
@@ -416,6 +476,7 @@ v1Router.patch("/workOrder/bulkUpdate", authenticateJWT, async (req, res) => {
       updated: updatedCount,
       status,
       status_reason,
+      updated_by,
     });
 
     res.json({

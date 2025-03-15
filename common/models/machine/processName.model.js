@@ -1,6 +1,7 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Machine from "./machine.model.js";
+import User from "../user.model.js";
 
 const MachineProcessName = sequelize.define(
   "MachineProcessName",

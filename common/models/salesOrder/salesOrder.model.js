@@ -95,10 +95,15 @@ const SalesOrder = sequelize.define(
   }
 );
 
-User.hasMany(SalesOrder, { foreignKey: "created_by" });
-User.hasMany(SalesOrder, { foreignKey: "updated_by" });
-SalesOrder.belongsTo(User, { foreignKey: "created_by" });
-SalesOrder.belongsTo(User, { foreignKey: "updated_by" });
+Company.hasMany(SalesOrder, { foreignKey: "company_id" });
+SalesOrder.belongsTo(Company, { foreignKey: "company_id" });
 
+Client.hasMany(SalesOrder, { foreignKey: "client_id" });
+SalesOrder.belongsTo(Client, { foreignKey: "client_id" });
+
+// User.hasMany(SalesOrder, { foreignKey: "created_by" });
+// User.hasMany(SalesOrder, { foreignKey: "updated_by" });
+SalesOrder.belongsTo(User, { foreignKey: "created_by", as: "creator_sales" });
+SalesOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater_sales" });
 
 export default SalesOrder;

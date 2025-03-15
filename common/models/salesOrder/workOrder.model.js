@@ -136,9 +136,9 @@ WorkOrder.belongsTo(Company, { foreignKey: "company_id" });
 Client.hasMany(WorkOrder, { foreignKey: "client_id" });
 WorkOrder.belongsTo(Client, { foreignKey: "client_id" });
 
-User.hasMany(WorkOrder, { foreignKey: "created_by" });
-User.hasMany(WorkOrder, { foreignKey: "updated_by" });
-WorkOrder.belongsTo(User, { foreignKey: "created_by" });
-WorkOrder.belongsTo(User, { foreignKey: "updated_by" });
+// User.hasMany(WorkOrder, { foreignKey: "created_by" });
+// User.hasMany(WorkOrder, { foreignKey: "updated_by" });
+WorkOrder.belongsTo(User, { foreignKey: "created_by", as: "creator_work" });
+WorkOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater_work" });
 
 export default WorkOrder;
