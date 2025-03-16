@@ -12,6 +12,7 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import companyScope from "../../common/middleware/companyScope.js";
 
 dotenv.config();
 
@@ -119,7 +120,7 @@ v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
 });
 
 // GET all sales orders with pagination and filtering - updated to handle status
-v1Router.get("/sales-order", authenticateJWT, async (req, res) => {
+v1Router.get("/sales-order", authenticateJWT,companyScope, async (req, res) => {
   try {
     const {
       page = 1,

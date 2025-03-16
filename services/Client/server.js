@@ -15,6 +15,7 @@ import {
 } from "../../common/helper/rabbitmq.js";
 import { validateClient } from "../../common/inputvalidation/validationClient.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import companyScope from "../../common/middleware/companyScope.js";
 
 dotenv.config();
 
@@ -89,7 +90,7 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get All Clients (GET) with Addresses - Only active clients
-v1Router.get("/clients", authenticateJWT, async (req, res) => {
+v1Router.get("/clients", authenticateJWT, companyScope, async (req, res) => {
   try {
     let { page = 1, limit = 10, search, includeInactive = false } = req.query;
     page = parseInt(page);
@@ -133,7 +134,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
         },
         {
           model: User,
-          as: "updater_client", 
+          as: "updater_client",
           attributes: ["id", "name", "email"],
         },
       ],
@@ -175,7 +176,7 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
 
     const client = await Client.findByPk(clientId, {
       include: [
-        { model: Address, as: "addresses" }, // Include addresses
+        { model: Address, as: "addresses" },
         {
           model: User,
           as: "creator_client",

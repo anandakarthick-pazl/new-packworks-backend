@@ -12,6 +12,7 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import companyScope from "../../common/middleware/companyScope.js";
 
 dotenv.config();
 
@@ -53,7 +54,7 @@ v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
+v1Router.get("/sku-details", authenticateJWT,companyScope, async (req, res) => {
   try {
     const {
       page = 1,
