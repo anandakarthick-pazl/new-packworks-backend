@@ -12,7 +12,8 @@
     "sku": "nodemon services/sku/server.js",
     "sales": "nodemon services/salesOrder/server.js",
     "work": "nodemon services/workOrder/server.js",
-    "machine": "nodemon services/machine/server.js"
+    "machine": "nodemon services/machine/server.js",
+    "common": "nodemon services/common-service/server.js"
   },
   "keywords": [],
   "author": "",

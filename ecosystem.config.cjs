@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "Company-Service",
-      script: "./services/company/server.js", 
+      script: "./services/company/server.js",
       watch: false,
       env: {
         PORT: 3001,
@@ -10,7 +10,7 @@ module.exports = {
     },
     {
       name: "User-Service",
-      script: "./services/user-service/server.js", 
+      script: "./services/user-service/server.js",
       watch: false,
       env: {
         PORT: 3002,
@@ -26,7 +26,7 @@ module.exports = {
     },
     {
       name: "Sku-Service",
-      script: "./services/sku/server.js", 
+      script: "./services/sku/server.js",
       watch: false,
       env: {
         PORT: 3004,
@@ -34,7 +34,7 @@ module.exports = {
     },
     {
       name: "SalesOrder-Service",
-      script: "./services/salesOrder/server.js", 
+      script: "./services/salesOrder/server.js",
       watch: false,
       env: {
         PORT: 3005,
@@ -42,7 +42,7 @@ module.exports = {
     },
     {
       name: "WorkOrder-Service",
-      script: "./services/workOrder/server.js", 
+      script: "./services/workOrder/server.js",
       watch: false,
       env: {
         PORT: 3006,
@@ -50,9 +50,16 @@ module.exports = {
     },
     {
       name: "machine-Service",
-      script: "./services/machine/server.js", 
+      script: "./services/machine/server.js",
       env: {
         PORT: 3007,
+      },
+    },
+    {
+      name: "common-Service",
+      script: "./services/common-service/server.js",
+      env: {
+        PORT: 3008,
       },
     },
   ],
