@@ -25,15 +25,17 @@ const MachineProcessName = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    createdAt: {
+    created_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    updatedAt: {
+    updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      onUpdate: DataTypes.NOW, 
+
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),

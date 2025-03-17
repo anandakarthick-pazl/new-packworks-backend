@@ -38,23 +38,21 @@ const MachineProcessField = sequelize.define(
       type: DataTypes.TINYINT(1),
       allowNull: false,
     },
-    createdAt: {
+    created_at: {
       type: DataTypes.DATE,
-      allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    updatedAt: {
+    updated_at: {
       type: DataTypes.DATE,
-      allowNull: false,
       defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW,
+      onUpdate: DataTypes.NOW, 
+
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
       defaultValue: "active",
     },
-
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,

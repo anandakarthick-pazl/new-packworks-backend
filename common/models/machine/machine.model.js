@@ -95,18 +95,22 @@ const Machine = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    created_by: {
-      type: DataTypes.INTEGER,
+    created_at: {
+      type: DataTypes.DATE,
       allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      onUpdate: DataTypes.NOW, 
+
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
       defaultValue: "active",
-    },
-    updated_by: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
