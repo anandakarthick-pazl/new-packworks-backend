@@ -24,6 +24,15 @@ const Client = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    gst_status: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull:true
+    },
+    gst_number: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     entity_type: {
       type: DataTypes.ENUM("Client", "Vendor"),
       allowNull: false,
@@ -148,6 +157,5 @@ User.hasMany(Client, { foreignKey: "created_by", as: "created_clients" });
 User.hasMany(Client, { foreignKey: "updated_by", as: "updated_clients" });
 Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Client.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
-
 
 export default Client;

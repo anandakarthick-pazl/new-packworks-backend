@@ -12,6 +12,8 @@ import {
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
 import { validateClient } from "../../common/inputvalidation/validationClient.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import companyScope from "../../common/middleware/companyScope.js";
@@ -29,7 +31,7 @@ const Address = db.ClientAddress;
 const User = db.User;
 
 // 🔹 Create a Client (POST)
-v1Router.post("/clients", authenticateJWT, async (req, res) => {
+v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { clientData, addresses } = req.body;
@@ -54,8 +56,8 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
           {
             ...address,
             client_id: newClient.client_id,
-            created_by: req.user.id, // Set from authenticated user
-            updated_by: req.user.id, // Set from authenticated user
+            created_by: req.user.id,
+            updated_by: req.user.id,
           },
           { transaction: t }
         );
@@ -83,7 +85,7 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
     await t.rollback();
     res
       .status(500)
-      .json({ message: "Error adding client", error: error.message });
+      .json({ message: "Error adding client", error: "Email already exists" });
   }
 });
 
@@ -106,6 +108,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
         { company_name: { [Op.like]: `%${search}%` } },
         { PAN: { [Op.like]: `%${search}%` } },
         { display_name: { [Op.like]: `%${search}%` } },
+        { gst_number: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -180,86 +183,91 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction();
+v1Router.put(
+  "/clients/:id",
+  authenticateJWT,
+  validateClient,
+  async (req, res) => {
+    const t = await sequelize.transaction();
 
-  try {
-    const { clientData, addresses } = req.body;
-    const clientId = req.params.id;
+    try {
+      const { clientData, addresses } = req.body;
+      const clientId = req.params.id;
 
-    // Check if client exists
-    const client = await Client.findByPk(clientId, { transaction: t });
-    if (!client) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ status: false, message: "Client not found" });
-    }
-
-    // Update client data
-    const updatedClientData = {
-      ...clientData,
-      updated_by: req.user.id,
-      updated_at: new Date(),
-    };
-
-    await client.update(updatedClientData, {
-      transaction: t,
-      fields: Object.keys(updatedClientData),
-    });
-
-    let updatedAddresses = [];
-
-    // Handle Addresses (Only Update, No Creation)
-    if (addresses && addresses.length > 0) {
-      for (const address of addresses) {
-        if (!address.id) {
-          await t.rollback();
-          return res.status(400).json({
-            status: false,
-            message:
-              "Address ID is missing. Only existing addresses can be updated.",
-          });
-        }
-
-        const existingAddress = await Address.findOne({
-          where: { id: address.id, client_id: clientId },
-          transaction: t,
-        });
-
-        if (!existingAddress) {
-          await t.rollback();
-          return res.status(404).json({
-            status: false,
-            message: `Address with ID ${address.id} not found or doesn't belong to the client.`,
-          });
-        }
-
-        const addressWithUser = {
-          ...address,
-          updated_by: req.user.id,
-          updated_at: new Date(),
-        };
-
-        await existingAddress.update(addressWithUser, { transaction: t });
-        updatedAddresses.push(existingAddress);
+      // Check if client exists
+      const client = await Client.findByPk(clientId, { transaction: t });
+      if (!client) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ status: false, message: "Client not found" });
       }
+
+      // Update client data
+      const updatedClientData = {
+        ...clientData,
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      };
+
+      await client.update(updatedClientData, {
+        transaction: t,
+        fields: Object.keys(updatedClientData),
+      });
+
+      let updatedAddresses = [];
+
+      // Handle Addresses (Only Update, No Creation)
+      if (addresses && addresses.length > 0) {
+        for (const address of addresses) {
+          if (!address.id) {
+            await t.rollback();
+            return res.status(400).json({
+              status: false,
+              message:
+                "Address ID is missing. Only existing addresses can be updated.",
+            });
+          }
+
+          const existingAddress = await Address.findOne({
+            where: { id: address.id, client_id: clientId },
+            transaction: t,
+          });
+
+          if (!existingAddress) {
+            await t.rollback();
+            return res.status(404).json({
+              status: false,
+              message: `Address with ID ${address.id} not found or doesn't belong to the client.`,
+            });
+          }
+
+          const addressWithUser = {
+            ...address,
+            updated_by: req.user.id,
+            updated_at: new Date(),
+          };
+
+          await existingAddress.update(addressWithUser, { transaction: t });
+          updatedAddresses.push(existingAddress);
+        }
+      }
+
+      await t.commit();
+
+      return res.status(200).json({
+        status: true,
+        message: "Client and addresses updated successfully",
+        client,
+        addresses: updatedAddresses,
+      });
+    } catch (error) {
+      await t.rollback();
+      console.error("Error updating client and addresses:", error);
+      return res.status(500).json({ status: false, message: error.message });
     }
-
-    await t.commit();
-
-    return res.status(200).json({
-      status: true,
-      message: "Client and addresses updated successfully",
-      client,
-      addresses: updatedAddresses,
-    });
-  } catch (error) {
-    await t.rollback();
-    console.error("Error updating client and addresses:", error);
-    return res.status(500).json({ status: false, message: error.message });
   }
-});
+);
 
 // 🔹 Soft Delete a Client (DELETE) - Changes status to inactive
 v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
@@ -278,7 +286,7 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     await client.update(
       {
         status: "inactive",
-        updated_by: req.user.id, // Set from authenticated user
+        updated_by: req.user.id,
         updated_at: new Date(),
       },
       { transaction: t }
@@ -288,7 +296,7 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     await Address.update(
       {
         status: "inactive",
-        updated_by: req.user.id, // Set from authenticated user
+        updated_by: req.user.id,
         updated_at: new Date(),
       },
       {
@@ -306,6 +314,193 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   } catch (error) {
     await t.rollback();
     logger.error("Client Soft Delete Error:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+});
+
+// Download Clients Data as Excel (GET)
+v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
+  try {
+    let { search, includeInactive = false } = req.query;
+
+    const whereClause = {};
+
+    // By default, only show active clients unless includeInactive is true
+    if (includeInactive !== "true") {
+      whereClause.status = "active";
+    }
+
+    if (search) {
+      whereClause[Op.or] = [
+        { company_name: { [Op.like]: `%${search}%` } },
+        { PAN: { [Op.like]: `%${search}%` } },
+        { display_name: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    // Fetch clients with the same filters as the GET API but without pagination
+    const { rows: clients } = await Client.findAndCountAll({
+      where: whereClause,
+      include: [
+        { model: Address, as: "addresses" },
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "name", "email"],
+        },
+        {
+          model: User,
+          as: "updater",
+          attributes: ["id", "name", "email"],
+        },
+      ],
+      order: [["client_id", "ASC"]],
+    });
+
+    // Create a new Excel workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const clientSheet = workbook.addWorksheet("Clients");
+    const addressSheet = workbook.addWorksheet("Addresses");
+
+    // Set up client sheet headers
+    clientSheet.columns = [
+      { header: "Client ID", key: "client_id", width: 10 },
+      { header: "Company Name", key: "company_name", width: 30 },
+      { header: "Display Name", key: "display_name", width: 20 },
+      { header: "PAN", key: "PAN", width: 15 },
+      { header: "Email", key: "email", width: 30 },
+      { header: "Phone", key: "phone", width: 15 },
+      { header: "Status", key: "status", width: 10 },
+      { header: "Created By", key: "created_by_name", width: 20 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated By", key: "updated_by_name", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Set up address sheet headers
+    addressSheet.columns = [
+      { header: "Address ID", key: "id", width: 10 },
+      { header: "Client ID", key: "client_id", width: 10 },
+      { header: "Company Name", key: "company_name", width: 30 },
+      { header: "Address Type", key: "address_type", width: 15 },
+      { header: "Address Line 1", key: "address_line1", width: 30 },
+      { header: "Address Line 2", key: "address_line2", width: 30 },
+      { header: "City", key: "city", width: 20 },
+      { header: "State", key: "state", width: 20 },
+      { header: "Country", key: "country", width: 20 },
+      { header: "Postal Code", key: "postal_code", width: 15 },
+      { header: "Status", key: "status", width: 10 },
+    ];
+
+    // Add styles to header rows
+    const headerStyle = {
+      font: { bold: true, color: { argb: "FFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "4472C4" } },
+    };
+
+    clientSheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    addressSheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    // Add data to client sheet
+    clients.forEach((client) => {
+      clientSheet.addRow({
+        client_id: client.client_id,
+        company_name: client.company_name,
+        display_name: client.display_name,
+        PAN: client.PAN,
+        email: client.email,
+        phone: client.phone,
+        status: client.status,
+        created_by_name: client.creator ? client.creator.name : "N/A",
+        created_at: client.created_at
+          ? new Date(client.created_at).toLocaleString()
+          : "N/A",
+        updated_by_name: client.updater ? client.updater.name : "N/A",
+        updated_at: client.updated_at
+          ? new Date(client.updated_at).toLocaleString()
+          : "N/A",
+      });
+
+      // Add data to address sheet if client has addresses
+      if (client.addresses && client.addresses.length > 0) {
+        client.addresses.forEach((address) => {
+          addressSheet.addRow({
+            id: address.id,
+            client_id: client.client_id,
+            company_name: client.company_name, // Add company name for reference
+            address_type: address.address_type,
+            address_line1: address.address_line1,
+            address_line2: address.address_line2,
+            city: address.city,
+            state: address.state,
+            country: address.country,
+            postal_code: address.postal_code,
+            status: address.status,
+          });
+        });
+      }
+    });
+
+    // Apply alternating row colors for better readability
+    clientSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    addressSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    // Create a readable stream for the workbook
+    const buffer = await workbook.xlsx.writeBuffer();
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Set response headers for file download
+    const searchSuffix = search ? `-${search}` : "";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `clients-data${searchSuffix}-${timestamp}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    // Log the download
+    logger.info(
+      `Excel download initiated by user ${
+        req.user.id
+      } with filters: ${JSON.stringify({ search, includeInactive })}`
+    );
+  } catch (error) {
+    logger.error("Excel Download Error:", error);
     return res.status(500).json({ status: false, message: error.message });
   }
 });
