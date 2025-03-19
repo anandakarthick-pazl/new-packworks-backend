@@ -37,8 +37,9 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
     // Add user tracking information internally
     const newClientData = {
       ...clientData,
-      created_by: req.user.id, 
-      updated_by: req.user.id, 
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      updated_by: req.user.id,
       status: "active",
     };
 
@@ -179,7 +180,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Update a Client and Addresses (PUT)
 v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
 
@@ -187,7 +187,7 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
     const { clientData, addresses } = req.body;
     const clientId = req.params.id;
 
-    // Find client
+    // Check if client exists
     const client = await Client.findByPk(clientId, { transaction: t });
     if (!client) {
       await t.rollback();
@@ -196,14 +196,13 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
         .json({ status: false, message: "Client not found" });
     }
 
-    // Add updater information internally
+    // Update client data
     const updatedClientData = {
       ...clientData,
-      updated_by: req.user.id, // Set from authenticated user
+      updated_by: req.user.id,
       updated_at: new Date(),
     };
 
-    // Update client data
     await client.update(updatedClientData, {
       transaction: t,
       fields: Object.keys(updatedClientData),
@@ -211,50 +210,53 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
 
     let updatedAddresses = [];
 
-    // Handle Addresses
+    // Handle Addresses (Only Update, No Creation)
     if (addresses && addresses.length > 0) {
-      updatedAddresses = await Promise.all(
-        addresses.map(async (address) => {
-          const addressWithUser = {
-            ...address,
-            updated_by: req.user.id, // Add user ID to each address
-          };
+      for (const address of addresses) {
+        if (!address.id) {
+          await t.rollback();
+          return res.status(400).json({
+            status: false,
+            message:
+              "Address ID is missing. Only existing addresses can be updated.",
+          });
+        }
 
-          if (address.address_id) {
-            // Update existing address
-            await Address.update(addressWithUser, {
-              where: { address_id: address.address_id },
-              transaction: t,
-            });
-            return await Address.findByPk(address.address_id, {
-              transaction: t,
-            });
-          } else {
-            // Create new address
-            return await Address.create(
-              {
-                ...addressWithUser,
-                client_id: client.client_id,
-                created_by: req.user.id, // Set created_by for new addresses
-              },
-              { transaction: t }
-            );
-          }
-        })
-      );
+        const existingAddress = await Address.findOne({
+          where: { id: address.id, client_id: clientId },
+          transaction: t,
+        });
+
+        if (!existingAddress) {
+          await t.rollback();
+          return res.status(404).json({
+            status: false,
+            message: `Address with ID ${address.id} not found or doesn't belong to the client.`,
+          });
+        }
+
+        const addressWithUser = {
+          ...address,
+          updated_by: req.user.id,
+          updated_at: new Date(),
+        };
+
+        await existingAddress.update(addressWithUser, { transaction: t });
+        updatedAddresses.push(existingAddress);
+      }
     }
 
     await t.commit();
 
     return res.status(200).json({
       status: true,
-      message: "Client and Addresses updated successfully",
-      client: client,
+      message: "Client and addresses updated successfully",
+      client,
       addresses: updatedAddresses,
     });
   } catch (error) {
     await t.rollback();
-    logger.error("Client Update Error:", error);
+    console.error("Error updating client and addresses:", error);
     return res.status(500).json({ status: false, message: error.message });
   }
 });

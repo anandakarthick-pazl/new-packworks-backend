@@ -19,7 +19,6 @@ const Client = sequelize.define(
         key: "id",
       },
       onUpdate: "CASCADE",
-      onDelete: "CASCADE",
     },
     client_ref_id: {
       type: DataTypes.STRING,
