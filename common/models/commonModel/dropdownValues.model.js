@@ -73,7 +73,6 @@ const DropdownValue = sequelize.define(
   {
     tableName: "dropdown_values",
     timestamps: false,
-    // underscored:false
   }
 );
 
