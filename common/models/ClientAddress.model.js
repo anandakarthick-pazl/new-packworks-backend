@@ -62,6 +62,14 @@ const Address = sequelize.define(
       allowNull: false,
       defaultValue: "active",
     },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -81,17 +89,17 @@ const Address = sequelize.define(
   },
   {
     tableName: "addresses",
-    timestamps: true,
+    timestamps: false,
   }
 );
 // Define the relationship
 Client.hasMany(Address, { foreignKey: "client_id", as: "addresses" });
-Address.belongsTo(Client, { foreignKey: "client_id", as: "clients" });
+Address.belongsTo(Client, { foreignKey: "client_id" });
 
-User.hasMany(Address, { foreignKey: "created_by", as: "address_creater" });
-Address.belongsTo(User, { foreignKey: "created_by", as: "creater" });
+User.hasMany(Address, { foreignKey: "created_by", as: "created_addresses" });
+Address.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
-User.hasMany(Address, { foreignKey: "updated_by", as: "address_updater" });
+User.hasMany(Address, { foreignKey: "updated_by", as: "updated_addresses" });
 Address.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
 export default Address;

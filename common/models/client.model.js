@@ -13,7 +13,7 @@ const Client = sequelize.define(
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: Company,
         key: "id",
@@ -21,7 +21,6 @@ const Client = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-
     client_ref_id: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -121,7 +120,7 @@ const Client = sequelize.define(
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: User,
         key: "id",
@@ -129,7 +128,7 @@ const Client = sequelize.define(
     },
     updated_by: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: User,
         key: "id",
@@ -145,10 +144,11 @@ const Client = sequelize.define(
 // Define the relationship
 Company.hasMany(Client, { foreignKey: "company_id" });
 Client.belongsTo(Company, { foreignKey: "company_id" });
-
+// Update the Client model associations
 User.hasMany(Client, { foreignKey: "created_by", as: "created_clients" });
-Client.belongsTo(User, { foreignKey: "created_by", as: "creator_client" });
-
 User.hasMany(Client, { foreignKey: "updated_by", as: "updated_clients" });
-Client.belongsTo(User, { foreignKey: "updated_by", as: "updater_client" });
+Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+Client.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+
 export default Client;

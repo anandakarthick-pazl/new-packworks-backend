@@ -6,8 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 
-// Import the Redis and RabbitMQ configurations
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
+// Import only the RabbitMQ configuration
 import {
   publishToQueue,
   rabbitChannel,
@@ -31,39 +30,34 @@ const User = db.User;
 
 // 🔹 Create a Client (POST)
 v1Router.post("/clients", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction(); // Start transaction
-
+  const t = await sequelize.transaction();
   try {
     const { clientData, addresses } = req.body;
 
     // Add user tracking information
     clientData.created_by = req.user.id;
     clientData.updated_by = req.user.id;
-    clientData.status = "active"; // Ensure new clients are active by default
-
+    clientData.status = "active";
     // 1. Create Client
     const newClient = await Client.create(clientData, { transaction: t });
 
-    // 2. Create Addresses and store them in an array
+    // 2. Create Addresses and store them in an 
     let createdAddresses = [];
-    if (addresses && addresses.length > 0) {
-      createdAddresses = await Promise.all(
-        addresses.map(async (address) => {
-          return await Address.create(
-            {
-              ...address,
-              client_id: newClient.client_id, // Link address to client
-            },
-            { transaction: t }
-          );
-        })
-      );
-    }
+    createdAddresses = await Promise.all(
+      addresses.map(async (address) => {
+        return await Address.create(
+          {
+            ...address,
+            client_id: newClient.client_id,
+            created_by: req.user.id, 
+            updated_by: req.user.id, 
+          },
+          { transaction: t }
+        );
+      })
+    );
 
-    await t.commit(); // Commit transaction
-
-    // Clear Redis cache after successful creation
-    await clearClientCache();
+    await t.commit();
 
     // Publish message to RabbitMQ
     await publishToQueue({
@@ -75,14 +69,13 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
         addresses: createdAddresses,
       },
     });
-
     res.status(201).json({
       message: "Client and Addresses added successfully",
       client: newClient,
-      addresses: createdAddresses, // Include addresses in response
+      addresses: createdAddresses,
     });
   } catch (error) {
-    await t.rollback(); // Rollback if error
+    await t.rollback();
     res
       .status(500)
       .json({ message: "Error adding client", error: error.message });
@@ -90,23 +83,11 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get All Clients (GET) with Addresses - Only active clients
-v1Router.get("/clients", authenticateJWT, companyScope, async (req, res) => {
+v1Router.get("/clients", authenticateJWT, async (req, res) => {
   try {
     let { page = 1, limit = 10, search, includeInactive = false } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
-
-    // Create a cache key based on request parameters
-    const cacheKey = `client:all:page${page}:limit${limit}:search${
-      search || "none"
-    }:includeInactive${includeInactive}`;
-
-    // Try to get data from Redis first
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-      logger.info("Data retrieved from Redis cache");
-      return res.status(200).json(JSON.parse(cachedData));
-    }
 
     const whereClause = {};
 
@@ -129,12 +110,12 @@ v1Router.get("/clients", authenticateJWT, companyScope, async (req, res) => {
         { model: Address, as: "addresses" },
         {
           model: User,
-          as: "creator_client",
+          as: "creator",
           attributes: ["id", "name", "email"],
         },
         {
           model: User,
-          as: "updater_client",
+          as: "updater",
           attributes: ["id", "name", "email"],
         },
       ],
@@ -151,9 +132,6 @@ v1Router.get("/clients", authenticateJWT, companyScope, async (req, res) => {
       totalRecords: count,
     };
 
-    // Store in Redis with expiration (e.g., 1 hour)
-    await redisClient.set(cacheKey, JSON.stringify(response), "EX", 3600);
-
     return res.status(200).json(response);
   } catch (error) {
     logger.error("Client Fetch Error:", error);
@@ -165,26 +143,18 @@ v1Router.get("/clients", authenticateJWT, companyScope, async (req, res) => {
 v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   try {
     const clientId = req.params.id;
-    const cacheKey = `client:${clientId}`;
-
-    // Try to get data from Redis first
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-      logger.info(`Client ${clientId} retrieved from Redis cache`);
-      return res.status(200).json(JSON.parse(cachedData));
-    }
 
     const client = await Client.findByPk(clientId, {
       include: [
         { model: Address, as: "addresses" },
         {
           model: User,
-          as: "creator_client",
+          as: "creator",
           attributes: ["id", "name", "email"],
         },
         {
           model: User,
-          as: "updater_client",
+          as: "updater  ",
           attributes: ["id", "name", "email"],
         },
       ],
@@ -197,9 +167,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     }
 
     const response = { status: true, data: client };
-
-    // Store in Redis with expiration (e.g., 1 hour)
-    await redisClient.set(cacheKey, JSON.stringify(response), "EX", 3600);
 
     return res.status(200).json(response);
   } catch (error) {
@@ -263,20 +230,6 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
 
     await t.commit();
 
-    // Clear Redis cache after successful update
-    await clearClientCache();
-
-    // Publish message to RabbitMQ
-    await publishToQueue({
-      operation: "UPDATE",
-      clientId: client.client_id,
-      timestamp: new Date(),
-      data: {
-        client: client,
-        addresses: updatedAddresses,
-      },
-    });
-
     return res.status(200).json({
       status: true,
       message: "Client and Addresses updated successfully",
@@ -313,24 +266,24 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
       { transaction: t }
     );
 
-    await t.commit();
-
-    // Clear Redis cache after successful soft deletion
-    await clearClientCache();
-
-    // Publish message to RabbitMQ
-    await publishToQueue({
-      operation: "SOFT_DELETE",
-      clientId: client.client_id,
-      timestamp: new Date(),
-      data: {
-        client: client,
+    // Also mark all related addresses as inactive
+    await Address.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+        updated_at: new Date(),
       },
-    });
+      {
+        where: { client_id: clientId },
+        transaction: t,
+      }
+    );
+
+    await t.commit();
 
     return res.status(200).json({
       status: true,
-      message: "Client marked as inactive successfully",
+      message: "Client and related addresses marked as inactive successfully",
     });
   } catch (error) {
     await t.rollback();
@@ -338,63 +291,6 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-// // 🔹 Hard Delete a Client and Its Addresses (for admin purposes)
-// v1Router.delete("/clients/:id/hard", authenticateJWT, async (req, res) => {
-//   // Check if user has admin privileges
-//   if (!req.user.isAdmin) {
-//     return res.status(403).json({
-//       status: false,
-//       message: "Only administrators can perform hard delete operations",
-//     });
-//   }
-
-//   const t = await sequelize.transaction();
-//   try {
-//     const clientId = req.params.id;
-//     const client = await Client.findByPk(clientId, { transaction: t });
-//     if (!client) {
-//       await t.rollback();
-//       return res
-//         .status(404)
-//         .json({ status: false, message: "Client not found" });
-//     }
-
-//     // Delete addresses first (assuming client_id is the foreign key in addresses)
-//     await Address.destroy({
-//       where: { client_id: client.client_id },
-//       transaction: t,
-//     });
-
-//     // Delete client
-//     await client.destroy({ transaction: t });
-
-//     await t.commit();
-
-//     // Clear Redis cache after successful deletion
-//     await clearClientCache();
-
-//     // Publish message to RabbitMQ
-//     await publishToQueue({
-//       operation: "HARD_DELETE",
-//       clientId: clientId,
-//       timestamp: new Date(),
-//       data: {
-//         message: "Client and related addresses permanently deleted",
-//       },
-//     });
-
-//     return res.status(200).json({
-//       status: true,
-//       message: "Client and related Addresses permanently deleted successfully",
-//     });
-//   } catch (error) {
-//     await t.rollback();
-//     logger.error("Client Hard Delete Error:", error);
-//     return res.status(500).json({ status: false, message: error.message });
-//   }
-// });
-
 // 🔹 Restore a Soft-Deleted Client
 v1Router.post("/clients/:id/restore", authenticateJWT, async (req, res) => {
   try {
@@ -421,19 +317,6 @@ v1Router.post("/clients/:id/restore", authenticateJWT, async (req, res) => {
       updated_at: new Date(),
     });
 
-    // Clear Redis cache after successful restoration
-    await clearClientCache();
-
-    // Publish message to RabbitMQ
-    await publishToQueue({
-      operation: "RESTORE",
-      clientId: client.client_id,
-      timestamp: new Date(),
-      data: {
-        client: client,
-      },
-    });
-
     return res.status(200).json({
       status: true,
       message: "Client restored successfully",
@@ -450,7 +333,6 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
     rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
@@ -458,9 +340,6 @@ app.get("/health", (req, res) => {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-
-  // Close Redis connection using the exported function
-  await redisClient.quit();
 
   // Close RabbitMQ connection using the exported function
   await closeRabbitMQConnection();
@@ -470,10 +349,6 @@ process.on("SIGINT", async () => {
 
 // Use Version 1 Router
 app.use("/api", v1Router);
-
-// Update the Client model associations
-Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
-Client.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
 await db.sequelize.sync();
 const PORT = 3003;
