@@ -73,10 +73,14 @@ const DropdownValue = sequelize.define(
   {
     tableName: "dropdown_values",
     timestamps: false,
+    // underscored:false
   }
 );
 
 DropdownName.hasMany(DropdownValue, { foreignKey: "dropdown_id" });
-DropdownValue.belongsTo(DropdownName, { foreignKey: "dropdown_id", as:"dropdownName"  });
+DropdownValue.belongsTo(DropdownName, {
+  foreignKey: "dropdown_id",
+  as: "dropdownName",
+});
 
 export default DropdownValue;

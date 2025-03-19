@@ -64,6 +64,7 @@ const DropdownName = sequelize.define(
   {
     tableName: "dropdown_names",
     timestamps: false,
+    // underscored:false
   }
 );
 
