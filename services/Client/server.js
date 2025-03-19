@@ -34,14 +34,18 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
   try {
     const { clientData, addresses } = req.body;
 
-    // Add user tracking information
-    clientData.created_by = req.user.id;
-    clientData.updated_by = req.user.id;
-    clientData.status = "active";
-    // 1. Create Client
-    const newClient = await Client.create(clientData, { transaction: t });
+    // Add user tracking information internally
+    const newClientData = {
+      ...clientData,
+      created_by: req.user.id, 
+      updated_by: req.user.id, 
+      status: "active",
+    };
 
-    // 2. Create Addresses and store them in an 
+    // 1. Create Client
+    const newClient = await Client.create(newClientData, { transaction: t });
+
+    // 2. Create Addresses and store them in an array
     let createdAddresses = [];
     createdAddresses = await Promise.all(
       addresses.map(async (address) => {
@@ -49,8 +53,8 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
           {
             ...address,
             client_id: newClient.client_id,
-            created_by: req.user.id, 
-            updated_by: req.user.id, 
+            created_by: req.user.id, // Set from authenticated user
+            updated_by: req.user.id, // Set from authenticated user
           },
           { transaction: t }
         );
@@ -192,14 +196,17 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
         .json({ status: false, message: "Client not found" });
     }
 
-    // Add updater information
-    clientData.updated_by = req.user.id;
-    clientData.updated_at = new Date();
+    // Add updater information internally
+    const updatedClientData = {
+      ...clientData,
+      updated_by: req.user.id, // Set from authenticated user
+      updated_at: new Date(),
+    };
 
     // Update client data
-    await client.update(clientData, {
+    await client.update(updatedClientData, {
       transaction: t,
-      fields: Object.keys(clientData),
+      fields: Object.keys(updatedClientData),
     });
 
     let updatedAddresses = [];
@@ -208,9 +215,14 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
     if (addresses && addresses.length > 0) {
       updatedAddresses = await Promise.all(
         addresses.map(async (address) => {
+          const addressWithUser = {
+            ...address,
+            updated_by: req.user.id, // Add user ID to each address
+          };
+
           if (address.address_id) {
             // Update existing address
-            await Address.update(address, {
+            await Address.update(addressWithUser, {
               where: { address_id: address.address_id },
               transaction: t,
             });
@@ -220,7 +232,11 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
           } else {
             // Create new address
             return await Address.create(
-              { ...address, client_id: client.client_id },
+              {
+                ...addressWithUser,
+                client_id: client.client_id,
+                created_by: req.user.id, // Set created_by for new addresses
+              },
               { transaction: t }
             );
           }
@@ -260,7 +276,7 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     await client.update(
       {
         status: "inactive",
-        updated_by: req.user.id,
+        updated_by: req.user.id, // Set from authenticated user
         updated_at: new Date(),
       },
       { transaction: t }
@@ -270,7 +286,7 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     await Address.update(
       {
         status: "inactive",
-        updated_by: req.user.id,
+        updated_by: req.user.id, // Set from authenticated user
         updated_at: new Date(),
       },
       {
@@ -288,42 +304,6 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   } catch (error) {
     await t.rollback();
     logger.error("Client Soft Delete Error:", error);
-    return res.status(500).json({ status: false, message: error.message });
-  }
-});
-// 🔹 Restore a Soft-Deleted Client
-v1Router.post("/clients/:id/restore", authenticateJWT, async (req, res) => {
-  try {
-    const clientId = req.params.id;
-    const client = await Client.findByPk(clientId);
-
-    if (!client) {
-      return res
-        .status(404)
-        .json({ status: false, message: "Client not found" });
-    }
-
-    // Check if client is already active
-    if (client.status === "active") {
-      return res
-        .status(400)
-        .json({ status: false, message: "Client is already active" });
-    }
-
-    // Restore client by setting status to active
-    await client.update({
-      status: "active",
-      updated_by: req.user.id,
-      updated_at: new Date(),
-    });
-
-    return res.status(200).json({
-      status: true,
-      message: "Client restored successfully",
-      client: client,
-    });
-  } catch (error) {
-    logger.error("Client Restore Error:", error);
     return res.status(500).json({ status: false, message: error.message });
   }
 });
