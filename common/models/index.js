@@ -12,7 +12,7 @@ import WorkOrder from './salesOrder/workOrder.model.js';
 import Machine from './machine/machine.model.js';
 import MachineProcessName from './machine/processName.model.js';
 import MachineProcessField from './machine/processField.model.js';
-import DropdownName from './commonModel/dropDown.model.js';
+import DropdownName from './commonModel/dropdown.model.js';
 import DropdownValue from './commonModel/dropdownValues.model.js';
 import MachineProcessValue from './machine/processValue.model.js';
 

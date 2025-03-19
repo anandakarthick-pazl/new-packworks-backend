@@ -3,7 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
-import DropdownName from "./dropDown.model.js";
+import DropdownName from "./dropdown.model.js";
 
 const DropdownValue = sequelize.define(
   "DropdownValue",
