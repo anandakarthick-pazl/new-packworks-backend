@@ -94,6 +94,8 @@ const Client = sequelize.define(
     },
     documents: {
       type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: [],
     },
     website_url: {
       type: DataTypes.STRING,

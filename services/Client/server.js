@@ -102,6 +102,9 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
     page = parseInt(page);
     limit = parseInt(limit);
 
+    console.log("pages", page);
+    console.log("object", limit);
+
     const whereClause = {};
 
     // By default, only show active clients unless includeInactive is true
@@ -142,9 +145,10 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       limit,
       offset: (page - 1) * limit,
       order: [["client_id", "ASC"]],
+      distinct:true
     });
-
-    const response = {
+    console.log("count",count);
+    const response = {  
       status: true,
       data: clients.map((client) => ({
         ...client.toJSON(),
@@ -337,7 +341,6 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
 
 v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   try {
