@@ -338,16 +338,21 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// Download Clients Data as Excel (GET)
+
 v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   try {
-    let { search, includeInactive = false } = req.query;
+    let { search, includeInactive = false, entity_type } = req.query;
 
     const whereClause = {};
 
     // By default, only show active clients unless includeInactive is true
     if (includeInactive !== "true") {
       whereClause.status = "active";
+    }
+
+    // Add entity_type filter if provided
+    if (entity_type) {
+      whereClause.entity_type = entity_type;
     }
 
     if (search) {
@@ -382,14 +387,35 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
     const clientSheet = workbook.addWorksheet("Clients");
     const addressSheet = workbook.addWorksheet("Addresses");
 
-    // Set up client sheet headers
+    // Set up client sheet headers with all model fields
     clientSheet.columns = [
       { header: "Client ID", key: "client_id", width: 10 },
+      { header: "Company ID", key: "company_id", width: 10 },
+      { header: "Client Ref ID", key: "client_ref_id", width: 15 },
+      { header: "Entity Type", key: "entity_type", width: 15 },
+      { header: "Customer Type", key: "customer_type", width: 15 },
       { header: "Company Name", key: "company_name", width: 30 },
       { header: "Display Name", key: "display_name", width: 20 },
+      { header: "Salutation", key: "salutation", width: 10 },
+      { header: "First Name", key: "first_name", width: 20 },
+      { header: "Last Name", key: "last_name", width: 20 },
       { header: "PAN", key: "PAN", width: 15 },
+      { header: "GST Status", key: "gst_status", width: 10 },
+      { header: "GST Number", key: "gst_number", width: 20 },
       { header: "Email", key: "email", width: 30 },
-      { header: "Phone", key: "phone", width: 15 },
+      { header: "Work Phone", key: "work_phone", width: 15 },
+      { header: "Mobile", key: "mobile", width: 15 },
+      { header: "Currency", key: "currency", width: 15 },
+      { header: "Opening Balance", key: "opening_balance", width: 15 },
+      { header: "Payment Terms", key: "payment_terms", width: 15 },
+      { header: "Portal Enabled", key: "enable_portal", width: 15 },
+      { header: "Portal Language", key: "portal_language", width: 15 },
+      { header: "Website", key: "website_url", width: 20 },
+      { header: "Department", key: "department", width: 15 },
+      { header: "Designation", key: "designation", width: 15 },
+      { header: "Twitter", key: "twitter", width: 15 },
+      { header: "Skype", key: "skype", width: 15 },
+      { header: "Facebook", key: "facebook", width: 15 },
       { header: "Status", key: "status", width: 10 },
       { header: "Created By", key: "created_by_name", width: 20 },
       { header: "Created At", key: "created_at", width: 20 },
@@ -397,19 +423,24 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
       { header: "Updated At", key: "updated_at", width: 20 },
     ];
 
-    // Set up address sheet headers
+    // Set up address sheet headers with all fields from Address model
     addressSheet.columns = [
       { header: "Address ID", key: "id", width: 10 },
       { header: "Client ID", key: "client_id", width: 10 },
       { header: "Company Name", key: "company_name", width: 30 },
-      { header: "Address Type", key: "address_type", width: 15 },
-      { header: "Address Line 1", key: "address_line1", width: 30 },
-      { header: "Address Line 2", key: "address_line2", width: 30 },
+      { header: "Entity Type", key: "entity_type", width: 15 },
+      { header: "Attention", key: "attention", width: 20 },
+      { header: "Address Line 1", key: "street1", width: 30 },
+      { header: "Address Line 2", key: "street2", width: 30 },
       { header: "City", key: "city", width: 20 },
       { header: "State", key: "state", width: 20 },
       { header: "Country", key: "country", width: 20 },
-      { header: "Postal Code", key: "postal_code", width: 15 },
+      { header: "Postal Code", key: "pinCode", width: 15 },
+      { header: "Phone", key: "phone", width: 15 },
+      { header: "Fax", key: "faxNumber", width: 15 },
       { header: "Status", key: "status", width: 10 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
     ];
 
     // Add styles to header rows
@@ -430,11 +461,32 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
     clients.forEach((client) => {
       clientSheet.addRow({
         client_id: client.client_id,
+        company_id: client.company_id,
+        client_ref_id: client.client_ref_id,
+        entity_type: client.entity_type,
+        customer_type: client.customer_type,
         company_name: client.company_name,
         display_name: client.display_name,
+        salutation: client.salutation,
+        first_name: client.first_name,
+        last_name: client.last_name,
         PAN: client.PAN,
+        gst_status: client.gst_status ? "Yes" : "No",
+        gst_number: client.gst_number,
         email: client.email,
-        phone: client.phone,
+        work_phone: client.work_phone,
+        mobile: client.mobile,
+        currency: client.currency,
+        opening_balance: client.opening_balance,
+        payment_terms: client.payment_terms,
+        enable_portal: client.enable_portal ? "Yes" : "No",
+        portal_language: client.portal_language,
+        website_url: client.website_url,
+        department: client.department,
+        designation: client.designation,
+        twitter: client.twitter,
+        skype: client.skype,
+        facebook: client.facebook,
         status: client.status,
         created_by_name: client.creator ? client.creator.name : "N/A",
         created_at: client.created_at
@@ -452,15 +504,24 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
           addressSheet.addRow({
             id: address.id,
             client_id: client.client_id,
-            company_name: client.company_name, // Add company name for reference
-            address_type: address.address_type,
-            address_line1: address.address_line1,
-            address_line2: address.address_line2,
+            company_name: client.company_name,
+            entity_type: client.entity_type,
+            attention: address.attention,
+            street1: address.street1,
+            street2: address.street2,
             city: address.city,
             state: address.state,
             country: address.country,
-            postal_code: address.postal_code,
+            pinCode: address.pinCode,
+            phone: address.phone,
+            faxNumber: address.faxNumber,
             status: address.status,
+            created_at: address.created_at
+              ? new Date(address.created_at).toLocaleString()
+              : "N/A",
+            updated_at: address.updated_at
+              ? new Date(address.updated_at).toLocaleString()
+              : "N/A",
           });
         });
       }
@@ -501,8 +562,9 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
 
     // Set response headers for file download
     const searchSuffix = search ? `-${search}` : "";
+    const entityTypeSuffix = entity_type ? `-${entity_type}` : "";
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `clients-data${searchSuffix}-${timestamp}.xlsx`;
+    const filename = `clients-data${searchSuffix}${entityTypeSuffix}-${timestamp}.xlsx`;
 
     res.setHeader(
       "Content-Type",
@@ -517,7 +579,11 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
     logger.info(
       `Excel download initiated by user ${
         req.user.id
-      } with filters: ${JSON.stringify({ search, includeInactive })}`
+      } with filters: ${JSON.stringify({
+        search,
+        includeInactive,
+        entity_type,
+      })}`
     );
   } catch (error) {
     logger.error("Excel Download Error:", error);
