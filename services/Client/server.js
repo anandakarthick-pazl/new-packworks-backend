@@ -92,7 +92,13 @@ v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
 // 🔹 Get All Clients (GET) with Addresses - Only active clients
 v1Router.get("/clients", authenticateJWT, async (req, res) => {
   try {
-    let { page = 1, limit = 10, search, includeInactive = false } = req.query;
+    let {
+      page = 1,
+      limit = 10,
+      search,
+      includeInactive = false,
+      entity_type,
+    } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
 
@@ -102,12 +108,18 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
     if (includeInactive !== "true") {
       whereClause.status = "active";
     }
+    // Add entity_type filter if provided
+    if (entity_type) {
+      whereClause.entity_type = entity_type;
+    }
 
     if (search) {
       whereClause[Op.or] = [
         { company_name: { [Op.like]: `%${search}%` } },
         { PAN: { [Op.like]: `%${search}%` } },
         { display_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { mobile: { [Op.like]: `%${search}%` } },
         { gst_number: { [Op.like]: `%${search}%` } },
       ];
     }
@@ -134,7 +146,15 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
 
     const response = {
       status: true,
-      data: clients,
+      data: clients.map((client) => ({
+        ...client.toJSON(),
+        client_id:
+          client.entity_type === "Client"
+            ? `CLNT-${client.client_id}`
+            : client.entity_type === "Vendor"
+            ? `VEND-${client.client_id}`
+            : client.client_id,
+      })),
       totalPages: Math.ceil(count / limit),
       currentPage: page,
       totalRecords: count,
