@@ -145,10 +145,10 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       limit,
       offset: (page - 1) * limit,
       order: [["client_id", "ASC"]],
-      distinct:true
+      distinct: true,
     });
-    console.log("count",count);
-    const response = {  
+    console.log("count", count);
+    const response = {
       status: true,
       data: clients.map((client) => ({
         ...client.toJSON(),
@@ -225,6 +225,11 @@ v1Router.put(
         return res
           .status(404)
           .json({ status: false, message: "Client not found" });
+      }
+
+      // Prevent email updates
+      if (clientData?.email) {
+        delete clientData.email;
       }
 
       // Update client data

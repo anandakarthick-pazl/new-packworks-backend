@@ -56,6 +56,7 @@ export const validateClient = async (req, res, next) => {
 
         // Define schema for address
         const addressSchema = Joi.object({
+            id: Joi.number().integer().positive().optional(),
             attention: Joi.string().allow(null, ''),
             country: Joi.string().required(),
             street1: Joi.string().required(),
