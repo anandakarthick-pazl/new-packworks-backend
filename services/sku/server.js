@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
 import {
   publishToQueue,
   rabbitChannel,
@@ -13,6 +12,7 @@ import {
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import companyScope from "../../common/middleware/companyScope.js";
+import { validateSku } from "../../common/inputvalidation/validateSku.js";
 
 dotenv.config();
 
@@ -25,165 +25,148 @@ const Sku = db.Sku;
 const SkuType = db.SkuType;
 
 // 🔹 Create a SKU (POST)
-v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    // Add created_by and updated_by from the authenticated user
-    const skuData = {
-      ...req.body,
-      company_id: req.user.company_id,
-      created_by: req.user.id,
-      updated_by: req.user.id,
-      status: "active",
-    };
+v1Router.post(
+  "/sku-details",
+  authenticateJWT,
+  validateSku,
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      // Add created_by and updated_by from the authenticated user
+      const skuData = {
+        ...req.body,
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        updated_by: req.user.id,
+        status: "active",
+      };
 
-    const newSku = await Sku.create(skuData, { transaction: t });
-    await t.commit();
-    await clearClientCache();
-    await publishToQueue({
-      operation: "CREATE",
-      skuId: newSku.id,
-      timestamp: new Date(),
-      data: newSku,
-    });
-    res.status(201).json({ message: "SKU created successfully", sku: newSku });
-  } catch (error) {
-    await t.rollback();
-    res
-      .status(500)
-      .json({ message: "Error creating SKU", error: error.message });
-  }
-});
-
-v1Router.get("/sku-details", authenticateJWT,companyScope, async (req, res) => {
-  try {
-    const {
-      page = 1,
-      limit = 10,
-      search = "",
-      sku_name,
-      client,
-      ply,
-      status = "active",
-    } = req.query;
-
-    // Create a cache key based on the query parameters
-    const cacheKey = `sku-details_${page}_${limit}_${search}_${
-      sku_name || ""
-    }_${client || ""}_${ply || ""}_${status}`;
-
-    // Try to get data from Redis cache first
-    const cachedData = await redisClient.get(cacheKey);
-
-    if (cachedData) {
-      logger.info(`Cache hit for ${cacheKey}`);
-      return res.status(200).json(JSON.parse(cachedData));
+      const newSku = await Sku.create(skuData, { transaction: t });
+      await t.commit();
+      await publishToQueue({
+        operation: "CREATE",
+        skuId: newSku.id,
+        timestamp: new Date(),
+        data: newSku,
+      });
+      res
+        .status(201)
+        .json({ message: "SKU created successfully", sku: newSku });
+    } catch (error) {
+      await t.rollback();
+      res
+        .status(500)
+        .json({ message: "Error creating SKU", error: error.message });
     }
+  }
+);
 
-    logger.info(`Cache miss for ${cacheKey}`);
-    const offset = (page - 1) * limit;
+v1Router.get(
+  "/sku-details",
+  authenticateJWT,
+  companyScope,
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search = "",
+        sku_name,
+        client,
+        ply,
+        status = "active",
+      } = req.query;
 
-    // Build the where condition for search
-    let whereCondition = {
-      status: status, // Only return records with the requested status
-    };
+      const offset = (page - 1) * limit;
 
-    // Handle specific field searches if provided
-    if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
-    if (client) whereCondition.client = { [Op.like]: `%${client}%` };
-    if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
+      // Build the where condition for search
+      let whereCondition = {
+        status: status, // Only return records with the requested status
+      };
 
-    // Handle generic search across multiple fields if no specific fields are provided
-    if (search && Object.keys(whereCondition).length === 1) {
-      // Only status is set
-      whereCondition = {
-        [Op.and]: [
-          { status: status },
+      // Handle specific field searches if provided
+      if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+      if (client) whereCondition.client = { [Op.like]: `%${client}%` };
+      if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
+
+      // Handle generic search across multiple fields if no specific fields are provided
+      if (search && Object.keys(whereCondition).length === 1) {
+        // Only status is set
+        whereCondition = {
+          [Op.and]: [
+            { status: status },
+            {
+              [Op.or]: [
+                { sku_name: { [Op.like]: `%${search}%` } },
+                { client: { [Op.like]: `%${search}%` } },
+                { ply: { [Op.like]: `%${search}%` } },
+              ],
+            },
+          ],
+        };
+      }
+
+      // Get total count for pagination metadata
+      const totalCount = await Sku.count({
+        where: whereCondition,
+      });
+
+      // Fetch skus with pagination and search
+      const skus = await Sku.findAll({
+        where: whereCondition,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
           {
-            [Op.or]: [
-              { sku_name: { [Op.like]: `%${search}%` } },
-              { client: { [Op.like]: `%${search}%` } },
-              { ply: { [Op.like]: `%${search}%` } },
-            ],
+            model: db.User,
+            as: "sku_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: db.User,
+            as: "sku_updater",
+            attributes: ["id", "name"],
+            required: false,
           },
         ],
+      });
+
+      // Ensure sku_values is parsed as JSON
+      const formattedSkus = skus.map((sku) => ({
+        ...sku.toJSON(),
+        sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+      }));
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(totalCount / limit);
+
+      const responseData = {
+        data: formattedSkus,
+        pagination: {
+          totalCount,
+          totalPages,
+          currentPage: parseInt(page),
+          pageSize: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+        },
       };
+
+      res.status(200).json(responseData);
+    } catch (error) {
+      logger.error("Error fetching SKUs:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
     }
-
-    // Get total count for pagination metadata
-    const totalCount = await Sku.count({
-      where: whereCondition,
-    });
-
-    // Fetch skus with pagination and search
-    const skus = await Sku.findAll({
-      where: whereCondition,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      include: [
-        {
-          model: db.User,
-          as: "sku_creator",
-          attributes: ["id", "name"],
-          required: false,
-        },
-        {
-          model: db.User,
-          as: "sku_updater",
-          attributes: ["id", "name"],
-          required: false,
-        },
-      ],
-    });
-
-    // Ensure sku_values is parsed as JSON
-    const formattedSkus = skus.map((sku) => ({
-      ...sku.toJSON(),
-      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
-    }));
-
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(totalCount / limit);
-
-    const responseData = {
-      data: formattedSkus,
-      pagination: {
-        totalCount,
-        totalPages,
-        currentPage: parseInt(page),
-        pageSize: parseInt(limit),
-        hasNextPage: parseInt(page) < totalPages,
-        hasPrevPage: parseInt(page) > 1,
-      },
-    };
-
-    await redisClient.set(cacheKey, JSON.stringify(responseData), "EX", 3600);
-
-    res.status(200).json(responseData);
-  } catch (error) {
-    logger.error("Error fetching SKUs:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
   }
-});
+);
 
-// 🔹 Get SKU by ID with Redis caching (GET)
+// 🔹 Get SKU by ID (GET)
 v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   try {
-    const cacheKey = `skuDetail_${req.params.id}`;
-
-    // Try to get data from Redis cache first
-    const cachedData = await redisClient.get(cacheKey);
-
-    if (cachedData) {
-      logger.info(`Cache hit for ${cacheKey}`);
-      return res.status(200).json(JSON.parse(cachedData));
-    }
-
-    logger.info(`Cache miss for ${cacheKey}`);
-
     const sku = await Sku.findByPk(req.params.id, {
       include: [
         {
@@ -211,9 +194,6 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
     };
 
-    // Store in Redis cache
-    await redisClient.set(cacheKey, JSON.stringify(formattedSku), "EX", 3600);
-
     res.status(200).json(formattedSku);
   } catch (error) {
     logger.error("Error fetching SKU by ID:", error);
@@ -225,39 +205,45 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Update SKU (PUT)
-v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    // Add updated_by from the authenticated user
-    const skuData = {
-      ...req.body,
-      updated_by: req.user.id,
-    };
+v1Router.put(
+  "/sku-details/:id",
+  authenticateJWT,
+  validateSku,
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      // Add updated_by from the authenticated user
+      const skuData = {
+        ...req.body,
+        updated_by: req.user.id,
+      };
 
-    const updatedSku = await Sku.update(skuData, {
-      where: { id: req.params.id },
-      transaction: t,
-    });
+      const updatedSku = await Sku.update(skuData, {
+        where: { id: req.params.id },
+        transaction: t,
+      });
 
-    if (!updatedSku[0])
-      return res.status(404).json({ message: "SKU not found" });
+      if (!updatedSku[0])
+        return res.status(404).json({ message: "SKU not found" });
 
-    await t.commit();
-    await clearClientCache();
-    await publishToQueue({
-      operation: "UPDATE",
-      skuId: req.params.id,
-      timestamp: new Date(),
-      data: skuData,
-    });
-    res.status(200).json({ message: "SKU updated successfully" });
-  } catch (error) {
-    await t.rollback();
-    res
-      .status(500)
-      .json({ message: "Error updating SKU", error: error.message });
+      await t.commit();
+      await publishToQueue({
+        operation: "UPDATE",
+        skuId: req.params.id,
+        timestamp: new Date(),
+        data: skuData,
+      });
+      res
+        .status(200)
+        .json({ message: "SKU updated successfully", updatedData: skuData });
+    } catch (error) {
+      await t.rollback();
+      res
+        .status(500)
+        .json({ message: "Error updating SKU", error: error.message });
+    }
   }
-});
+);
 
 // 🔹 Soft Delete SKU (DELETE) - changes status to inactive
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
@@ -279,7 +265,6 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: "SKU not found" });
 
     await t.commit();
-    await clearClientCache();
     await publishToQueue({
       operation: "SOFT_DELETE",
       skuId: req.params.id,
@@ -295,38 +280,22 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Hard Delete SKU (for admin purposes if needed)
-// v1Router.delete("/sku-details/:id/hard", authenticateJWT, async (req, res) => {
-//   const t = await sequelize.transaction();
-//   try {
-//     const deletedSku = await Sku.destroy({
-//       where: { id: req.params.id },
-//       transaction: t,
-//     });
-//     if (!deletedSku) return res.status(404).json({ message: "SKU not found" });
-//     await t.commit();
-//     await clearClientCache();
-//     await publishToQueue({
-//       operation: "HARD_DELETE",
-//       skuId: req.params.id,
-//       timestamp: new Date(),
-//     });
-//     res.status(200).json({ message: "SKU permanently deleted successfully" });
-//   } catch (error) {
-//     await t.rollback();
-//     res
-//       .status(500)
-//       .json({ message: "Error deleting SKU", error: error.message });
-//   }
-// });
-
 // 🔹 Get all SKU Types
 v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
   try {
-    const { status = "active" } = req.query;
+    const { status = "active", page = 1, limit = 10 } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    // Get total count for pagination
+    const totalCount = await SkuType.count({
+      where: { status: status },
+    });
 
     const skuTypes = await SkuType.findAll({
       where: { status: status },
+      limit: parseInt(limit),
+      offset: parseInt(offset),
       include: [
         {
           model: db.User,
@@ -342,7 +311,23 @@ v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
         },
       ],
     });
-    res.status(200).json(skuTypes);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const responseData = {
+      data: skuTypes,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: parseInt(page),
+        // pageSize: parseInt(limit),
+        // hasNextPage: parseInt(page) < totalPages,
+        // hasPrevPage: parseInt(page) > 1,
+      },
+    };
+
+    res.status(200).json(responseData);
   } catch (error) {
     res
       .status(500)
@@ -356,6 +341,7 @@ v1Router.post("/sku-type", authenticateJWT, async (req, res) => {
   try {
     const skuTypeData = {
       ...req.body,
+      company_id: req.user.company_id,
       created_by: req.user.id,
       updated_by: req.user.id,
       status: "active",
@@ -457,7 +443,6 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
     rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
@@ -465,7 +450,6 @@ app.get("/health", (req, res) => {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-  await redisClient.quit();
   await closeRabbitMQConnection();
   process.exit(0);
 });
