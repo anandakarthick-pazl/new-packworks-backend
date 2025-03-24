@@ -536,7 +536,7 @@ process.on("SIGINT", async () => {
 });
 
 // Use Version 1 Router
-app.use("/api", v1Router);
+app.use("/api/common-service", v1Router);
 
 // Start the server
 await db.sequelize.sync();
