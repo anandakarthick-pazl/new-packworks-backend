@@ -31,6 +31,7 @@ v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
     // Add created_by and updated_by from the authenticated user
     const skuData = {
       ...req.body,
+      company_id: req.user.company_id,
       created_by: req.user.id,
       updated_by: req.user.id,
       status: "active",

@@ -14,7 +14,7 @@ const Sku = sequelize.define(
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: Company,
         key: "id",
@@ -24,7 +24,7 @@ const Sku = sequelize.define(
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: Client,
         key: "client_id",
@@ -33,7 +33,6 @@ const Sku = sequelize.define(
       onDelete: "CASCADE",
     },
     sku_name: { type: DataTypes.STRING, allowNull: false },
-    client: { type: DataTypes.STRING, allowNull: false },
     ply: { type: DataTypes.INTEGER, allowNull: false },
     length: { type: DataTypes.FLOAT, allowNull: false },
     width: { type: DataTypes.FLOAT, allowNull: false },
