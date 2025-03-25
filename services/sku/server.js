@@ -166,6 +166,7 @@ v1Router.get(
 
 // 🔹 Get SKU by ID (GET)
 v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
+  console.log("req.params.id", req.params.id);
   try {
     const sku = await Sku.findByPk(req.params.id, {
       include: [
@@ -393,21 +394,24 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get all SKU Types
-v1Router.get("/sku-details/sku-type", authenticateJWT, async (req, res) => {
+v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   try {
-    const { status = "active", page = 1, limit = 10 } = req.query;
+    const { status = "active", company_id } = req.query;
+    console.log("object, status, company_id", status, company_id);
 
-    const offset = (page - 1) * limit;
+    // Prepare where conditions
+    const whereConditions = {
+      status: status,
+    };
 
-    // Get total count for pagination
-    const totalCount = await SkuType.count({
-      where: { status: status },
-    });
+    // Add company_id filter if provided
+    if (company_id) {
+      whereConditions.company_id = company_id;
+    }
 
+    // Find SKU types with associated data
     const skuTypes = await SkuType.findAll({
-      where: { status: status },
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      where: whereConditions,
       include: [
         {
           model: db.User,
@@ -421,32 +425,35 @@ v1Router.get("/sku-details/sku-type", authenticateJWT, async (req, res) => {
           attributes: ["id", "name"],
           required: false,
         },
+        {
+          model: db.Company,
+          attributes: ["id", "name"],
+          required: false,
+        },
       ],
+      order: [["created_at", "DESC"]], // Order by creation date
     });
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(totalCount / limit);
+    // If no SKU types found, return meaningful response
+    if (skuTypes.length === 0) {
+      return res.status(404).json({
+        message: "No SKU types found",
+        data: [],
+      });
+    }
 
-    const responseData = {
+    // Send response with SKU types
+    res.status(200).json({
       data: skuTypes,
-      pagination: {
-        totalCount,
-        totalPages,
-        currentPage: parseInt(page),
-        // pageSize: parseInt(limit),
-        // hasNextPage: parseInt(page) < totalPages,
-        // hasPrevPage: parseInt(page) > 1,
-      },
-    };
-
-    res.status(200).json(responseData);
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    console.error("Error in SKU Type Fetch:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
-
 // 🔹 Create SKU Type
 v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -521,34 +528,38 @@ v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Soft Delete SKU Type
-v1Router.delete("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    const updatedSkuType = await SkuType.update(
-      {
-        status: "inactive",
-        updated_by: req.user.id,
-      },
-      {
-        where: { id: req.params.id },
-        transaction: t,
-      }
-    );
+v1Router.delete(
+  "/sku-details/sku-type/:id",
+  authenticateJWT,
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      const updatedSkuType = await SkuType.update(
+        {
+          status: "inactive",
+          updated_by: req.user.id,
+        },
+        {
+          where: { id: req.params.id },
+          transaction: t,
+        }
+      );
 
-    if (!updatedSkuType[0])
-      return res.status(404).json({ message: "SKU Type not found" });
+      if (!updatedSkuType[0])
+        return res.status(404).json({ message: "SKU Type not found" });
 
-    await t.commit();
-    res
-      .status(200)
-      .json({ message: "SKU Type marked as inactive successfully" });
-  } catch (error) {
-    await t.rollback();
-    res
-      .status(500)
-      .json({ message: "Error deactivating SKU Type", error: error.message });
+      await t.commit();
+      res
+        .status(200)
+        .json({ message: "SKU Type marked as inactive successfully" });
+    } catch (error) {
+      await t.rollback();
+      res
+        .status(500)
+        .json({ message: "Error deactivating SKU Type", error: error.message });
+    }
   }
-});
+);
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
