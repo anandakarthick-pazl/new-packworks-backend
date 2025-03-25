@@ -393,7 +393,7 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get all SKU Types
-v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
+v1Router.get("/sku-details/sku-type", authenticateJWT, async (req, res) => {
   try {
     const { status = "active", page = 1, limit = 10 } = req.query;
 
@@ -448,7 +448,7 @@ v1Router.get("/sku-type", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Create SKU Type
-v1Router.post("/sku-type", authenticateJWT, async (req, res) => {
+v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const skuTypeData = {
@@ -473,7 +473,7 @@ v1Router.post("/sku-type", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Update SKU Type
-v1Router.put("/sku-type/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { sku_type } = req.body; // Extract only sku_type
@@ -521,7 +521,7 @@ v1Router.put("/sku-type/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Soft Delete SKU Type
-v1Router.delete("/sku-type/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const updatedSkuType = await SkuType.update(

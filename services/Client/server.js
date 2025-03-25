@@ -227,18 +227,14 @@ v1Router.put(
           .json({ status: false, message: "Client not found" });
       }
 
-      // Prevent email updates
-      if (clientData?.email) {
-        delete clientData.email;
-      }
-
-      // Update client data
+      // Prepare update data
       const updatedClientData = {
         ...clientData,
         updated_by: req.user.id,
         updated_at: new Date(),
       };
 
+      // Update client data
       await client.update(updatedClientData, {
         transaction: t,
         fields: Object.keys(updatedClientData),
