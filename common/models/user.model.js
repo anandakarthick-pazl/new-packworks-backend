@@ -26,6 +26,10 @@ const User = sequelize.define('User', {
         type: DataTypes.TINYINT(1),
         defaultValue: 0,
     },
+    customised_permissions: {
+        type: DataTypes.TINYINT(1),
+        defaultValue: 0,
+    },
     name: {
         type: DataTypes.STRING(191),
         allowNull: false,
