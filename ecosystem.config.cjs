@@ -61,6 +61,12 @@ module.exports = {
       env: {
         PORT: 3008,
       },
+    }, {
+      name: "rbac-Service",
+      script: "./services/rbac/server.js",
+      env: {
+        PORT: 3009,
+      },
     },
   ],
 };
