@@ -209,6 +209,7 @@ v1Router.put(
   authenticateJWT,
   validateSku,
   async (req, res) => {
+    console.log("object");
     const transaction = await sequelize.transaction();
     try {
       // Define allowed fields to update
@@ -238,7 +239,7 @@ v1Router.put(
         "status",
       ];
 
-      // Find the current SKU first
+      // Find the current SKU
       const currentSku = await Sku.findByPk(req.params.id);
 
       if (!currentSku) {
@@ -256,27 +257,26 @@ v1Router.put(
 
       // Add updated_by
       updateData.updated_by = req.user.id;
-
+      console.log(updateData);
       // Special handling for sku_name
       if (updateData.sku_name) {
-        // If the SKU name is the same as the current SKU's name, remove it from updateData
-        if (updateData.sku_name === currentSku.sku_name) {
-          delete updateData.sku_name;
-        } else {
-          // Check for duplicate SKU name, excluding the current SKU
+        if (updateData.sku_name !== currentSku.sku_name && updateData.id !== req.params.id) {
+          console.log("object");
+          // Check for duplicate SKU name for the same client, excluding the current SKU
           const existingSku = await Sku.findOne({
             where: {
               sku_name: updateData.sku_name,
               client_id: currentSku.client_id,
-              id: { [Op.ne]: req.params.id }, // Exclude the current SKU
+              id: { [Op.ne]: req.params.id },
             },
             transaction,
           });
-
+            console.log("object",existingSku);
           if (existingSku) {
             await transaction.rollback();
             return res.status(400).json({
-              message: "SKU name already exists for this client",
+              message: 
+                "SKU name already exists for this client.Please use a different name.",
             });
           }
         }
@@ -289,16 +289,16 @@ v1Router.put(
       ) {
         await transaction.rollback();
         return res.status(400).json({
-          message: "Cannot change client for an existing SKU",
+          message: "Cannot change client for an existing SKU.",
         });
       }
 
-      // If no updateable fields remain, return
+      // Check if no valid fields to update
       if (Object.keys(updateData).length <= 1) {
         // 1 is for updated_by
         await transaction.rollback();
         return res.status(400).json({
-          message: "No updateable fields provided",
+          message: "No updateable fields provided.",
         });
       }
 
@@ -308,10 +308,9 @@ v1Router.put(
         transaction,
       });
 
-      // Check if SKU was found and updated
       if (updatedCount === 0) {
         await transaction.rollback();
-        return res.status(404).json({ message: "SKU not found" });
+        return res.status(404).json({ message: "SKU not found." });
       }
 
       // Fetch the updated SKU to return to the client
@@ -328,15 +327,16 @@ v1Router.put(
         data: updateData,
       });
 
-      res.status(200).json({
-        message: "SKU updated successfully",
+      return res.status(200).json({
+        message: "SKU updated successfully.",
         updatedData: updatedSku,
       });
     } catch (error) {
-      // Rollback the transaction in case of any error
+      console.log(error,"12345")
+      // Rollback the transaction on error
       await transaction.rollback();
-      res.status(500).json({
-        message: "Error updating SKU",
+      return res.status(500).json({
+        message: "Error updating SKU.",
         error: error.message,
       });
     }

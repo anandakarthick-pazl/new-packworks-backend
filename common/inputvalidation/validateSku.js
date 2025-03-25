@@ -57,6 +57,7 @@ export const validateSku = async (req, res, next) => {
     }
 
     const { client_id, sku_name } = value;
+    const skuId = req.params.id; // Extract SKU ID from URL params
 
     // Check if Client exists
     const clientExists = await Client.findByPk(client_id);
@@ -64,8 +65,15 @@ export const validateSku = async (req, res, next) => {
       return res.status(400).json({ message: "Client not found" });
     }
 
-    // Check for duplicate SKU Name
-    const existingSku = await Sku.findOne({ where: { sku_name, client_id } });
+    // Check for duplicate SKU Name (excluding the current SKU if updating)
+    const existingSku = await Sku.findOne({
+      where: {
+        sku_name,
+        client_id,
+        ...(skuId ? { id: { [Op.ne]: skuId } } : {}),
+      },
+    });
+
     if (existingSku) {
       return res
         .status(400)
