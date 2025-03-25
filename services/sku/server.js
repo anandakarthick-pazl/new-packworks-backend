@@ -204,47 +204,144 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Update SKU (PUT)
 v1Router.put(
   "/sku-details/:id",
   authenticateJWT,
   validateSku,
   async (req, res) => {
-    const t = await sequelize.transaction();
+    const transaction = await sequelize.transaction();
     try {
-      // Add updated_by from the authenticated user
-      const skuData = {
-        ...req.body,
-        updated_by: req.user.id,
-      };
+      // Define allowed fields to update
+      const allowedFields = [
+        "client_id",
+        "sku_name",
+        "ply",
+        "length",
+        "width",
+        "height",
+        "joints",
+        "ups",
+        "inner_outer_dimension",
+        "flap_width",
+        "flap_tolerance",
+        "length_trimming_tolerance",
+        "width_trimming_tolerance",
+        "strict_adherence",
+        "customer_reference",
+        "reference_number",
+        "internal_id",
+        "board_size_cm2",
+        "deckle_size",
+        "minimum_order_level",
+        "sku_type",
+        "sku_values",
+        "status",
+      ];
 
-      const updatedSku = await Sku.update(skuData, {
-        where: { id: req.params.id },
-        transaction: t,
+      // Find the current SKU first
+      const currentSku = await Sku.findByPk(req.params.id);
+
+      if (!currentSku) {
+        await transaction.rollback();
+        return res.status(404).json({ message: "SKU not found" });
+      }
+
+      // Filter request body to only include allowed fields
+      const updateData = {};
+      allowedFields.forEach((field) => {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
       });
 
-      if (!updatedSku[0])
-        return res.status(404).json({ message: "SKU not found" });
+      // Add updated_by
+      updateData.updated_by = req.user.id;
 
-      await t.commit();
+      // Special handling for sku_name
+      if (updateData.sku_name) {
+        // If the SKU name is the same as the current SKU's name, remove it from updateData
+        if (updateData.sku_name === currentSku.sku_name) {
+          delete updateData.sku_name;
+        } else {
+          // Check for duplicate SKU name, excluding the current SKU
+          const existingSku = await Sku.findOne({
+            where: {
+              sku_name: updateData.sku_name,
+              client_id: currentSku.client_id,
+              id: { [Op.ne]: req.params.id }, // Exclude the current SKU
+            },
+            transaction,
+          });
+
+          if (existingSku) {
+            await transaction.rollback();
+            return res.status(400).json({
+              message: "SKU name already exists for this client",
+            });
+          }
+        }
+      }
+
+      // If client_id is provided, ensure it matches the current SKU's client
+      if (
+        updateData.client_id &&
+        updateData.client_id !== currentSku.client_id
+      ) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: "Cannot change client for an existing SKU",
+        });
+      }
+
+      // If no updateable fields remain, return
+      if (Object.keys(updateData).length <= 1) {
+        // 1 is for updated_by
+        await transaction.rollback();
+        return res.status(400).json({
+          message: "No updateable fields provided",
+        });
+      }
+
+      // Perform the update
+      const [updatedCount] = await Sku.update(updateData, {
+        where: { id: req.params.id },
+        transaction,
+      });
+
+      // Check if SKU was found and updated
+      if (updatedCount === 0) {
+        await transaction.rollback();
+        return res.status(404).json({ message: "SKU not found" });
+      }
+
+      // Fetch the updated SKU to return to the client
+      const updatedSku = await Sku.findByPk(req.params.id, { transaction });
+
+      // Commit the transaction
+      await transaction.commit();
+
+      // Publish update to queue (optional)
       await publishToQueue({
         operation: "UPDATE",
         skuId: req.params.id,
         timestamp: new Date(),
-        data: skuData,
+        data: updateData,
       });
-      res
-        .status(200)
-        .json({ message: "SKU updated successfully", updatedData: skuData });
+
+      res.status(200).json({
+        message: "SKU updated successfully",
+        updatedData: updatedSku,
+      });
     } catch (error) {
-      await t.rollback();
-      res
-        .status(500)
-        .json({ message: "Error updating SKU", error: error.message });
+      // Rollback the transaction in case of any error
+      await transaction.rollback();
+      res.status(500).json({
+        message: "Error updating SKU",
+        error: error.message,
+      });
     }
   }
 );
-
 // 🔹 Soft Delete SKU (DELETE) - changes status to inactive
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();

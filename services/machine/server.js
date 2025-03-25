@@ -988,7 +988,7 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 
 await db.sequelize.sync();
-const PORT = 3008;
+const PORT = 3007;
 const service = "Machine Service";
 app.listen(PORT, () => {
   console.log(`${service} running on port ${PORT}`);
