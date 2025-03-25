@@ -209,7 +209,6 @@ v1Router.put(
   authenticateJWT,
   validateSku,
   async (req, res) => {
-    console.log("object");
     const transaction = await sequelize.transaction();
     try {
       // Define allowed fields to update
@@ -257,11 +256,13 @@ v1Router.put(
 
       // Add updated_by
       updateData.updated_by = req.user.id;
-      console.log(updateData);
+
       // Special handling for sku_name
       if (updateData.sku_name) {
-        if (updateData.sku_name !== currentSku.sku_name && updateData.id !== req.params.id) {
-          console.log("object");
+        if (
+          updateData.sku_name !== currentSku.sku_name &&
+          updateData.id !== req.params.id
+        ) {
           // Check for duplicate SKU name for the same client, excluding the current SKU
           const existingSku = await Sku.findOne({
             where: {
@@ -271,12 +272,11 @@ v1Router.put(
             },
             transaction,
           });
-            console.log("object",existingSku);
           if (existingSku) {
             await transaction.rollback();
             return res.status(400).json({
-              message: 
-                "SKU name already exists for this client.Please use a different name.",
+              message:
+                "SKU name already exists for this client. Please use a different name.",
             });
           }
         }
@@ -298,7 +298,7 @@ v1Router.put(
         // 1 is for updated_by
         await transaction.rollback();
         return res.status(400).json({
-          message: "No updateable fields provided.",
+          message: "No updatable fields provided.",
         });
       }
 
@@ -316,6 +316,20 @@ v1Router.put(
       // Fetch the updated SKU to return to the client
       const updatedSku = await Sku.findByPk(req.params.id, { transaction });
 
+      // Convert sku_values from string to JSON if needed
+      if (updatedSku.sku_values) {
+        try {
+          updatedSku.sku_values = JSON.parse(updatedSku.sku_values);
+        } catch (error) {
+          console.error("Error parsing sku_values:", error.message);
+          await transaction.rollback();
+          return res.status(500).json({
+            message: "Error parsing sku_values.",
+            error: error.message,
+          });
+        }
+      }
+
       // Commit the transaction
       await transaction.commit();
 
@@ -332,7 +346,7 @@ v1Router.put(
         updatedData: updatedSku,
       });
     } catch (error) {
-      console.log(error,"12345")
+      console.log(error, "Error in SKU Update");
       // Rollback the transaction on error
       await transaction.rollback();
       return res.status(500).json({
@@ -342,6 +356,7 @@ v1Router.put(
     }
   }
 );
+
 // 🔹 Soft Delete SKU (DELETE) - changes status to inactive
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
