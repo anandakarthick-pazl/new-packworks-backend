@@ -14,7 +14,10 @@
     "work": "nodemon services/workOrder/server.js",
     "machine": "nodemon services/machine/server.js",
     "common": "nodemon services/common-service/server.js",
-    "rbac": "nodemon services/rbac/server.js"
+    "rbac": "nodemon services/rbac/server.js",
+    "department": "nodemon services/department/server.js",
+    "designations": "nodemon services/designations/server.js",
+    "role": "nodemon services/role/server.js"
   },
   "keywords": [],
   "author": "",

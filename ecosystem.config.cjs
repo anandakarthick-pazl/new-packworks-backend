@@ -61,11 +61,34 @@ module.exports = {
       env: {
         PORT: 3008,
       },
-    }, {
+    },
+    {
       name: "rbac-Service",
       script: "./services/rbac/server.js",
       env: {
         PORT: 3009,
+      },
+    },
+    {
+      name: "department-Service",
+      script: "./services/department/server.js",
+      env: {
+        PORT: 3010,
+      },
+    },
+    {
+      name: "designation-Service",
+      script: "./services/designations/server.js",
+      env: {
+        PORT: 3011,
+      },
+    },
+    ,
+    {
+      name: "role-Service",
+      script: "./services/role/server.js",
+      env: {
+        PORT: 3012,
       },
     },
   ],

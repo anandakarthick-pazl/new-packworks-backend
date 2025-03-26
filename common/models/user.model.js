@@ -1,6 +1,8 @@
 import { DataTypes } from 'sequelize';
 import  sequelize from '../database/database.js';
 import Company from './company.model.js';
+import UserRole from './userRole.model.js';
+import Employee from './employee.model.js';
 
 const User = sequelize.define('User', {
     id: {
@@ -103,5 +105,7 @@ const User = sequelize.define('User', {
     tableName: 'users',
     timestamps: false,
 });
+
+
 
 export default User;
