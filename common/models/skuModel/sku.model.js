@@ -33,6 +33,7 @@ const Sku = sequelize.define(
       onDelete: "CASCADE",
     },
     sku_name: { type: DataTypes.STRING, allowNull: false },
+    client: { type: DataTypes.STRING, allowNull: false },
     ply: { type: DataTypes.INTEGER, allowNull: false },
     length: { type: DataTypes.FLOAT, allowNull: false },
     width: { type: DataTypes.FLOAT, allowNull: false },

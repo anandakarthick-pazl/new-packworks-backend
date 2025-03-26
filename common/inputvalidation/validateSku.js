@@ -21,6 +21,7 @@ export const validateSku = async (req, res, next) => {
     const skuSchema = Joi.object({
       client_id: Joi.number().integer().positive().required(),
       sku_name: Joi.string().required(),
+      client: Joi.string().required(),
       ply: Joi.number().integer().positive().required(),
       length: Joi.number().positive().required(),
       width: Joi.number().positive().required(),
@@ -39,9 +40,7 @@ export const validateSku = async (req, res, next) => {
       board_size_cm2: Joi.number().positive().required(),
       deckle_size: Joi.number().positive().required(),
       minimum_order_level: Joi.number().integer().positive().required(),
-      sku_type: Joi.string()
-        .valid("Corrugated box", "Carton", "Package")
-        .required(),
+      sku_type: Joi.string().required(),
       sku_values: Joi.array().items(skuValueSchema).min(1).required(),
     });
 

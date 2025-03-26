@@ -61,108 +61,107 @@ v1Router.post(
   }
 );
 
-v1Router.get(
-  "/sku-details",
-  authenticateJWT,
-  companyScope,
-  async (req, res) => {
-    try {
-      const {
-        page = 1,
-        limit = 10,
-        search = "",
-        sku_name,
-        client,
-        ply,
-        status = "active",
-      } = req.query;
+v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      sku_name,
+      client,
+      ply,
+      sku_type,
+      status = "active",
+    } = req.query;
 
-      const offset = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-      // Build the where condition for search
-      let whereCondition = {
-        status: status, // Only return records with the requested status
-      };
+    // Build the where condition for search
+    let whereCondition = {
+      status: status,
+    };
 
-      // Handle specific field searches if provided
-      if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
-      if (client) whereCondition.client = { [Op.like]: `%${client}%` };
-      if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
+    // Handle specific field searches if provided
+    if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+    if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
+    
+    if (client) whereCondition.client = { [Op.like]: `%${client}%` };
+    if (sku_type) whereCondition.sku_type = { [Op.like]: `%${sku_type}%` };
 
-      // Handle generic search across multiple fields if no specific fields are provided
-      if (search && Object.keys(whereCondition).length === 1) {
-        // Only status is set
-        whereCondition = {
-          [Op.and]: [
-            { status: status },
-            {
-              [Op.or]: [
-                { sku_name: { [Op.like]: `%${search}%` } },
-                { client: { [Op.like]: `%${search}%` } },
-                { ply: { [Op.like]: `%${search}%` } },
-              ],
-            },
-          ],
-        };
-      }
+    // Apply filters for client and sku_type if provided
+    if (client) whereCondition.client = client;
+    if (sku_type) whereCondition.sku_type = sku_type;
 
-      // Get total count for pagination metadata
-      const totalCount = await Sku.count({
-        where: whereCondition,
-      });
-
-      // Fetch skus with pagination and search
-      const skus = await Sku.findAll({
-        where: whereCondition,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        include: [
+    // Handle generic search across multiple fields if no specific fields are provided
+    if (search) {
+      whereCondition = {
+        [Op.and]: [
+          { status: status },
           {
-            model: db.User,
-            as: "sku_creator",
-            attributes: ["id", "name"],
-            required: false,
-          },
-          {
-            model: db.User,
-            as: "sku_updater",
-            attributes: ["id", "name"],
-            required: false,
+            [Op.or]: [
+              { sku_name: { [Op.like]: `%${search}%` } },
+              { client: { [Op.like]: `%${search}%` } },
+              { ply: { [Op.like]: `%${search}%` } },
+              { sku_type: { [Op.like]: `%${search}%` } },
+              
+            ],
           },
         ],
-      });
-
-      // Ensure sku_values is parsed as JSON
-      const formattedSkus = skus.map((sku) => ({
-        ...sku.toJSON(),
-        sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
-      }));
-
-      // Calculate pagination metadata
-      const totalPages = Math.ceil(totalCount / limit);
-
-      const responseData = {
-        data: formattedSkus,
-        pagination: {
-          totalCount,
-          totalPages,
-          currentPage: parseInt(page),
-          pageSize: parseInt(limit),
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1,
-        },
       };
-
-      res.status(200).json(responseData);
-    } catch (error) {
-      logger.error("Error fetching SKUs:", error);
-      res.status(500).json({
-        message: "Internal Server Error",
-        error: error.message,
-      });
     }
+
+    // Get total count for pagination metadata
+    const totalCount = await Sku.count({ where: whereCondition });
+
+    // Fetch skus with pagination and search
+    const skus = await Sku.findAll({
+      where: whereCondition,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        {
+          model: db.User,
+          as: "sku_creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "sku_updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    const formattedSkus = skus.map((sku) => ({
+      ...sku.toJSON(),
+      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+    }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const responseData = {
+      data: formattedSkus,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: parseInt(page),
+        pageSize: parseInt(limit),
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    };
+
+    res.status(200).json(responseData);
+  } catch (error) {
+    logger.error("Error fetching SKUs:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
-);
+});
 
 // 🔹 Get SKU by ID (GET)
 v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
@@ -257,7 +256,7 @@ v1Router.put(
 
       // Add updated_by
       updateData.updated_by = req.user.id;
-      updateData.updated_at= new Date();
+      updateData.updated_at = new Date();
 
       // Special handling for sku_name
       if (updateData.sku_name) {
