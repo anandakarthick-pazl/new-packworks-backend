@@ -2,9 +2,11 @@ import { DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
+import BaseModel from "./base.model.js";
 
-const Client = sequelize.define(
-  "Client",
+class Client extends BaseModel {}
+
+Client.init(
   {
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -13,7 +15,7 @@ const Client = sequelize.define(
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: Company,
         key: "id",
@@ -22,12 +24,12 @@ const Client = sequelize.define(
     },
     client_ref_id: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     gst_status: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
-      allowNull:true
+      allowNull: true,
     },
     gst_number: {
       type: DataTypes.STRING,
@@ -77,43 +79,54 @@ const Client = sequelize.define(
     currency: {
       type: DataTypes.STRING,
       defaultValue: "INR Indian Rupee",
+      allowNull: true,
     },
     opening_balance: {
       type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
     },
     payment_terms: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     enable_portal: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+      allowNull: true,
     },
     portal_language: {
       type: DataTypes.STRING,
       defaultValue: "English",
+      allowNull: true,
     },
     documents: {
-      type: DataTypes.JSON,
+      type: DataTypes.JSON, 
       allowNull: true,
       defaultValue: [],
     },
     website_url: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     department: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     designation: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     twitter: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     skype: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     facebook: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,

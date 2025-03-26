@@ -84,7 +84,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     // Handle specific field searches if provided
     if (sku_name) whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
     if (ply) whereCondition.ply = { [Op.like]: `%${ply}%` };
-    
+
     if (client) whereCondition.client = { [Op.like]: `%${client}%` };
     if (sku_type) whereCondition.sku_type = { [Op.like]: `%${sku_type}%` };
 
@@ -103,7 +103,6 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
               { client: { [Op.like]: `%${search}%` } },
               { ply: { [Op.like]: `%${search}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
-              
             ],
           },
         ],

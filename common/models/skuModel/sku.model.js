@@ -14,7 +14,7 @@ const Sku = sequelize.define(
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: Company,
         key: "id",
@@ -24,7 +24,7 @@ const Sku = sequelize.define(
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: Client,
         key: "client_id",
@@ -35,29 +35,33 @@ const Sku = sequelize.define(
     sku_name: { type: DataTypes.STRING, allowNull: false },
     client: { type: DataTypes.STRING, allowNull: false },
     ply: { type: DataTypes.INTEGER, allowNull: false },
-    length: { type: DataTypes.FLOAT, allowNull: false },
-    width: { type: DataTypes.FLOAT, allowNull: false },
-    height: { type: DataTypes.FLOAT, allowNull: false },
-    joints: { type: DataTypes.INTEGER },
-    ups: { type: DataTypes.INTEGER },
+    length: { type: DataTypes.FLOAT, allowNull: true },
+    width: { type: DataTypes.FLOAT, allowNull: true },
+    height: { type: DataTypes.FLOAT, allowNull: true },
+    joints: { type: DataTypes.INTEGER, allowNull: true },
+    ups: { type: DataTypes.INTEGER, allowNull: true },
     inner_outer_dimension: {
       type: DataTypes.ENUM("Inner", "Outer"),
-      allowNull: false,
+      allowNull: true,
     },
-    flap_width: { type: DataTypes.FLOAT },
-    flap_tolerance: { type: DataTypes.FLOAT },
-    length_trimming_tolerance: { type: DataTypes.FLOAT },
-    width_trimming_tolerance: { type: DataTypes.FLOAT },
-    strict_adherence: { type: DataTypes.BOOLEAN, defaultValue: false },
-    customer_reference: { type: DataTypes.STRING },
-    reference_number: { type: DataTypes.STRING },
-    internal_id: { type: DataTypes.STRING },
-    board_size_cm2: { type: DataTypes.STRING },
-    deckle_size: { type: DataTypes.FLOAT },
-    minimum_order_level: { type: DataTypes.INTEGER },
-    sku_type: { type: DataTypes.STRING },
+    flap_width: { type: DataTypes.FLOAT, allowNull: true },
+    flap_tolerance: { type: DataTypes.FLOAT, allowNull: true },
+    length_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
+    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
+    strict_adherence: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
+    customer_reference: { type: DataTypes.STRING, allowNull: true },
+    reference_number: { type: DataTypes.STRING, allowNull: true },
+    internal_id: { type: DataTypes.STRING, allowNull: true },
+    board_size_cm2: { type: DataTypes.STRING, allowNull: true },
+    deckle_size: { type: DataTypes.FLOAT, allowNull: true },
+    minimum_order_level: { type: DataTypes.INTEGER, allowNull: true },
+    sku_type: { type: DataTypes.STRING, allowNull: true },
     sku_values: {
-      type: Sequelize.JSON, // or Sequelize.JSONB
+      type: Sequelize.JSON,
       allowNull: true,
     },
     status: {
@@ -67,7 +71,7 @@ const Sku = sequelize.define(
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: User,
         key: "id",
@@ -75,7 +79,7 @@ const Sku = sequelize.define(
     },
     updated_by: {
       type: DataTypes.INTEGER.UNSIGNED,
-      // allowNull: false,
+      allowNull: true,
       references: {
         model: User,
         key: "id",
@@ -94,7 +98,6 @@ Sku.belongsTo(Company, { foreignKey: "company_id" });
 Client.hasMany(Sku, { foreignKey: "client_id" });
 Sku.belongsTo(Client, { foreignKey: "client_id" });
 
-// Better naming for associations to prevent conflicts
 Sku.belongsTo(User, { foreignKey: "created_by", as: "sku_creator" });
 Sku.belongsTo(User, { foreignKey: "updated_by", as: "sku_updater" });
 
