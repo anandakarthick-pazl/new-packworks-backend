@@ -37,7 +37,7 @@ v1Router.post(
         ...req.body,
         company_id: req.user.company_id,
         created_by: req.user.id,
-        updated_by: req.user.id,
+        // updated_by: req.user.id,
         status: "active",
       };
 
@@ -236,7 +236,7 @@ v1Router.put(
         "minimum_order_level",
         "sku_type",
         "sku_values",
-        "status",
+        // "status",
       ];
 
       // Find the current SKU
@@ -257,6 +257,7 @@ v1Router.put(
 
       // Add updated_by
       updateData.updated_by = req.user.id;
+      updateData.updated_at= new Date();
 
       // Special handling for sku_name
       if (updateData.sku_name) {
@@ -366,7 +367,8 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
     const updatedSku = await Sku.update(
       {
         status: "inactive",
-        updated_by: req.user.id,
+        updated_at: new Date(),
+        updated_by: 10,
       },
       {
         where: { id: req.params.id },
