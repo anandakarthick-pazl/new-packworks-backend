@@ -24,7 +24,7 @@ import path from "path";
 dotenv.config();
 
 const app = express();
-app.use("/upload/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/file/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use(json());
 app.use(cors());
 const storage = multer.diskStorage({
