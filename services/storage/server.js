@@ -224,7 +224,7 @@ process.on("SIGINT", async () => {
 });
 
 // Use Version 1 Router
-app.use("/api", v1Router);
+app.use("/api/file", v1Router);
 await db.sequelize.sync();
 const PORT = 3013;
 app.listen(PORT, () => {
