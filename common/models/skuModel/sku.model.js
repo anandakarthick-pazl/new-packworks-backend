@@ -74,7 +74,7 @@ const Sku = sequelize.define(
     },
     updated_by: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      // allowNull: false,
       references: {
         model: User,
         key: "id",
