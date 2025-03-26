@@ -17,7 +17,8 @@
     "rbac": "nodemon services/rbac/server.js",
     "department": "nodemon services/department/server.js",
     "designations": "nodemon services/designations/server.js",
-    "role": "nodemon services/role/server.js"
+    "role": "nodemon services/role/server.js",
+    "storage": "nodemon services/storage/server.js"
   },
   "keywords": [],
   "author": "",

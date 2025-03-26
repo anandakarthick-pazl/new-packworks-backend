@@ -91,5 +91,12 @@ module.exports = {
         PORT: 3012,
       },
     },
+    {
+      name: "storage-Service",
+      script: "./services/storage/server.js",
+      env: {
+        PORT: 3013,
+      },
+    },
   ],
 };
