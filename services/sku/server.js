@@ -368,7 +368,7 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
       {
         status: "inactive",
         updated_at: new Date(),
-        updated_by: 10,
+        updated_by: req.user.id,
       },
       {
         where: { id: req.params.id },
