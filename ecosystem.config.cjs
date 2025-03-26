@@ -83,7 +83,7 @@ module.exports = {
         PORT: 3011,
       },
     },
-    ,
+
     {
       name: "role-Service",
       script: "./services/role/server.js",
