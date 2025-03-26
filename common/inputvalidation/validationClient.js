@@ -7,6 +7,7 @@ export const validateClient = async (req, res, next) => {
   try {
     // Define validation schema for client data
     const clientDataSchema = Joi.object({
+      // Core required fields
       company_id: Joi.number().integer().positive().allow(null),
       client_ref_id: Joi.string().required(),
       gst_status: Joi.boolean().default(true),
@@ -44,35 +45,40 @@ export const validateClient = async (req, res, next) => {
         .pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/)
         .message("Invalid PAN format")
         .allow(null, ""),
-    //   currency: Joi.string().default("INR Indian Rupee"),
-    //   opening_balance: Joi.number().precision(2).allow(null),
-    //   payment_terms: Joi.string().allow(null, ""),
-    //   enable_portal: Joi.boolean().default(false),
-    //   portal_language: Joi.string().default("English"),
-    //   documents: Joi.object().allow(null),
-    //   website_url: Joi.string().uri().allow(null, ""),
-    //   department: Joi.string().allow(null, ""),
-    //   designation: Joi.string().allow(null, ""),
-    //   twitter: Joi.string().allow(null, ""),
-    //   skype: Joi.string().allow(null, ""),
-    //   facebook: Joi.string().allow(null, ""),
       status: Joi.string().valid("active", "inactive").default("active"),
-    });
+
+      // Optional fields
+      currency: Joi.string().optional().allow(null, ""),
+      opening_balance: Joi.number().optional().allow(null),
+      payment_terms: Joi.string().optional().allow(null, ""),
+      enable_portal: Joi.boolean().optional(),
+      portal_language: Joi.string().optional().allow(null, ""),
+      documents: Joi.object().optional().allow(null),
+      website_url: Joi.string().uri().optional().allow(null, ""),
+      department: Joi.string().optional().allow(null, ""),
+      designation: Joi.string().optional().allow(null, ""),
+      twitter: Joi.string().optional().allow(null, ""),
+      skype: Joi.string().optional().allow(null, ""),
+      facebook: Joi.string().optional().allow(null, ""),
+    }).unknown(true);
 
     // Define schema for address
     const addressSchema = Joi.object({
+      // Core required fields
       id: Joi.number().integer().positive().optional(),
       attention: Joi.string().allow(null, ""),
       country: Joi.string().required(),
-    //   street1: Joi.string().required(),
-    //   street2: Joi.string().allow(null, ""),
       city: Joi.string().required(),
       state: Joi.string().required(),
       pinCode: Joi.string().required(),
       phone: Joi.string().required(),
       faxNumber: Joi.string().allow(null, ""),
       status: Joi.string().valid("active", "inactive").default("active"),
-    });
+
+      // Optional fields
+      street1: Joi.string().optional().allow(null, ""),
+      street2: Joi.string().optional().allow(null, ""),
+    }).unknown(true);
 
     // Define the main schema with clientData and addresses as separate properties
     const mainSchema = Joi.object({
@@ -80,7 +86,7 @@ export const validateClient = async (req, res, next) => {
       addresses: Joi.array().items(addressSchema).min(1).required().messages({
         "array.min": "At least one address is required",
       }),
-    });
+    }).unknown(true);
 
     // Validate request body
     const { error, value } = mainSchema.validate(req.body, {
