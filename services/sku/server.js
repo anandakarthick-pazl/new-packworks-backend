@@ -5,14 +5,11 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import {
-  publishToQueue,
+import   publishToQueue,
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import companyScope from "../../common/middleware/companyScope.js";
-import { validateSku } from "../../common/inputvalidation/validateSku.js";
 
 dotenv.config();
 
@@ -199,7 +196,6 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
 v1Router.put(
   "/sku-details/:id",
   authenticateJWT,
-  validateSku,
   async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
