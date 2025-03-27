@@ -49,6 +49,10 @@ const User = sequelize.define('User', {
         type: DataTypes.INTEGER,
         allowNull: true,
     },
+    country_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+    },
     mobile: {
         type: DataTypes.STRING(191),
         allowNull: true,

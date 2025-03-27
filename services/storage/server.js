@@ -24,7 +24,7 @@ import path from "path";
 dotenv.config();
 
 const app = express();
-app.use("/file/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/upload", express.static(path.join(process.cwd(), "uploads")));
 app.use(json());
 app.use(cors());
 const storage = multer.diskStorage({
@@ -178,7 +178,7 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
 
     // Insert into file_storage table
     const newFile = await FileStorage.create({
-      company_id: 1,
+      company_id: req.user.company_id || null,
       path: fileUrl,
       filename: originalname,
       type: mimetype,
