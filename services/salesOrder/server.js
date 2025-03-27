@@ -63,7 +63,6 @@ v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
         status: "active", // Set default status to active
         created_by: req.user.id, // Get user ID from JWT token
         updated_by: req.user.id, // Same as created_by initially
-        
       },
       { transaction }
     );
@@ -82,8 +81,8 @@ v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
       acceptable_excess_units: work.acceptable_excess_units || null,
       planned_start_date: work.planned_start_date || null,
       planned_end_date: work.planned_end_date || null,
-      outsource_name:work.outsource_name || null,
-        // work.manufacture === "outsource" ? work.outsource_name : null, 
+      outsource_name: work.outsource_name || null,
+      // work.manufacture === "outsource" ? work.outsource_name : null,
     }));
 
     const createdWorkOrders = await WorkOrder.bulkCreate(workOrders, {
@@ -120,98 +119,103 @@ v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
 });
 
 // GET all sales orders with pagination and filtering - updated to handle status
-v1Router.get("/sales-order", authenticateJWT,companyScope, async (req, res) => {
-  try {
-    const {
-      page = 1,
-      limit = 10,
-      client,
-      confirmation,
-      status = "active",
-    } = req.query;
-    const offset = (page - 1) * limit;
+v1Router.get(
+  "/sales-order",
+  authenticateJWT,
+  companyScope,
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        client,
+        confirmation,
+        status = "active",
+      } = req.query;
+      const offset = (page - 1) * limit;
 
-    // Try to get from cache first
-    const cacheKey = `${CACHE_KEYS.SALES_ORDER_LIST}:${page}:${limit}:${
-      client || ""
-    }:${confirmation || ""}:${status}`;
-    const cachedData = await redisClient.get(cacheKey);
+      // Try to get from cache first
+      const cacheKey = `${CACHE_KEYS.SALES_ORDER_LIST}:${page}:${limit}:${
+        client || ""
+      }:${confirmation || ""}:${status}`;
+      const cachedData = await redisClient.get(cacheKey);
 
-    if (cachedData) {
-      return res.json(JSON.parse(cachedData));
-    }
+      if (cachedData) {
+        return res.json(JSON.parse(cachedData));
+      }
 
-    // Build filter conditions
-    const where = {
-      status: status, // Only fetch records with specified status (default is active)
-    };
-    if (client) where.client = { [Op.like]: `%${client}%` };
-    if (confirmation !== undefined)
-      where.confirmation = confirmation === "true";
+      // Build filter conditions
+      const where = {
+        status: status, // Only fetch records with specified status (default is active)
+      };
+      if (client) where.client = { [Op.like]: `%${client}%` };
+      if (confirmation !== undefined)
+        where.confirmation = confirmation === "true";
 
-    // Fetch data from database
-    const { count, rows } = await SalesOrder.findAndCountAll({
-      where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      include: [
-        {
-          model: WorkOrder,
-          as: "workOrders",
-        },
-        {
-          model: db.User,
-          as: "creator_sales",
-          attributes: ["id", "name", "email"],
-          foreignKey: "created_by",
-        },
-        {
-          model: db.User,
-          as: "updater_sales",
-          attributes: ["id", "name", "email"],
-          foreignKey: "updated_by",
-        },
-      ],
-      order: [["created_at", "DESC"]],
-    });
+      // Fetch data from database
+      const { count, rows } = await SalesOrder.findAndCountAll({
+        where,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: WorkOrder,
+            as: "workOrders",
+          },
+          {
+            model: db.User,
+            as: "creator_sales",
+            attributes: ["id", "name", "email"],
+            foreignKey: "created_by",
+          },
+          {
+            model: db.User,
+            as: "updater_sales",
+            attributes: ["id", "name", "email"],
+            foreignKey: "updated_by",
+          },
+        ],
+        order: [["created_at", "DESC"]],
+      });
 
-    // Transform data
-    const result = {
-      total: count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(count / limit),
-      data: rows.map((order) => {
-        const plainOrder = order.get({ plain: true });
-        // Safely parse sku_details considering it might be already an object or a string
-        try {
-          if (typeof plainOrder.sku_details === "string") {
-            plainOrder.sku_details = JSON.parse(plainOrder.sku_details);
+      // Transform data
+      const result = {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit),
+        data: rows.map((order) => {
+          const plainOrder = order.get({ plain: true });
+          // Safely parse sku_details considering it might be already an object or a string
+          try {
+            if (typeof plainOrder.sku_details === "string") {
+              plainOrder.sku_details = JSON.parse(plainOrder.sku_details);
+            }
+            // If it's already an object, keep it as is
+          } catch (e) {
+            // In case of parsing error, set to empty array
+            plainOrder.sku_details = [];
+            logger.error(
+              `Error parsing sku_details for order ${plainOrder.id}:`,
+              e
+            );
           }
-          // If it's already an object, keep it as is
-        } catch (e) {
-          // In case of parsing error, set to empty array
-          plainOrder.sku_details = [];
-          logger.error(
-            `Error parsing sku_details for order ${plainOrder.id}:`,
-            e
-          );
-        }
-        return plainOrder;
-      }),
-    };
+          return plainOrder;
+        }),
+      };
 
-    // Cache the result
-    await redisClient.set(cacheKey, JSON.stringify(result), "EX", 300); // Cache for 5 minutes
+      // Cache the result
+      await redisClient.set(cacheKey, JSON.stringify(result), "EX", 300); // Cache for 5 minutes
 
-    res.json(result);
-  } catch (error) {
-    logger.error("Error fetching sales orders:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+      res.json(result);
+    } catch (error) {
+      logger.error("Error fetching sales orders:", error);
+      res
+        .status(500)
+        .json({ message: "Internal Server Error", error: error.message });
+    }
   }
-});
+);
 
 // GET single sales order by ID - updated to include creator and updater info
 v1Router.get("/sales-order/:id", authenticateJWT, async (req, res) => {
@@ -433,60 +437,6 @@ v1Router.delete("/sales-order/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// New endpoint to restore a soft-deleted sales order
-v1Router.put("/sales-order/:id/restore", authenticateJWT, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    // Find the sales order
-    const salesOrder = await SalesOrder.findByPk(id);
-
-    if (!salesOrder) {
-      return res.status(404).json({ message: "Sales order not found" });
-    }
-
-    if (salesOrder.status === "active") {
-      return res.status(400).json({ message: "Sales order is already active" });
-    }
-
-    // Restore by setting status back to active
-    await salesOrder.update({
-      status: "active",
-      updated_by: req.user.id,
-      updated_at: new Date(),
-    });
-
-    // Clear cache
-    await clearClientCache(`${CACHE_KEYS.SALES_ORDER_LIST}:*`);
-    await clearClientCache(`${CACHE_KEYS.SALES_ORDER_DETAIL}${id}`);
-
-    // Get the updated record
-    const updatedOrder = await SalesOrder.findByPk(id, {
-      include: [
-        {
-          model: WorkOrder,
-          as: "workOrders",
-        },
-      ],
-    });
-
-    const result = updatedOrder.get({ plain: true });
-    result.sku_details = JSON.parse(result.sku_details || "[]");
-
-    // Publish update to queue
-    await publishToQueue(QUEUES.SALES_ORDER_UPDATED, result);
-
-    res.json({
-      message: "Sales Order restored successfully",
-      data: result,
-    });
-  } catch (error) {
-    logger.error("Error restoring sales order:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {

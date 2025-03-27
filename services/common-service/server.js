@@ -33,6 +33,7 @@ const extractUserDetails = (req, res, next) => {
   next();
 };
 
+// POST create new dropdown name
 v1Router.post(
   "/dropdown-name",
   authenticateJWT,
@@ -52,23 +53,6 @@ v1Router.post(
     }
 
     try {
-      // Check for existing dropdown name with the same name in the company
-      const existingDropdownName = await DropdownName.findOne({
-        where: {
-          company_id: req.userCompanyId,
-          dropdown_name: dropdownDetails.dropdown_name,
-          status: "active", // Only check against active records
-        },
-      });
-
-      // If a dropdown name already exists, return an error
-      if (existingDropdownName) {
-        return res.status(409).json({
-          message: "A dropdown name with this name already exists",
-          error: "Existing dropdown name",
-        });
-      }
-
       // Create Dropdown Name - using token-based details
       const newDropdownName = await DropdownName.create({
         company_id: req.userCompanyId,
@@ -85,47 +69,6 @@ v1Router.post(
       });
     } catch (error) {
       logger.error("Error creating dropdown name:", error);
-      res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
-    }
-  }
-);
-
-v1Router.get(
-  "/dropdown-name",
-  authenticateJWT,
-  extractUserDetails,
-  async (req, res) => {
-    try {
-      const { dropdown_name } = req.query;
-
-      // Build filter conditions
-      const where = {
-        company_id: req.userCompanyId,
-        status: "active", // Default to active status
-      };
-
-      // Case-insensitive partial name search
-      if (dropdown_name) {
-        where.dropdown_name = sequelize.where(
-          sequelize.fn("LOWER", sequelize.col("dropdown_name")),
-          {
-            [Op.like]: `%${dropdown_name.toLowerCase()}%`,
-          }
-        );
-      }
-
-      // Fetch data from database
-      const dropdownNames = await DropdownName.findAll({
-        where,
-        order: [["created_at", "DESC"]],
-        attributes: ["id", "dropdown_name", "status"], // Optional: Select specific fields
-      });
-
-      res.json(dropdownNames);
-    } catch (error) {
-      logger.error("Error fetching dropdown names:", error);
       res
         .status(500)
         .json({ message: "Internal Server Error", error: error.message });
@@ -161,6 +104,7 @@ v1Router.put(
           dropdownDetails.dropdown_name || dropdownName.dropdown_name,
         status: dropdownDetails.status || dropdownName.status,
         updated_by: req.userId,
+        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
       });
 
       res.json({
@@ -196,7 +140,7 @@ v1Router.delete(
       await dropdownName.update({
         status: "inactive",
         updated_by: req.userId,
-        updated_at: req.userId,
+        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
       });
 
       res.json({
@@ -309,7 +253,7 @@ v1Router.put(
           valueDetails.dropdown_value || dropdownValue.dropdown_value,
         status: valueDetails.status || dropdownValue.status,
         updated_by: req.userId,
-        updated_at: req.userId,
+        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
       });
 
       res.json({
@@ -345,7 +289,7 @@ v1Router.delete(
       await dropdownValue.update({
         status: "inactive",
         updated_by: req.userId,
-        updated_at: req.userId,
+        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
       });
 
       res.json({
@@ -361,10 +305,107 @@ v1Router.delete(
   }
 );
 
-v1Router.get("/countries", authenticateJWT,async (req, res) => {
+// GET dropdown names with search options
+v1Router.get(
+  "/dropdown-name",
+  authenticateJWT,
+  extractUserDetails,
+  async (req, res) => {
+    try {
+      const {
+        dropdown_name,
+        client_id,
+        status = "active", // Default to showing only active records
+      } = req.query;
+
+      // Build filter conditions
+      const where = { company_id: req.userCompanyId };
+      if (dropdown_name)
+        where.dropdown_name = { [Op.like]: `%${dropdown_name}%` };
+      if (client_id) where.client_id = client_id;
+
+      // Filter by status - allow "all" to return both active and inactive records
+      if (status && status !== "all") {
+        where.status = status;
+      }
+
+      // Fetch data from database
+      const dropdownNames = await DropdownName.findAll({
+        where,
+        order: [["created_at", "DESC"]],
+      });
+
+      res.json(dropdownNames);
+    } catch (error) {
+      logger.error("Error fetching dropdown names:", error);
+      res
+        .status(500)
+        .json({ message: "Internal Server Error", error: error.message });
+    }
+  }
+);
+
+// GET dropdown values with search options
+v1Router.get(
+  "/dropdown-value",
+  authenticateJWT,
+  extractUserDetails,
+  async (req, res) => {
+    try {
+      const {
+        dropdown_id,
+        dropdown_value,
+        client_id,
+        status = "active", // Default to showing only active records
+      } = req.query;
+
+      // Build filter conditions
+      const where = { company_id: req.userCompanyId };
+      if (dropdown_id) where.dropdown_id = dropdown_id;
+      if (dropdown_value)
+        where.dropdown_value = { [Op.like]: `%${dropdown_value}%` };
+      if (client_id) where.client_id = client_id;
+
+      // Filter by status - allow "all" to return both active and inactive records
+      if (status && status !== "all") {
+        where.status = status;
+      }
+
+      // Fetch data from database
+      const dropdownValues = await DropdownValue.findAll({
+        where,
+        include: [
+          {
+            model: DropdownName,
+            attributes: ["dropdown_name"],
+            as: "dropdownName",
+          },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      res.json(dropdownValues);
+    } catch (error) {
+      logger.error("Error fetching dropdown values:", error);
+      res
+        .status(500)
+        .json({ message: "Internal Server Error", error: error.message });
+    }
+  }
+);
+
+v1Router.get("/countries", authenticateJWT, async (req, res) => {
   try {
     const countries = await Country.findAll({
-      attributes: ["id", "iso", "name", "nicename", "iso3", "numcode", "phonecode"], // ✅ Fetch only required fields
+      attributes: [
+        "id",
+        "iso",
+        "name",
+        "nicename",
+        "iso3",
+        "numcode",
+        "phonecode",
+      ], // ✅ Fetch only required fields
       order: [["name", "ASC"]],
     });
 
@@ -380,58 +421,6 @@ v1Router.get("/countries", authenticateJWT,async (req, res) => {
     });
   }
 });
-
-v1Router.get(
-  "/dropdown-value/:dropdown_id?", // Optional dropdown_id parameter
-  authenticateJWT,
-  extractUserDetails,
-  async (req, res) => {
-    try {
-      const { dropdown_id } = req.params;
-      const { dropdown_value } = req.query;
-
-      // Build filter conditions
-      const where = {
-        company_id: req.userCompanyId,
-        status: "active", // Default to active status
-      };
-
-      // Add dropdown_id filter from URL params if provided
-      if (dropdown_id) where.dropdown_id = dropdown_id;
-
-      // Case-insensitive partial value search
-      if (dropdown_value) {
-        where.dropdown_value = sequelize.where(
-          sequelize.fn("LOWER", sequelize.col("dropdown_value")),
-          {
-            [Op.like]: `%${dropdown_value.toLowerCase()}%`,
-          }
-        );
-      }
-
-      // Fetch data from database
-      const dropdownValues = await DropdownValue.findAll({
-        where,
-        include: [
-          {
-            model: DropdownName,
-            attributes: ["dropdown_name"],
-            as: "dropdownName",
-          },
-        ],
-        order: [["created_at", "DESC"]],
-        attributes: ["id", "dropdown_id", "dropdown_value", "status"], // Optional: Select specific fields
-      });
-
-      res.json(dropdownValues);
-    } catch (error) {
-      logger.error("Error fetching dropdown values:", error);
-      res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
-    }
-  }
-);
 
 // Basic Health Check Endpoint
 app.get("/health", (req, res) => {
