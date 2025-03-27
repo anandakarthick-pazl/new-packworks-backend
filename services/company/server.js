@@ -21,7 +21,7 @@ const v1Router = Router();
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 // ✅ Secure all API routes with JWT middleware
-app.use(authenticateStaticToken);
+// app.use(authenticateStaticToken);
 app.use(logRequestResponse)
 // 🔹 Create a Company (POST)
 v1Router.post("/companies", validateCompany, async (req, res) => {
