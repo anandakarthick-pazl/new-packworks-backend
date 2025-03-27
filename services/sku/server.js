@@ -133,6 +133,12 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
 
     const responseData = {
       data: formattedSkus,
+      dashboard: {
+        total_skus: totalCount,
+        rscBox: 10,
+        crrugatedSheet: 15,
+        deCutBox: 20,
+      },
       pagination: {
         totalCount,
         totalPages,
