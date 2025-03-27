@@ -8,6 +8,8 @@ export const validateRegister = (req, res, next) => {
         email: Joi.string().email().required(),
         password: Joi.string().min(6).max(50).required(),
         mobile: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(),
+        image: Joi.string().max(191).optional().allow(null),
+        skills: Joi.string().max(255).optional().allow(null),
 
         // Employee-related fields
         employee_id: Joi.string().max(50).optional().allow(null),

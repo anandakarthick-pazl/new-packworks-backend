@@ -18,7 +18,8 @@
     "department": "nodemon services/department/server.js",
     "designations": "nodemon services/designations/server.js",
     "role": "nodemon services/role/server.js",
-    "storage": "nodemon services/storage/server.js"
+    "storage": "nodemon services/storage/server.js",
+    "company-address": "nodemon services/company-address/server.js"
   },
   "keywords": [],
   "author": "",

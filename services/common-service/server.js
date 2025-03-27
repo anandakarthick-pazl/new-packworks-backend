@@ -6,6 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import Country from "../../common/models/country.model.js";
 
 dotenv.config();
 
@@ -359,6 +360,26 @@ v1Router.delete(
     }
   }
 );
+
+v1Router.get("/countries", authenticateJWT,async (req, res) => {
+  try {
+    const countries = await Country.findAll({
+      attributes: ["id", "iso", "name", "nicename", "iso3", "numcode", "phonecode"], // ✅ Fetch only required fields
+      order: [["name", "ASC"]],
+    });
+
+    return res.json({
+      success: true,
+      data: countries,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching countries",
+      error: error.message,
+    });
+  }
+});
 
 v1Router.get(
   "/dropdown-value/:dropdown_id?", // Optional dropdown_id parameter
