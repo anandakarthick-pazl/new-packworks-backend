@@ -18,6 +18,8 @@ export const validateRegister = (req, res, next) => {
         slack_username: Joi.string().max(191).optional().allow(null),
         department_id: Joi.number().integer().optional().allow(null),
         designation_id: Joi.number().integer().optional().allow(null),
+        country_phonecode: Joi.number().integer().optional().allow(null),
+        country_id: Joi.number().integer().optional().allow(null),
 
         // ✅ Corrected: Default today's date for empty fields
         joining_date: Joi.date().optional().allow(null).default(() => new Date()),

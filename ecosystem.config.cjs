@@ -105,5 +105,12 @@ module.exports = {
         PORT: 3014,
       },
     },
+    {
+      name: "File View-Service",
+      script: "./services/upload-view/server.js",
+      env: {
+        PORT: 3015,
+      },
+    },
   ],
 };

@@ -24,7 +24,7 @@ import path from "path";
 dotenv.config();
 
 const app = express();
-app.use("/file/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/upload", express.static(path.join(process.cwd(), "uploads")));
 app.use(json());
 app.use(cors());
 const storage = multer.diskStorage({
@@ -159,14 +159,14 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
       const fileStream = fs.createReadStream(req.file.path);
       const s3Params = {
         Bucket: awsConfig.AWS_BUCKET_NAME,
-        Key: `uploads/${req.file.filename}`,
+        Key: `packworkz/uploads/${req.file.filename}`,
         Body: fileStream,
         ContentType: mimetype,
       };
       await s3.send(new PutObjectCommand(s3Params));
 
       // Generate File URL
-      fileUrl = `https://${awsConfig.AWS_BUCKET_NAME}.s3.${awsConfig.AWS_REGION}.amazonaws.com/uploads/${req.file.filename}`;
+      fileUrl = `https://${awsConfig.AWS_BUCKET_NAME}.s3.${awsConfig.AWS_REGION}.amazonaws.com/packworkz/uploads/${req.file.filename}`;
       storageLocation = "aws_s3";
 
       // Delete local temp file after upload
@@ -178,7 +178,7 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
 
     // Insert into file_storage table
     const newFile = await FileStorage.create({
-      company_id: 1,
+      company_id: req.user.company_id || null,
       path: fileUrl,
       filename: originalname,
       type: mimetype,

@@ -46,7 +46,7 @@ v1Router.post(
     try {
       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
 
-      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to,image } = req.body;
+      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to,image,country_phonecode,country_id } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
       const department = await Department.findByPk(department_id);
@@ -103,7 +103,9 @@ v1Router.post(
           email,
           mobile,
           company_id: req.user.company_id,
-          image
+          image,
+          country_phonecode,
+          country_id
           
         },
         { transaction }
