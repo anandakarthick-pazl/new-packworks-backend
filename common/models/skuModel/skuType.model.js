@@ -66,6 +66,8 @@ Company.hasMany(SkuType, { foreignKey: "company_id" });
 SkuType.belongsTo(Company, { foreignKey: "company_id" });
 
 // Better naming for associations to prevent conflicts
+User.hasMany(SkuType, { foreignKey: "created_by", as: "creator_sku_types" });
+User.hasMany(SkuType, { foreignKey: "updated_by", as: "updater_sku_types" });
 SkuType.belongsTo(User, { foreignKey: "created_by", as: "creator_sku_types" });
 SkuType.belongsTo(User, { foreignKey: "updated_by", as: "updater_sku_types" });
 
