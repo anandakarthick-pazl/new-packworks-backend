@@ -173,7 +173,7 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
       fs.unlinkSync(req.file.path);
     } else {
       // Store Locally
-      fileUrl = `${process.env.FILE_UPLOAD_URL}/uploads/${req.file.filename}`;
+      fileUrl = `${process.env.FILE_UPLOAD_URL}/${req.file.filename}`;
     }
 
     // Insert into file_storage table
