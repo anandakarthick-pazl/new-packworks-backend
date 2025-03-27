@@ -15,6 +15,7 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import FileStorage from "../../common/models/fileStorage.model.js";
 import FileStorageSetting from "../../common/models/fileStorageSetting.model.js";
+import GlobalSettings from "../../common/models/global_settings.model.js";
 import Company from "../../common/models/company.model.js";
 import multer from "multer";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -40,7 +41,46 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: async (req, file, cb) => {
+    try {
+      const { allowedTypes } = await getStorageType();
+
+      if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: ${allowedTypes.join(", ")}`), false);
+      }
+      cb(null, true);
+    } catch (error) {
+      console.error("File validation error:", error);
+      cb(new Error("Error validating file"), false);
+    }
+  },
+  limits: { fileSize: async (req, file, cb) => {
+    const { maxSize } = await getStorageType();
+    cb(null, maxSize * 1024 * 1024); // Convert MB to bytes
+  }},
+});
+const checkFileCount = async (req, res, next) => {
+  try {
+    const { maxFiles } = await getStorageType();
+
+    // Count user's uploaded files
+    const fileCount = await FileStorage.count({ where: { company_id: req.user.company_id } });
+
+    if (fileCount >= maxFiles) {
+      return res.status(400).json({
+        success: false,
+        message: `You have reached the max file limit (${maxFiles} files).`,
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("File count validation error:", error);
+    return res.status(500).json({ success: false, error: "Error validating file count" });
+  }
+};
 
 /**
  * 📌 Decode Auth Keys (AWS Credentials)
@@ -64,8 +104,15 @@ const getStorageType = async () => {
     if (!setting) return { storageType: "local", awsConfig: null };
 
     const awsConfig = setting.filesystem === "aws_s3" ? decodeAuthKeys(setting.auth_keys) : null;
+    // Fetch Global Settings
+    const globalSettings = await GlobalSettings.findOne();
+    const allowedTypes = globalSettings?.allowed_file_types
+      ? globalSettings.allowed_file_types.split(",").map((type) => type.trim())
+      : [];
+    const maxSize = globalSettings?.allowed_file_size || 10; // Default 10MB
+    const maxFiles = globalSettings?.allow_max_no_of_files || 10; // Default 10 files
 
-    return { storageType: setting.filesystem, awsConfig };
+    return { storageType: setting.filesystem, awsConfig, allowedTypes, maxSize, maxFiles };
   } catch (error) {
     console.error("Error fetching storage setting:", error);
     return { storageType: "local", awsConfig: null };
@@ -138,7 +185,7 @@ v1Router.post("/save-storage-settings", authenticateJWT, upload.single("file"), 
 });
 
 
-v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res) => {
+v1Router.post("/upload", authenticateJWT, checkFileCount, upload.single("file"), async (req, res) => {
   try {
     const { storageType, awsConfig } = await getStorageType();
     const { originalname, mimetype, size } = req.file;
@@ -146,7 +193,6 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
     let storageLocation = "local";
 
     if (storageType === "aws_s3" && awsConfig) {
-      // Configure AWS S3 Client
       const s3 = new S3Client({
         region: awsConfig.AWS_REGION,
         credentials: {
@@ -155,7 +201,6 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
         },
       });
 
-      // Upload to S3
       const fileStream = fs.createReadStream(req.file.path);
       const s3Params = {
         Bucket: awsConfig.AWS_BUCKET_NAME,
@@ -165,18 +210,14 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
       };
       await s3.send(new PutObjectCommand(s3Params));
 
-      // Generate File URL
       fileUrl = `https://${awsConfig.AWS_BUCKET_NAME}.s3.${awsConfig.AWS_REGION}.amazonaws.com/packworkz/uploads/${req.file.filename}`;
       storageLocation = "aws_s3";
 
-      // Delete local temp file after upload
       fs.unlinkSync(req.file.path);
     } else {
-      // Store Locally
       fileUrl = `${process.env.FILE_UPLOAD_URL}/${req.file.filename}`;
     }
 
-    // Insert into file_storage table
     const newFile = await FileStorage.create({
       company_id: req.user.company_id || null,
       path: fileUrl,
@@ -202,6 +243,7 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 
 
