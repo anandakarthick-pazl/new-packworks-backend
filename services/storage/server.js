@@ -159,14 +159,14 @@ v1Router.post("/upload", authenticateJWT, upload.single("file"), async (req, res
       const fileStream = fs.createReadStream(req.file.path);
       const s3Params = {
         Bucket: awsConfig.AWS_BUCKET_NAME,
-        Key: `uploads/${req.file.filename}`,
+        Key: `packworkz/uploads/${req.file.filename}`,
         Body: fileStream,
         ContentType: mimetype,
       };
       await s3.send(new PutObjectCommand(s3Params));
 
       // Generate File URL
-      fileUrl = `https://${awsConfig.AWS_BUCKET_NAME}.s3.${awsConfig.AWS_REGION}.amazonaws.com/uploads/${req.file.filename}`;
+      fileUrl = `https://${awsConfig.AWS_BUCKET_NAME}.s3.${awsConfig.AWS_REGION}.amazonaws.com/packworkz/uploads/${req.file.filename}`;
       storageLocation = "aws_s3";
 
       // Delete local temp file after upload
