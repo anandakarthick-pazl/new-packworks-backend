@@ -5,7 +5,8 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import   publishToQueue,
+import {
+  publishToQueue,
   rabbitChannel,
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
