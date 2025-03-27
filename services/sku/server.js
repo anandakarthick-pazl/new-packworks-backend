@@ -214,7 +214,7 @@ v1Router.put(
         "flap_width",
         "flap_tolerance",
         "length_trimming_tolerance",
-        "width_trimming_tolerance",
+        // "width_trimming_tolerance",
         "strict_adherence",
         "customer_reference",
         "reference_number",

@@ -48,7 +48,7 @@ const Sku = sequelize.define(
     flap_width: { type: DataTypes.FLOAT, allowNull: true },
     flap_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     length_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
-    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
+    // width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     strict_adherence: {
       type: DataTypes.BOOLEAN,
       allowNull: true,
