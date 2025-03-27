@@ -46,7 +46,7 @@ v1Router.post(
     try {
       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
 
-      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to } = req.body;
+      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to,image } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
       const department = await Department.findByPk(department_id);
@@ -103,6 +103,8 @@ v1Router.post(
           email,
           mobile,
           company_id: req.user.company_id,
+          image
+          
         },
         { transaction }
       );
@@ -130,7 +132,8 @@ v1Router.post(
         notice_period_start_date,
         probation_end_date,
         company_address_id,
-        overtime_hourly_rate
+        overtime_hourly_rate,
+        skills
       } = req.body;
 
       // ✅ Ensure `joining_date` is set properly
@@ -163,6 +166,7 @@ v1Router.post(
           created_at: new Date(),
           created_by: userId,
           updated_at: new Date(),
+          skills
         },
         { transaction }
       );
@@ -314,7 +318,7 @@ v1Router.put(
       logger.info("🟢 Updating user: " + JSON.stringify(req.body));
       const { userId } = req.params;
 
-      const { name, email, password, mobile, role_id } = req.body;
+      const { name, email, password, mobile, role_id,image } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
       const department = await Department.findOne({ where: { id: req.body.department_id } });
@@ -365,7 +369,7 @@ v1Router.put(
 
       // Step 3: Update User details
       await user.update(
-        { name, mobile },
+        { name, mobile,image, updated_at: new Date() },
         { transaction }
       );
 
@@ -397,7 +401,8 @@ v1Router.put(
         notice_period_start_date,
         probation_end_date,
         company_address_id,
-        overtime_hourly_rate
+        overtime_hourly_rate,
+        skills
       } = req.body; // Extract only Employee-related fields
 
       await employee.update(
@@ -427,7 +432,8 @@ v1Router.put(
           probation_end_date,
           company_address_id,
           overtime_hourly_rate,
-          updated_at: new Date()
+          updated_at: new Date(),
+          skills
         },
         { transaction }
       );

@@ -25,6 +25,10 @@ const Employee = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    skills: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     hourly_rate: {
       type: DataTypes.DOUBLE,
       allowNull: true,
