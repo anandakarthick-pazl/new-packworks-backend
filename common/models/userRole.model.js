@@ -35,7 +35,7 @@ const UserRole = sequelize.define('UserRole', {
     updated_at: {
       type: DataTypes.DATE,
       allowNull: true,
-      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
     tableName: 'role_user',

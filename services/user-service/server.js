@@ -18,6 +18,7 @@ import Employee from "../../common/models/employee.model.js";
 import Department from "../../common/models/department.model.js";
 import Designation from "../../common/models/designation.model.js";
 import UserRole from "../../common/models/userRole.model.js";
+import Role from "../../common/models/role.model.js";
 import { logRequestResponse } from "../../common/middleware/errorLogger.js";
 import logger from "../../common/helper/logger.js";
 dotenv.config();
@@ -27,7 +28,7 @@ app.use(json());
 app.use(cors());
 
 const v1Router = Router();
-app.use(logRequestResponse);
+// app.use(logRequestResponse);
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
@@ -38,43 +39,63 @@ v1Router.post(
   validateRegister,
   authenticateJWT,
   async (req, res) => {
-    console.log("regsitering user");
+    console.log("Registering user");
     const transaction = await sequelize.transaction();
+    const userId = req.user.id; // Logged-in user ID
+
     try {
       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
-      const { name, email, password, mobile } = req.body;
 
-      // Check if user already exists
+      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to } = req.body;
+
+      // Step 1: Validate department_id, designation_id, and role_id
+      const department = await Department.findByPk(department_id);
+      if (!department) {
+        await transaction.rollback();
+        return res.status(400).json({ status: false, message: "Invalid department_id" });
+      }
+
+      const designation = await Designation.findByPk(designation_id);
+      if (!designation) {
+        await transaction.rollback();
+        return res.status(400).json({ status: false, message: "Invalid designation_id" });
+      }
+
+      const role = await Role.findByPk(role_id);
+      if (!role) {
+        await transaction.rollback();
+        return res.status(400).json({ status: false, message: "Invalid role_id" });
+      }
+      const reportingTo = await User.findByPk(reporting_to);
+      if (!reportingTo) {
+        await transaction.rollback();
+        return res.status(400).json({ status: false, message: "Invalid Reporting To" });
+      }
+
+      // Step 2: Check if user already exists
       const existingUser = await User.findOne({
         where: { email, company_id: req.user.company_id },
         transaction,
       });
 
       if (existingUser) {
-        logger.info("existingUser : Email already registered");
+        logger.info("❌ Email already registered");
         await transaction.rollback();
-        return res.status(400).json({
-          status: false,
-          message: "Email already registered",
-          data: [],
-        });
+        return res.status(400).json({ status: false, message: "Email already registered" });
       }
 
-      // Hash password
+      // Step 3: Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Step 1: Insert into UserAuth table
+      // Step 4: Insert into UserAuth table
       const newUserAuth = await UserAuth.create(
-        {
-          email,
-          password: hashedPassword,
-        },
+        { email, password: hashedPassword },
         { transaction }
       );
 
-      logger.info("newUserAuth : " + JSON.stringify(newUserAuth));
+      logger.info("✅ newUserAuth: " + JSON.stringify(newUserAuth));
 
-      // Step 2: Insert into User table
+      // Step 5: Insert into User table
       const newUser = await User.create(
         {
           name,
@@ -86,25 +107,20 @@ v1Router.post(
         { transaction }
       );
 
-      logger.info("newUser : " + JSON.stringify(newUser));
+      logger.info("✅ newUser: " + JSON.stringify(newUser));
 
-      // Step 3: Insert into Employee table
+      // Step 6: Insert into Employee table
       const {
         employee_id,
         address,
         hourly_rate,
         slack_username,
-        department_id,
-        designation_id,
         joining_date,
         last_date,
         added_by,
         last_updated_by,
         attendance_reminder,
         date_of_birth,
-        calendar_view,
-        about_me,
-        reporting_to,
         contract_end_date,
         internship_end_date,
         employment_type,
@@ -115,27 +131,25 @@ v1Router.post(
         probation_end_date,
         company_address_id,
         overtime_hourly_rate
-      } = req.body; // Extract only Employee-related fields
+      } = req.body;
 
+      // ✅ Ensure `joining_date` is set properly
       const employee = await Employee.create(
         {
-          user_id: newUser.id,  // Assigned dynamically
-          company_id: req.user.company_id, // Assigned dynamically
+          user_id: newUser.id,
+          company_id: req.user.company_id,
           employee_id,
           address,
           hourly_rate,
           slack_username,
           department_id,
           designation_id,
-          joining_date,
+          joining_date: joining_date || new Date(), // ✅ Fix: Set default date if missing
           last_date,
           added_by,
           last_updated_by,
           attendance_reminder,
           date_of_birth,
-          calendar_view,
-          about_me,
-          reporting_to,
           contract_end_date,
           internship_end_date,
           employment_type,
@@ -145,33 +159,52 @@ v1Router.post(
           notice_period_start_date,
           probation_end_date,
           company_address_id,
-          overtime_hourly_rate
+          overtime_hourly_rate,
+          created_at: new Date(),
+          created_by: userId,
+          updated_at: new Date(),
         },
         { transaction }
       );
 
-      logger.info("newEmployee : " + JSON.stringify(employee));
+      logger.info("✅ newEmployee: " + JSON.stringify(employee));
 
-      // Commit transaction
+      // Step 7: Assign Role to User
+      const [userRole, created] = await UserRole.findOrCreate({
+        where: { user_id: newUser.id },
+        defaults: { role_id, created_by: userId },
+        transaction,
+      });
+
+      if (!created) {
+        await userRole.update(
+          { role_id, updated_by: userId },
+          { transaction }
+        );
+      }
+
+      logger.info("✅ User role assigned");
+
+      // Step 8: Commit transaction
       await transaction.commit();
       logger.info("✅ User Registered Successfully");
 
-      // 🔹 Prepare Email Message
+      // Step 9: Prepare Email Message
       const emailPayload = {
         to: email,
         subject: "Welcome to Our Platform!",
         body: `
-                <h2>Hello ${name},</h2>
-                <p>Your account has been created successfully!</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Password:</strong> ${password}</p>
-                <p>Please login and change your password.</p>
-            `,
+          <h2>Hello ${name},</h2>
+          <p>Your account has been created successfully!</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Password:</strong> ${password}</p>
+          <p>Please login and change your password.</p>
+        `,
       };
 
-      logger.info("emailPayload : " + JSON.stringify(emailPayload));
+      logger.info("📩 Email Payload: " + JSON.stringify(emailPayload));
 
-      // 🔹 Publish Email Task to RabbitMQ
+      // Step 10: Publish Email Task to RabbitMQ
       const connection = await amqp.connect(RABBITMQ_URL);
       const channel = await connection.createChannel();
       await channel.assertQueue(QUEUE_NAME, { durable: true });
@@ -191,11 +224,61 @@ v1Router.post(
         message: "User registered successfully",
         data: newUser,
       });
+
+    } catch (error) {
+      await transaction.rollback();
+      logger.error(`❌ User Register Error: ${error.message}`);
+
+      return res.status(500).json({
+        status: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
+
+
+v1Router.delete(
+  "/employees/:userId",
+  authenticateJWT,
+  async (req, res) => {
+    console.log("Delete user details...");
+    const transaction = await sequelize.transaction();
+    try {
+      const { userId } = req.params;
+      const user = await User.findOne({
+        where: { id: userId, company_id: req.user.company_id },
+        transaction,
+      });
+      if (user) {
+        await user.update({
+          status: 'deactive',
+          updated_by: req.user.id,
+          updated_at: new Date(),
+        });
+        await transaction.commit();
+        return res.status(200).json({
+          status: true,
+          message: "User deleted successfully",
+          data: [],
+        });
+
+      } else {
+        await transaction.rollback();
+        return res.status(404).json({
+          status: false,
+          message: "User not found",
+          data: [],
+        });
+      }
+
+
     } catch (error) {
       await transaction.rollback();
 
       const stackLines = error.stack.split("\n");
-      const callerLine = stackLines[1]; // The line where the error occurred
+      const callerLine = stackLines[1];
       const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
       let fileName = "";
       let lineNumber = "";
@@ -212,11 +295,14 @@ v1Router.post(
         data: [],
       };
 
-      logger.error(`User register : ${JSON.stringify(errorMessage)}`);
+      logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
       return res.status(500).json(errorMessage);
     }
+
   }
 );
+
+
 
 v1Router.put(
   "/employees/:userId",
@@ -227,8 +313,24 @@ v1Router.put(
     try {
       logger.info("🟢 Updating user: " + JSON.stringify(req.body));
       const { userId } = req.params;
-      const { name, mobile } = req.body;
 
+      const { name, email, password, mobile, role_id } = req.body;
+
+      // Step 1: Validate department_id, designation_id, and role_id
+      const department = await Department.findOne({ where: { id: req.body.department_id } });
+      if (!department) {
+        return res.status(400).json({ status: false, message: "Invalid department_id" });
+      }
+
+      const designation = await Designation.findOne({ where: { id: req.body.designation_id } });
+      if (!designation) {
+        return res.status(400).json({ status: false, message: "Invalid designation_id" });
+      }
+
+      const role = await Role.findOne({ where: { id: role_id } });
+      if (!role) {
+        return res.status(400).json({ status: false, message: "Invalid role_id" });
+      }
       // Step 1: Check if User exists
       const user = await User.findOne({
         where: { id: userId, company_id: req.user.company_id },
@@ -324,10 +426,34 @@ v1Router.put(
           notice_period_start_date,
           probation_end_date,
           company_address_id,
-          overtime_hourly_rate
+          overtime_hourly_rate,
+          updated_at: new Date()
         },
         { transaction }
       );
+
+      const existingUserRole = await UserRole.findOne({ where: { user_id: userId } });
+
+      if (existingUserRole) {
+        // ✅ If user exists, update role_id
+        await existingUserRole.update({
+          role_id: role_id,
+          updated_by: userId,
+          updated_at: new Date(),
+        });
+
+
+      } else {
+        // 🚀 If user does not exist, insert new record
+        const newUserRole = await UserRole.create({
+          user_id: userId,
+          role_id: role_id,
+          created_by: userId,
+          created_at: new Date(),
+        });
+
+
+      }
 
       logger.info("✅ Employee details updated: " + JSON.stringify(employee));
 
