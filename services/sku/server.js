@@ -25,41 +25,34 @@ const Sku = db.Sku;
 const SkuType = db.SkuType;
 
 // 🔹 Create a SKU (POST)
-v1Router.post(
-  "/sku-details",
-  authenticateJWT,
-  validateSku,
-  async (req, res) => {
-    const t = await sequelize.transaction();
-    try {
-      // Add created_by and updated_by from the authenticated user
-      const skuData = {
-        ...req.body,
-        company_id: req.user.company_id,
-        created_by: req.user.id,
-        // updated_by: req.user.id,
-        status: "active",
-      };
+v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    // Add created_by and updated_by from the authenticated user
+    const skuData = {
+      ...req.body,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      // updated_by: req.user.id,
+      status: "active",
+    };
 
-      const newSku = await Sku.create(skuData, { transaction: t });
-      await t.commit();
-      await publishToQueue({
-        operation: "CREATE",
-        skuId: newSku.id,
-        timestamp: new Date(),
-        data: newSku,
-      });
-      res
-        .status(201)
-        .json({ message: "SKU created successfully", sku: newSku });
-    } catch (error) {
-      await t.rollback();
-      res
-        .status(500)
-        .json({ message: "Error creating SKU", error: error.message });
-    }
+    const newSku = await Sku.create(skuData, { transaction: t });
+    await t.commit();
+    await publishToQueue({
+      operation: "CREATE",
+      skuId: newSku.id,
+      timestamp: new Date(),
+      data: newSku,
+    });
+    res.status(201).json({ message: "SKU created successfully", sku: newSku });
+  } catch (error) {
+    await t.rollback();
+    res
+      .status(500)
+      .json({ message: "Error creating SKU", error: error.message });
   }
-);
+});
 
 v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   try {

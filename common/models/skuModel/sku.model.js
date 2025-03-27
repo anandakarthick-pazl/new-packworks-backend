@@ -38,6 +38,7 @@ const Sku = sequelize.define(
     length: { type: DataTypes.FLOAT, allowNull: true },
     width: { type: DataTypes.FLOAT, allowNull: true },
     height: { type: DataTypes.FLOAT, allowNull: true },
+    unit: { type: DataTypes.STRING, allowNull: true },
     joints: { type: DataTypes.INTEGER, allowNull: true },
     ups: { type: DataTypes.INTEGER, allowNull: true },
     inner_outer_dimension: {
