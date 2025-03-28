@@ -11,7 +11,7 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import ExcelJS from 'exceljs';
+import ExcelJS from "exceljs";
 import { Readable } from "stream";
 
 dotenv.config();
@@ -24,7 +24,7 @@ const v1Router = Router();
 
 const Sku = db.Sku;
 const SkuType = db.SkuType;
-const Client =db.Client;
+const Client = db.Client;
 
 // 🔹 Create a SKU (POST)
 v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
@@ -162,6 +162,8 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     const formattedSkus = skus.map((sku) => ({
       ...sku.toJSON(),
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+      created_at: sku.created_at, // Include created_at timestamp
+      updated_at: sku.updated_at, // Include updated_at timestamp
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
@@ -616,7 +618,6 @@ v1Router.get(
     }
   }
 );
-
 
 v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   try {

@@ -65,6 +65,14 @@ const Sku = sequelize.define(
       type: Sequelize.JSON,
       allowNull: true,
     },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
