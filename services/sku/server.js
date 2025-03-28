@@ -11,8 +11,6 @@ import {
   closeRabbitMQConnection,
 } from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import companyScope from "../../common/middleware/companyScope.js";
-import { validateSku } from "../../common/inputvalidation/validateSku.js";
 
 dotenv.config();
 
@@ -94,7 +92,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
             [Op.or]: [
               { sku_name: { [Op.like]: `%${search}%` } },
               { client: { [Op.like]: `%${search}%` } },
-              { ply: { [Op.like]: `%${search}%` } },
+              { ply: { [Op.like]: `%${ply}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
             ],
           },
@@ -126,6 +124,37 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       ],
     });
 
+    // Calculate dashboard values dynamically
+    const skuTypeCounts = await Sku.findAll({
+      attributes: [
+        "sku_type",
+        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+      ],
+      where: { status: "active" },
+      group: ["sku_type"],
+      raw: true,
+    });
+
+    // Create a dashboard object with dynamic SKU type counts
+    const dashboard = skuTypeCounts.reduce((acc, item) => {
+      // Map SKU type to a more readable key if needed
+      const keyMap = {
+        "RSC Box": "rscBox",
+        "Corrugated Sheet": "corrugatedSheet",
+        "Die Cut Box": "dieCutBox",
+      };
+
+      // Use the mapped key or fallback to a camelCased version of the sku_type
+      const key =
+        keyMap[item.sku_type] ||
+        item.sku_type
+          .replace(/\s+/g, "")
+          .replace(/^./, (char) => char.toLowerCase());
+
+      acc[key] = parseInt(item.count);
+      return acc;
+    }, {});
+
     const formattedSkus = skus.map((sku) => ({
       ...sku.toJSON(),
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
@@ -135,6 +164,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
 
     const responseData = {
       data: formattedSkus,
+      dashboard: dashboard,
       pagination: {
         totalCount,
         totalPages,
@@ -154,7 +184,6 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // 🔹 Get SKU by ID (GET)
 v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   console.log("req.params.id", req.params.id);
@@ -196,159 +225,151 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.put(
-  "/sku-details/:id",
-  authenticateJWT,
-  validateSku,
-  async (req, res) => {
-    const transaction = await sequelize.transaction();
-    try {
-      // Define allowed fields to update
-      const allowedFields = [
-        "client_id",
-        "sku_name",
-        "ply",
-        "length",
-        "width",
-        "height",
-        "joints",
-        "ups",
-        "inner_outer_dimension",
-        "flap_width",
-        "flap_tolerance",
-        "length_trimming_tolerance",
-        "width_trimming_tolerance",
-        "strict_adherence",
-        "customer_reference",
-        "reference_number",
-        "internal_id",
-        "board_size_cm2",
-        "deckle_size",
-        "minimum_order_level",
-        "sku_type",
-        "sku_values",
-        // "status",
-      ];
+v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    // Define allowed fields to update
+    const allowedFields = [
+      "client_id",
+      "sku_name",
+      "ply",
+      "length",
+      "width",
+      "height",
+      "joints",
+      "ups",
+      "inner_outer_dimension",
+      "flap_width",
+      "flap_tolerance",
+      "length_trimming_tolerance",
+      // "width_trimming_tolerance",
+      "strict_adherence",
+      "customer_reference",
+      "reference_number",
+      "internal_id",
+      "board_size_cm2",
+      "deckle_size",
+      "minimum_order_level",
+      "sku_type",
+      "sku_values",
+      // "status",
+    ];
 
-      // Find the current SKU
-      const currentSku = await Sku.findByPk(req.params.id);
+    // Find the current SKU
+    const currentSku = await Sku.findByPk(req.params.id);
 
-      if (!currentSku) {
-        await transaction.rollback();
-        return res.status(404).json({ message: "SKU not found" });
-      }
-
-      // Filter request body to only include allowed fields
-      const updateData = {};
-      allowedFields.forEach((field) => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      });
-
-      // Add updated_by
-      updateData.updated_by = req.user.id;
-      updateData.updated_at = new Date();
-
-      // Special handling for sku_name
-      if (updateData.sku_name) {
-        if (
-          updateData.sku_name !== currentSku.sku_name &&
-          updateData.id !== req.params.id
-        ) {
-          // Check for duplicate SKU name for the same client, excluding the current SKU
-          const existingSku = await Sku.findOne({
-            where: {
-              sku_name: updateData.sku_name,
-              client_id: currentSku.client_id,
-              id: { [Op.ne]: req.params.id },
-            },
-            transaction,
-          });
-          if (existingSku) {
-            await transaction.rollback();
-            return res.status(400).json({
-              message:
-                "SKU name already exists for this client. Please use a different name.",
-            });
-          }
-        }
-      }
-
-      // If client_id is provided, ensure it matches the current SKU's client
-      if (
-        updateData.client_id &&
-        updateData.client_id !== currentSku.client_id
-      ) {
-        await transaction.rollback();
-        return res.status(400).json({
-          message: "Cannot change client for an existing SKU.",
-        });
-      }
-
-      // Check if no valid fields to update
-      if (Object.keys(updateData).length <= 1) {
-        // 1 is for updated_by
-        await transaction.rollback();
-        return res.status(400).json({
-          message: "No updatable fields provided.",
-        });
-      }
-
-      // Perform the update
-      const [updatedCount] = await Sku.update(updateData, {
-        where: { id: req.params.id },
-        transaction,
-      });
-
-      if (updatedCount === 0) {
-        await transaction.rollback();
-        return res.status(404).json({ message: "SKU not found." });
-      }
-
-      // Fetch the updated SKU to return to the client
-      const updatedSku = await Sku.findByPk(req.params.id, { transaction });
-
-      // Convert sku_values from string to JSON if needed
-      if (updatedSku.sku_values) {
-        try {
-          updatedSku.sku_values = JSON.parse(updatedSku.sku_values);
-        } catch (error) {
-          console.error("Error parsing sku_values:", error.message);
-          await transaction.rollback();
-          return res.status(500).json({
-            message: "Error parsing sku_values.",
-            error: error.message,
-          });
-        }
-      }
-
-      // Commit the transaction
-      await transaction.commit();
-
-      // Publish update to queue (optional)
-      await publishToQueue({
-        operation: "UPDATE",
-        skuId: req.params.id,
-        timestamp: new Date(),
-        data: updateData,
-      });
-
-      return res.status(200).json({
-        message: "SKU updated successfully.",
-        updatedData: updatedSku,
-      });
-    } catch (error) {
-      console.log(error, "Error in SKU Update");
-      // Rollback the transaction on error
+    if (!currentSku) {
       await transaction.rollback();
-      return res.status(500).json({
-        message: "Error updating SKU.",
-        error: error.message,
+      return res.status(404).json({ message: "SKU not found" });
+    }
+
+    // Filter request body to only include allowed fields
+    const updateData = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    // Add updated_by
+    updateData.updated_by = req.user.id;
+    updateData.updated_at = new Date();
+
+    // Special handling for sku_name
+    if (updateData.sku_name) {
+      if (
+        updateData.sku_name !== currentSku.sku_name &&
+        updateData.id !== req.params.id
+      ) {
+        // Check for duplicate SKU name for the same client, excluding the current SKU
+        const existingSku = await Sku.findOne({
+          where: {
+            sku_name: updateData.sku_name,
+            client_id: currentSku.client_id,
+            id: { [Op.ne]: req.params.id },
+          },
+          transaction,
+        });
+        if (existingSku) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message:
+              "SKU name already exists for this client. Please use a different name.",
+          });
+        }
+      }
+    }
+
+    // If client_id is provided, ensure it matches the current SKU's client
+    if (updateData.client_id && updateData.client_id !== currentSku.client_id) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "Cannot change client for an existing SKU.",
       });
     }
+
+    // Check if no valid fields to update
+    if (Object.keys(updateData).length <= 1) {
+      // 1 is for updated_by
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "No updatable fields provided.",
+      });
+    }
+
+    // Perform the update
+    const [updatedCount] = await Sku.update(updateData, {
+      where: { id: req.params.id },
+      transaction,
+    });
+
+    if (updatedCount === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "SKU not found." });
+    }
+
+    // Fetch the updated SKU to return to the client
+    const updatedSku = await Sku.findByPk(req.params.id, { transaction });
+
+    // Convert sku_values from string to JSON if needed
+    if (updatedSku.sku_values) {
+      try {
+        updatedSku.sku_values = JSON.parse(updatedSku.sku_values);
+      } catch (error) {
+        console.error("Error parsing sku_values:", error.message);
+        await transaction.rollback();
+        return res.status(500).json({
+          message: "Error parsing sku_values.",
+          error: error.message,
+        });
+      }
+    }
+
+    // Commit the transaction
+    await transaction.commit();
+
+    // Publish update to queue (optional)
+    await publishToQueue({
+      operation: "UPDATE",
+      skuId: req.params.id,
+      timestamp: new Date(),
+      data: updateData,
+    });
+
+    return res.status(200).json({
+      message: "SKU updated successfully.",
+      updatedData: updatedSku,
+    });
+  } catch (error) {
+    console.log(error, "Error in SKU Update");
+    // Rollback the transaction on error
+    await transaction.rollback();
+    return res.status(500).json({
+      message: "Error updating SKU.",
+      error: error.message,
+    });
   }
-);
+});
 
 // 🔹 Soft Delete SKU (DELETE) - changes status to inactive
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
