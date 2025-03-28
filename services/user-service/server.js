@@ -642,13 +642,34 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
       }
     );
 
+    const statusCounts = await sequelize.query(
+      `SELECT 
+          SUM(CASE WHEN u.status = 'active' THEN 1 ELSE 0 END) AS active_count,
+          SUM(CASE WHEN u.status != 'active' THEN 1 ELSE 0 END) AS inactive_count
+      FROM employee_details e
+      JOIN users u ON e.user_id = u.id
+      WHERE 
+          u.name LIKE :search OR 
+          u.email LIKE :search`,
+      {
+        replacements: { search: `%${search}%` },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    // Extract active and inactive counts from the query result
+    const { active_count = 0, inactive_count = 0 } = statusCounts[0];
+
+
     res.json({
       success: true,
       totalRecords,
       totalPages,
       currentPage: parseInt(page),
       pageSize: parseInt(limit),
-      data: employees
+      data: employees,
+      activeEmployees: active_count,
+      inactiveEmployees: inactive_count
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
