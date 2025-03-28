@@ -253,8 +253,21 @@ v1Router.delete(
     const transaction = await sequelize.transaction();
     try {
       const { userId } = req.params;
+      const employee = await Employee.findOne({
+        where: { id: userId },
+        transaction,
+      });
+      if (!employee) {
+        logger.info("⚠️ Employee details not found.");
+        await transaction.rollback();
+        return res.status(404).json({
+          status: false,
+          message: "Employee details not found",
+          data: [],
+        });
+      }
       const user = await User.findOne({
-        where: { id: userId, company_id: req.user.company_id },
+        where: { id: employee.user_id, company_id: req.user.company_id },
         transaction,
       });
       if (user) {
@@ -680,17 +693,26 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
   try {
     const { employeeId } = req.params;
 
-    const employee = await Employee.findOne({
-      where: { id: employeeId },
-      include: [
-        {
-          model: User,
-          attributes: ['name', 'email'], // Fetch only name and email
-        },
-      ],
-    });
+    // Raw SQL Query to fetch employee details along with user details
+    const employee = await sequelize.query(
+      `SELECT 
+          e.*, 
+          u.name AS user_name, 
+          u.email AS user_email,
+          u.mobile AS mobile,
+          u.country_phonecode AS country_phonecode,
+          u.country_id AS country_id,
+          u.image AS image
+      FROM employee_details e
+      JOIN users u ON e.user_id = u.id
+      WHERE e.id = :employeeId`,
+      {
+        replacements: { employeeId },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
 
-    if (!employee) {
+    if (employee.length === 0) {
       return res.json({
         success: true,
         message: 'Employee not found',
@@ -700,7 +722,7 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
 
     return res.json({
       success: true,
-      data: employee  // Use the correct variable "employee"
+      data: employee[0]  // Returning the first record as an object
     });
 
   } catch (error) {
@@ -708,6 +730,7 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", (req, res) => {
