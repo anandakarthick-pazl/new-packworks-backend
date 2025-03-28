@@ -57,6 +57,8 @@ const Sku = sequelize.define(
     customer_reference: { type: DataTypes.STRING, allowNull: true },
     reference_number: { type: DataTypes.STRING, allowNull: true },
     internal_id: { type: DataTypes.STRING, allowNull: true },
+    length_board_size_cm2: { type: DataTypes.STRING, allowNull: true },
+    width_board_size_cm2: { type: DataTypes.STRING, allowNull: true },
     board_size_cm2: { type: DataTypes.STRING, allowNull: true },
     deckle_size: { type: DataTypes.FLOAT, allowNull: true },
     minimum_order_level: { type: DataTypes.INTEGER, allowNull: true },

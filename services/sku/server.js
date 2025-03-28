@@ -253,6 +253,8 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "customer_reference",
       "reference_number",
       "internal_id",
+      "length_board_size_cm2",
+      "width_board_size_cm2",
       "board_size_cm2",
       "deckle_size",
       "minimum_order_level",
