@@ -592,9 +592,10 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.post("/clients/check-gst", async (req, res) => {
+v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
   try {
-    const { company_id, gst_number } = req.body;
+    const { gst_number } = req.body;
+    const { company_id } = req.user; // Extract user ID from the request
 
     // Validate request parameters
     if (!company_id || !gst_number) {
