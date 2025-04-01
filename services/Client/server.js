@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
+import axios from "axios";
 
 // Import only the RabbitMQ configuration
 import {
@@ -591,6 +592,50 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.post("/clients/check-gst", async (req, res) => {
+  try {
+    const { company_id, gst_number } = req.body;
+
+    // Validate request parameters
+    if (!company_id || !gst_number) {
+      return res.status(400).json({
+        success: false,
+        message: "Company ID and GST number are required",
+      });
+    }
+
+    // Check if GST already exists for the same company
+    const existingClient = await Client.findOne({
+      where: { company_id, gst_number },
+    });
+
+    if (existingClient) {
+      return res.status(200).json({
+        success: false,
+        message: "This GST number is already registered with this company",
+        isExisting: true,
+      });
+    }
+
+    // If GST not found in our database, fetch from third-party API
+    const thirdPartyUrl = `http://sheet.gstincheck.co.in/check/9ee24120971acd5c17dc6cad239d99fa/${gst_number}`;
+    const thirdPartyResponse = await axios.get(thirdPartyUrl);
+
+    return res.status(200).json({
+      success: true,
+      message: "GST details fetched successfully",
+      isExisting: false,
+      gstDetails: thirdPartyResponse.data,
+    });
+  } catch (error) {
+    console.error("Error checking GST:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error checking GST number",
+      error: error.message,
+    });
+  }
+});
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({

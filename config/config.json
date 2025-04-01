@@ -1,9 +1,9 @@
 {
   "development": {
     "username": "root",
-    "password": "Dev2buzzHostPwd2025",
+    "password": "",
     "database": "packworks",
-    "host": "3.111.179.203",
+    "host": "127.0.0.1",
     "dialect": "mysql"
   },
   "test": {
