@@ -1,7 +1,8 @@
 // console.log("test");
 import express, { json, Router } from "express";
 import cors from "cors";
-import db from "../../common/models/index.js";
+import { Op } from "sequelize";
+import db from "../../common/models/index.js"; 
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 // import {
@@ -21,10 +22,40 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
+// Search Package with paginate
+
+
+
 // Get Packages
   v1Router.get("/", authenticateJWT, async (req, res) => {
     try {
-        const packages = await Package.findAll({where: { status: "active" }});
+        // const search = "";
+        // const page =  1; 
+        // const limit =  10; 
+        // const offset = (page - 1) * limit; 
+        const { search = "", page = "1", limit = "10" } = req.query;
+
+        // Convert page & limit to numbers
+        const pageNumber = parseInt(page) || 1;
+        const limitNumber = parseInt(limit) || 10;
+        const offset = (pageNumber - 1) * limitNumber;
+
+
+        let whereCondition = { status: "active" };
+
+        if (search) {   
+          whereCondition = {
+            ...whereCondition,
+            name: { [Op.like]: `%${search}%` }, 
+          };
+        }
+
+
+        const totalPackages = await Package.count({ where: whereCondition });
+        const packages = await Package.findAll({where: whereCondition, limit: limitNumber, offset });
+
+
+       
 
         const formattedPackages = packages.map(pkg => ({
           ...pkg.toJSON(), 
@@ -34,6 +65,9 @@ const v1Router = Router();
         return res.status(200).json({
           success: true,
           message:"Packages Fetched Successfully",
+          total: totalPackages, 
+          page, 
+          totalPages: Math.ceil(totalPackages / limit), 
           data:formattedPackages
         }); 
       } catch (error) {
