@@ -15,8 +15,12 @@ import MachineProcessField from './machine/processField.model.js';
 import DropdownName from './commonModel/dropdown.model.js';
 import DropdownValue from './commonModel/dropdownValues.model.js';
 import MachineProcessValue from './machine/processValue.model.js';
+import Package from "../models/package.model.js";
+import Currency from "../models/currency.model.js";
+import ModuleSettings from "../models/moduleSettings.model.js";
 
 
-const db = { sequelize, User, Company,UserAuth,apiLog,Client,ClientAddress,SkuType,Sku,SalesOrder,WorkOrder,DropdownName,DropdownValue, Machine,MachineProcessName,MachineProcessValue,MachineProcessField };
+
+const db = { sequelize, User, Company,UserAuth,apiLog,Client,ClientAddress,SkuType,Sku,SalesOrder,WorkOrder,DropdownName,DropdownValue, Machine,MachineProcessName,MachineProcessValue,MachineProcessField,Package,Currency,ModuleSettings };
 
 export default db;

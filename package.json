@@ -5,7 +5,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"Error: no test specified\" && exit 1", 
     "company": "nodemon services/company/server.js",
     "user": "nodemon services/user-service/server.js",
     "client": "nodemon services/Client/server.js",
@@ -20,7 +20,8 @@
     "role": "nodemon services/role/server.js",
     "storage": "nodemon services/storage/server.js",
     "company-address": "nodemon services/company-address/server.js",
-    "fil-view": "nodemon services/upload-view/server.js"
+    "fil-view": "nodemon services/upload-view/server.js",
+    "package": "nodemon services/package/server.js"
   },
   "keywords": [],
   "author": "",

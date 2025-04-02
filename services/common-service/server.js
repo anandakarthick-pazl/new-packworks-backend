@@ -9,6 +9,8 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import Country from "../../common/models/country.model.js";
 
 dotenv.config();
+const Currency=db.Currency;
+const ModuleSettings=db.ModuleSettings;
 
 const app = express();
 app.use(json());
@@ -429,6 +431,47 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
   });
 });
+
+
+
+ // Get Currency
+ v1Router.get("/currency",authenticateJWT, async (req, res) => {
+  try {
+  const currency = await Currency.findAll({where: { status: "active" },attributes:["id","company_id","currency_name","currency_symbol","currency_code","status"]});
+  return res.status(200).json({
+      success: true,
+      message:"Currencies fetched Successfully",
+      data: currency,
+  });
+  } catch (error) {
+  console.error("Error fetching departments:", error);
+  return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get ModuleSettings
+v1Router.get("/module",authenticateJWT, async (req, res) => {
+  try {
+  const settings = await ModuleSettings.findAll({where: { status: "active" },attributes:["id","company_id","module_name","status"]});
+
+  return res.status(200).json({
+      success: true,
+      message:"Module Fetched Successfully",
+      data: settings,
+  });
+  } catch (error) {
+  console.error("Error fetching Module Settings:", error);
+  return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
 
 // Use Version 1 Router
 app.use("/api/common-service", v1Router);

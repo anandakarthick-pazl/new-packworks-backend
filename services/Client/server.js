@@ -1,4 +1,4 @@
-import express, { json, Router } from "express";
+import express, { json, Router } from "express"; 
 import cors from "cors";
 import db from "../../common/models/index.js";
 import dotenv from "dotenv";
