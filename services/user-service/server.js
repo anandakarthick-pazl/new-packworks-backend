@@ -32,7 +32,6 @@ const v1Router = Router();
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
-
 // Register API with Transaction
 v1Router.post(
   "/register",
@@ -46,30 +45,50 @@ v1Router.post(
     try {
       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
 
-      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to,image,country_phonecode,country_id } = req.body;
+      const {
+        name,
+        email,
+        password,
+        mobile,
+        role_id,
+        department_id,
+        designation_id,
+        reporting_to,
+        image,
+        country_phonecode,
+        country_id,
+      } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
       const department = await Department.findByPk(department_id);
       if (!department) {
         await transaction.rollback();
-        return res.status(400).json({ status: false, message: "Invalid department_id" });
+        return res
+          .status(400)
+          .json({ status: false, message: "Invalid department_id" });
       }
 
       const designation = await Designation.findByPk(designation_id);
       if (!designation) {
         await transaction.rollback();
-        return res.status(400).json({ status: false, message: "Invalid designation_id" });
+        return res
+          .status(400)
+          .json({ status: false, message: "Invalid designation_id" });
       }
 
       const role = await Role.findByPk(role_id);
       if (!role) {
         await transaction.rollback();
-        return res.status(400).json({ status: false, message: "Invalid role_id" });
+        return res
+          .status(400)
+          .json({ status: false, message: "Invalid role_id" });
       }
       const reportingTo = await User.findByPk(reporting_to);
       if (!reportingTo) {
         await transaction.rollback();
-        return res.status(400).json({ status: false, message: "Invalid Reporting To" });
+        return res
+          .status(400)
+          .json({ status: false, message: "Invalid Reporting To" });
       }
 
       // Step 2: Check if user already exists
@@ -81,7 +100,9 @@ v1Router.post(
       if (existingUser) {
         logger.info("❌ Email already registered");
         await transaction.rollback();
-        return res.status(400).json({ status: false, message: "Email already registered" });
+        return res
+          .status(400)
+          .json({ status: false, message: "Email already registered" });
       }
 
       // Step 3: Hash password
@@ -105,8 +126,7 @@ v1Router.post(
           company_id: req.user.company_id,
           image,
           country_phonecode,
-          country_id
-          
+          country_id,
         },
         { transaction }
       );
@@ -135,7 +155,7 @@ v1Router.post(
         probation_end_date,
         company_address_id,
         overtime_hourly_rate,
-        skills
+        skills,
       } = req.body;
 
       // ✅ Ensure `joining_date` is set properly
@@ -168,7 +188,7 @@ v1Router.post(
           created_at: new Date(),
           created_by: userId,
           updated_at: new Date(),
-          skills
+          skills,
         },
         { transaction }
       );
@@ -183,10 +203,7 @@ v1Router.post(
       });
 
       if (!created) {
-        await userRole.update(
-          { role_id, updated_by: userId },
-          { transaction }
-        );
+        await userRole.update({ role_id, updated_by: userId }, { transaction });
       }
 
       logger.info("✅ User role assigned");
@@ -230,7 +247,6 @@ v1Router.post(
         message: "User registered successfully",
         data: newUser,
       });
-
     } catch (error) {
       await transaction.rollback();
       logger.error(`❌ User Register Error: ${error.message}`);
@@ -244,154 +260,180 @@ v1Router.post(
   }
 );
 
-
-v1Router.delete(
-  "/employees/:userId",
-  authenticateJWT,
-  async (req, res) => {
-    console.log("Delete user details...");
-    const transaction = await sequelize.transaction();
-    try {
-      const { userId } = req.params;
-      const employee = await Employee.findOne({
-        where: { id: userId },
-        transaction,
-      });
-      if (!employee) {
-        logger.info("⚠️ Employee details not found.");
-        await transaction.rollback();
-        return res.status(404).json({
-          status: false,
-          message: "Employee details not found",
-          data: [],
-        });
-      }
-      const user = await User.findOne({
-        where: { id: employee.user_id, company_id: req.user.company_id },
-        transaction,
-      });
-      if (user) {
-        await user.update({
-          status: 'deactive',
-          updated_by: req.user.id,
-          updated_at: new Date(),
-        });
-        await transaction.commit();
-        return res.status(200).json({
-          status: true,
-          message: "User deleted successfully",
-          data: [],
-        });
-
-      } else {
-        await transaction.rollback();
-        return res.status(404).json({
-          status: false,
-          message: "User not found",
-          data: [],
-        });
-      }
-
-
-    } catch (error) {
+v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
+  console.log("Delete user details...");
+  const transaction = await sequelize.transaction();
+  try {
+    const { userId } = req.params;
+    const employee = await Employee.findOne({
+      where: { id: userId },
+      transaction,
+    });
+    if (!employee) {
+      logger.info("⚠️ Employee details not found.");
       await transaction.rollback();
-
-      const stackLines = error.stack.split("\n");
-      const callerLine = stackLines[1];
-      const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
-      let fileName = "";
-      let lineNumber = "";
-
-      if (match) {
-        fileName = match[1];
-        lineNumber = match[2];
-      }
-      const errorMessage = {
+      return res.status(404).json({
         status: false,
-        message: error.message,
-        file: fileName,
-        line: lineNumber,
+        message: "Employee details not found",
         data: [],
-      };
+      });
+    }
+    const user = await User.findOne({
+      where: { id: employee.user_id, company_id: req.user.company_id },
+      transaction,
+    });
+    if (user) {
+      await user.update({
+        status: "deactive",
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      });
+      await transaction.commit();
+      return res.status(200).json({
+        status: true,
+        message: "User deleted successfully",
+        data: [],
+      });
+    } else {
+      await transaction.rollback();
+      return res.status(404).json({
+        status: false,
+        message: "User not found",
+        data: [],
+      });
+    }
+  } catch (error) {
+    await transaction.rollback();
 
-      logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
-      return res.status(500).json(errorMessage);
+    const stackLines = error.stack.split("\n");
+    const callerLine = stackLines[1];
+    const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
+    let fileName = "";
+    let lineNumber = "";
+
+    if (match) {
+      fileName = match[1];
+      lineNumber = match[2];
+    }
+    const errorMessage = {
+      status: false,
+      message: error.message,
+      file: fileName,
+      line: lineNumber,
+      data: [],
+    };
+
+    logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
+    return res.status(500).json(errorMessage);
+  }
+});
+
+v1Router.put("/employees/:userId", authenticateJWT, async (req, res) => {
+  console.log("Updating user details...");
+  const transaction = await sequelize.transaction();
+  try {
+    logger.info("🟢 Updating user: " + JSON.stringify(req.body));
+    const { userId } = req.params;
+
+    const { name, email, password, mobile, role_id, image } = req.body;
+
+    // Step 1: Validate department_id, designation_id, and role_id
+    const department = await Department.findOne({
+      where: { id: req.body.department_id },
+    });
+    if (!department) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid department_id" });
     }
 
-  }
-);
+    const designation = await Designation.findOne({
+      where: { id: req.body.designation_id },
+    });
+    if (!designation) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid designation_id" });
+    }
 
+    const role = await Role.findOne({ where: { id: role_id } });
+    if (!role) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid role_id" });
+    }
+    // Step 1: Check if User exists
+    const user = await User.findOne({
+      where: { id: userId, company_id: req.user.company_id },
+      transaction,
+    });
 
-
-v1Router.put(
-  "/employees/:userId",
-  authenticateJWT,
-  async (req, res) => {
-    console.log("Updating user details...");
-    const transaction = await sequelize.transaction();
-    try {
-      logger.info("🟢 Updating user: " + JSON.stringify(req.body));
-      const { userId } = req.params;
-
-      const { name, email, password, mobile, role_id,image } = req.body;
-
-      // Step 1: Validate department_id, designation_id, and role_id
-      const department = await Department.findOne({ where: { id: req.body.department_id } });
-      if (!department) {
-        return res.status(400).json({ status: false, message: "Invalid department_id" });
-      }
-
-      const designation = await Designation.findOne({ where: { id: req.body.designation_id } });
-      if (!designation) {
-        return res.status(400).json({ status: false, message: "Invalid designation_id" });
-      }
-
-      const role = await Role.findOne({ where: { id: role_id } });
-      if (!role) {
-        return res.status(400).json({ status: false, message: "Invalid role_id" });
-      }
-      // Step 1: Check if User exists
-      const user = await User.findOne({
-        where: { id: userId, company_id: req.user.company_id },
-        transaction,
+    if (!user) {
+      logger.info("❌ User not found.");
+      await transaction.rollback();
+      return res.status(404).json({
+        status: false,
+        message: "User not found",
+        data: [],
       });
+    }
 
-      if (!user) {
-        logger.info("❌ User not found.");
-        await transaction.rollback();
-        return res.status(404).json({
-          status: false,
-          message: "User not found",
-          data: [],
-        });
-      }
+    // Step 2: Check if Employee exists
+    const employee = await Employee.findOne({
+      where: { user_id: userId },
+      transaction,
+    });
 
-      // Step 2: Check if Employee exists
-      const employee = await Employee.findOne({
-        where: { user_id: userId },
-        transaction,
+    if (!employee) {
+      logger.info("⚠️ Employee details not found.");
+      await transaction.rollback();
+      return res.status(404).json({
+        status: false,
+        message: "Employee details not found",
+        data: [],
       });
+    }
 
-      if (!employee) {
-        logger.info("⚠️ Employee details not found.");
-        await transaction.rollback();
-        return res.status(404).json({
-          status: false,
-          message: "Employee details not found",
-          data: [],
-        });
-      }
+    // Step 3: Update User details
+    await user.update(
+      { name, mobile, image, updated_at: new Date() },
+      { transaction }
+    );
 
-      // Step 3: Update User details
-      await user.update(
-        { name, mobile,image, updated_at: new Date() },
-        { transaction }
-      );
+    logger.info("✅ User details updated: " + JSON.stringify(user));
 
-      logger.info("✅ User details updated: " + JSON.stringify(user));
+    // Step 4: Update Employee details
+    const {
+      employee_id,
+      address,
+      hourly_rate,
+      slack_username,
+      department_id,
+      designation_id,
+      joining_date,
+      last_date,
+      added_by,
+      last_updated_by,
+      attendance_reminder,
+      date_of_birth,
+      calendar_view,
+      about_me,
+      reporting_to,
+      contract_end_date,
+      internship_end_date,
+      employment_type,
+      marriage_anniversary_date,
+      marital_status,
+      notice_period_end_date,
+      notice_period_start_date,
+      probation_end_date,
+      company_address_id,
+      overtime_hourly_rate,
+      skills,
+    } = req.body; // Extract only Employee-related fields
 
-      // Step 4: Update Employee details
-      const {
+    await employee.update(
+      {
         employee_id,
         address,
         hourly_rate,
@@ -417,104 +459,69 @@ v1Router.put(
         probation_end_date,
         company_address_id,
         overtime_hourly_rate,
-        skills
-      } = req.body; // Extract only Employee-related fields
+        updated_at: new Date(),
+        skills,
+      },
+      { transaction }
+    );
 
-      await employee.update(
-        {
-          employee_id,
-          address,
-          hourly_rate,
-          slack_username,
-          department_id,
-          designation_id,
-          joining_date,
-          last_date,
-          added_by,
-          last_updated_by,
-          attendance_reminder,
-          date_of_birth,
-          calendar_view,
-          about_me,
-          reporting_to,
-          contract_end_date,
-          internship_end_date,
-          employment_type,
-          marriage_anniversary_date,
-          marital_status,
-          notice_period_end_date,
-          notice_period_start_date,
-          probation_end_date,
-          company_address_id,
-          overtime_hourly_rate,
-          updated_at: new Date(),
-          skills
-        },
-        { transaction }
-      );
+    const existingUserRole = await UserRole.findOne({
+      where: { user_id: userId },
+    });
 
-      const existingUserRole = await UserRole.findOne({ where: { user_id: userId } });
-
-      if (existingUserRole) {
-        // ✅ If user exists, update role_id
-        await existingUserRole.update({
-          role_id: role_id,
-          updated_by: userId,
-          updated_at: new Date(),
-        });
-
-
-      } else {
-        // 🚀 If user does not exist, insert new record
-        const newUserRole = await UserRole.create({
-          user_id: userId,
-          role_id: role_id,
-          created_by: userId,
-          created_at: new Date(),
-        });
-
-
-      }
-
-      logger.info("✅ Employee details updated: " + JSON.stringify(employee));
-
-      // Step 5: Commit Transaction
-      await transaction.commit();
-      logger.info("✅ User & Employee Updated Successfully");
-
-      return res.status(200).json({
-        status: true,
-        message: "User and employee updated successfully",
-        data: { user, employee },
+    if (existingUserRole) {
+      // ✅ If user exists, update role_id
+      await existingUserRole.update({
+        role_id: role_id,
+        updated_by: userId,
+        updated_at: new Date(),
       });
-    } catch (error) {
-      await transaction.rollback();
-
-      const stackLines = error.stack.split("\n");
-      const callerLine = stackLines[1];
-      const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
-      let fileName = "";
-      let lineNumber = "";
-
-      if (match) {
-        fileName = match[1];
-        lineNumber = match[2];
-      }
-      const errorMessage = {
-        status: false,
-        message: error.message,
-        file: fileName,
-        line: lineNumber,
-        data: [],
-      };
-
-      logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
-      return res.status(500).json(errorMessage);
+    } else {
+      // 🚀 If user does not exist, insert new record
+      const newUserRole = await UserRole.create({
+        user_id: userId,
+        role_id: role_id,
+        created_by: userId,
+        created_at: new Date(),
+      });
     }
+
+    logger.info("✅ Employee details updated: " + JSON.stringify(employee));
+
+    // Step 5: Commit Transaction
+    await transaction.commit();
+    logger.info("✅ User & Employee Updated Successfully");
+
+    return res.status(200).json({
+      status: true,
+      message: "User and employee updated successfully",
+      data: { user, employee },
+    });
+  } catch (error) {
+    await transaction.rollback();
+
+    const stackLines = error.stack.split("\n");
+    const callerLine = stackLines[1];
+    const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
+    let fileName = "";
+    let lineNumber = "";
+
+    if (match) {
+      fileName = match[1];
+      lineNumber = match[2];
+    }
+    const errorMessage = {
+      status: false,
+      message: error.message,
+      file: fileName,
+      line: lineNumber,
+      data: [],
+    };
+
+    logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
+    return res.status(500).json(errorMessage);
   }
-);
-
-
+});
 
 v1Router.post(
   "/login",
@@ -564,6 +571,12 @@ v1Router.post(
         // { expiresIn: "1h" }
       );
 
+      console.log("Generated Token Payload:", {
+        id: user.id,
+        email: user.email,
+        company_id: user.company_id,
+      });
+
       // 🔹 Update last login time
       await User.update({ last_login: new Date() }, { where: { id: user.id } });
 
@@ -586,8 +599,6 @@ v1Router.post(
 );
 v1Router.get("/employees", authenticateJWT, async (req, res) => {
   try {
-
-
     const { page = 1, limit = 10, search = "" } = req.query;
     const offset = (page - 1) * limit;
 
@@ -609,7 +620,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           u.status LIKE :search`,
       {
         replacements: { search: `%${search}%` },
-        type: sequelize.QueryTypes.SELECT
+        type: sequelize.QueryTypes.SELECT,
       }
     );
 
@@ -649,9 +660,9 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
         replacements: {
           search: `%${search}%`,
           limit: parseInt(limit),
-          offset: parseInt(offset)
+          offset: parseInt(offset),
         },
-        type: sequelize.QueryTypes.SELECT
+        type: sequelize.QueryTypes.SELECT,
       }
     );
 
@@ -666,13 +677,12 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           u.email LIKE :search`,
       {
         replacements: { search: `%${search}%` },
-        type: sequelize.QueryTypes.SELECT
+        type: sequelize.QueryTypes.SELECT,
       }
     );
 
     // Extract active and inactive counts from the query result
     const { active_count = 0, inactive_count = 0 } = statusCounts[0];
-
 
     res.json({
       success: true,
@@ -682,7 +692,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
       pageSize: parseInt(limit),
       data: employees,
       activeEmployees: active_count,
-      inactiveEmployees: inactive_count
+      inactiveEmployees: inactive_count,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -708,29 +718,27 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
       WHERE e.id = :employeeId`,
       {
         replacements: { employeeId },
-        type: sequelize.QueryTypes.SELECT
+        type: sequelize.QueryTypes.SELECT,
       }
     );
 
     if (employee.length === 0) {
       return res.json({
         success: true,
-        message: 'Employee not found',
-        data: {} // Empty object if no employee found
+        message: "Employee not found",
+        data: {}, // Empty object if no employee found
       });
     }
 
     return res.json({
       success: true,
-      data: employee[0]  // Returning the first record as an object
+      data: employee[0], // Returning the first record as an object
     });
-
   } catch (error) {
     console.error("Error fetching employee:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
-
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", (req, res) => {
