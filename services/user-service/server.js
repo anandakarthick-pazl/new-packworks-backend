@@ -46,7 +46,7 @@ v1Router.post(
     try {
       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
 
-      const { name, email, password, mobile, role_id, department_id, designation_id,reporting_to,image,country_phonecode,country_id } = req.body;
+      const { name, email, password, mobile, role_id, department_id, designation_id, reporting_to, image, country_phonecode, country_id } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
       const department = await Department.findByPk(department_id);
@@ -106,7 +106,7 @@ v1Router.post(
           image,
           country_phonecode,
           country_id
-          
+
         },
         { transaction }
       );
@@ -333,23 +333,36 @@ v1Router.put(
       logger.info("🟢 Updating user: " + JSON.stringify(req.body));
       const { userId } = req.params;
 
-      const { name, email, password, mobile, role_id,image } = req.body;
+      const { name, email, password, mobile, role_id, image } = req.body;
 
       // Step 1: Validate department_id, designation_id, and role_id
-      const department = await Department.findOne({ where: { id: req.body.department_id } });
-      if (!department) {
+      if (req.body.department_id) {
+        const department = await Department.findOne({ where: { id: req.body.department_id } });
+        if (!department) {
+          return res.status(400).json({ status: false, message: "Invalid department_id" });
+        }
+      } else {
         return res.status(400).json({ status: false, message: "Invalid department_id" });
-      }
 
-      const designation = await Designation.findOne({ where: { id: req.body.designation_id } });
-      if (!designation) {
+      }
+      if (req.body.designation_id) {
+        const designation = await Designation.findOne({ where: { id: req.body.designation_id } });
+        if (!designation) {
+          return res.status(400).json({ status: false, message: "Invalid designation_id" });
+        }
+      } else {
         return res.status(400).json({ status: false, message: "Invalid designation_id" });
-      }
 
+      }
+      if (req.body.role_id) {
       const role = await Role.findOne({ where: { id: role_id } });
       if (!role) {
         return res.status(400).json({ status: false, message: "Invalid role_id" });
       }
+    }else{
+      return res.status(400).json({ status: false, message: "Invalid role_id" });
+
+    }
       // Step 1: Check if User exists
       const user = await User.findOne({
         where: { id: userId, company_id: req.user.company_id },
@@ -384,7 +397,7 @@ v1Router.put(
 
       // Step 3: Update User details
       await user.update(
-        { name, mobile,image, updated_at: new Date() },
+        { name, mobile, image, updated_at: new Date() },
         { transaction }
       );
 
