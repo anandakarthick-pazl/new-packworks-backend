@@ -707,6 +707,7 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
     const employee = await sequelize.query(
       `SELECT 
           e.*, 
+          r.role_id,
           u.name AS user_name, 
           u.email AS user_email,
           u.mobile AS mobile,
@@ -715,6 +716,7 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
           u.image AS image
       FROM employee_details e
       JOIN users u ON e.user_id = u.id
+      JOIN role_user r ON u.id = r.user_id
       WHERE e.id = :employeeId`,
       {
         replacements: { employeeId },
