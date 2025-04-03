@@ -1,1 +1,9 @@
--- 01/04/2025
+-- 02/04/2025
+ALTER TABLE clients 
+ADD COLUMN client_ui_id VARCHAR(150);
+
+ALTER TABLE sku 
+ADD COLUMN select_dies VARCHAR(150);
+
+
+

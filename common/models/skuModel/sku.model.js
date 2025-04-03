@@ -41,6 +41,7 @@ const Sku = sequelize.define(
     unit: { type: DataTypes.STRING, allowNull: true },
     joints: { type: DataTypes.INTEGER, allowNull: true },
     ups: { type: DataTypes.INTEGER, allowNull: true },
+    select_dies: { type: DataTypes.STRING, allowNull: true },
     inner_outer_dimension: {
       type: DataTypes.ENUM("Inner", "Outer"),
       allowNull: true,

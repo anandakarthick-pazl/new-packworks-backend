@@ -46,7 +46,7 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
     };
 
     // 1. Create Client
-    const newClient = await Client.create(newClientData, { transaction: t });
+    const newClient = await Client.create(newClientData, { transaction: t, ...req.sequelizeOptions });
 
     console.log("create Client", newClient.toJSON());
 
@@ -61,7 +61,7 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
             created_by: req.user.id,
             updated_by: req.user.id,
           },
-          { transaction: t }
+          { transaction: t, ...req.sequelizeOptions }
         );
       })
     );
@@ -154,7 +154,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       status: true,
       data: clients.map((client) => ({
         ...client.toJSON(),
-        client_id:
+        client_ui_id:
           client.entity_type === "Client"
             ? `CLNT-${client.client_id}`
             : client.entity_type === "Vendor"

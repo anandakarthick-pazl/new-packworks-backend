@@ -13,6 +13,10 @@ Client.init(
       primaryKey: true,
       autoIncrement: true,
     },
+    client_ui_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+    },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -100,7 +104,7 @@ Client.init(
       allowNull: true,
     },
     documents: {
-      type: DataTypes.JSON, 
+      type: DataTypes.JSON,
       allowNull: true,
       defaultValue: [],
     },

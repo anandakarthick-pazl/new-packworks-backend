@@ -141,17 +141,20 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
 
     // Create a dashboard object with dynamic SKU type counts
     const dashboard = skuTypeCounts.reduce((acc, item) => {
-      // Map SKU type to a more readable key if needed
+      // Convert SKU type to lowercase first
+      const skuTypeLowerCase = item.sku_type.toLowerCase();
+
+      // Map SKU type to a more readable key if needed (with lowercase keys)
       const keyMap = {
-        "RSC Box": "rscBox",
-        "Corrugated Sheet": "corrugatedSheet",
-        "Die Cut Box": "dieCutBox",
+        "RSC box": "rscBox",
+        "Board": "board",
+        "Die Cut box": "dieCutBox",
       };
 
       // Use the mapped key or fallback to a camelCased version of the sku_type
       const key =
-        keyMap[item.sku_type] ||
-        item.sku_type
+        keyMap[skuTypeLowerCase] ||
+        skuTypeLowerCase
           .replace(/\s+/g, "")
           .replace(/^./, (char) => char.toLowerCase());
 
@@ -652,8 +655,8 @@ v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
           required: false,
         },
         {
-          model: db.Company, // Make sure this matches your model name exactly
-          attributes: ["id"], // Only fetch ID if name is causing issues
+          model: db.Company,
+          attributes: ["id"],
           required: false,
         },
       ],

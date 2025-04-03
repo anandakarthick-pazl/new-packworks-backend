@@ -56,18 +56,29 @@ class BaseModel extends Model {
     });
   }
 
-  // Static method to extract company ID from various sources
   static extractCompanyId(options) {
-    // Priority order for company_id:
-    // 1. Explicitly passed companyId in options
-    // 2. Global COMPANY_ID
-    // 3. User's company_id from authentication context
-    return (
-      options?.companyId ||
-      global.COMPANY_ID ||
-      options?.context?.user?.company_id
-    );
+    // Ensure req.user exists and contains company_id
+    if (options?.req?.user?.company_id) {
+      return options.req.user.company_id;
+    }
+
+    console.log("Company ID is missing from token");
+    return null; // Return null if company_id is not found in the token
   }
+
+  // static extractCompanyId(options) {
+  //   // Priority order for company_id:
+  //   // 1. Explicitly passed companyId in options
+  //   // 2. Global COMPANY_ID
+  //   // 3. User's company_id from authentication context (req.user)
+  //   return (
+  //     (options?.req ? options.req.user?.company_id : null)
+  //     ||
+  //     options?.companyId ||
+  //     global.COMPANY_ID ||
+  //     options?.context?.user?.company_id
+  //   );
+  // }
 
   // Method to bypass company scope for specific queries
   static async findAllWithoutScope(options = {}) {
