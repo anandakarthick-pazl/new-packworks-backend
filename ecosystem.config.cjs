@@ -112,5 +112,12 @@ module.exports = {
         PORT: 3015,
       },
     },
+    {
+      name: "billing-Service",
+      script: "./services/billing/server.js",
+      env: {
+        PORT: 3016,
+      },
+    },
   ],
 };
