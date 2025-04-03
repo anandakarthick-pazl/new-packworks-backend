@@ -25,12 +25,12 @@ export const authenticateJWT = (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded; // Attach user payload to request
         console.log("Decoded Token:", decoded);
-        if (!decoded.company_id) {
-            return res.status(400).json({
-                status: false,
-                message: "company_id is missing in token",
-            });
-        }
+        // if (!decoded.company_id) {
+        //     return res.status(400).json({
+        //         status: false,
+        //         message: "company_id is missing in token",
+        //     });
+        // }
         req.sequelizeOptions = { req }; // Attach Sequelize options to request
         next();
     } catch (err) {
