@@ -83,7 +83,6 @@ module.exports = {
         PORT: 3011,
       },
     },
-
     {
       name: "role-Service",
       script: "./services/role/server.js",
@@ -112,5 +111,24 @@ module.exports = {
         PORT: 3015,
       },
     },
+    {
+   
+      name: "package",
+      script: "./services/package/server.js",
+
+      env: {
+        PORT: 3016,
+      },
+    },
+    {
+   
+      name: "billing-Service",
+      script: "./services/billing/server.js",
+
+      env: {
+        PORT: 3017,
+      },
+    },
+    
   ],
 };

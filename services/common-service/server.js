@@ -18,6 +18,8 @@ const v1Router = Router();
 
 const DropdownName = db.DropdownName;
 const DropdownValue = db.DropdownValue;
+const Currency=db.Currency;
+const ModuleSettings=db.ModuleSettings;
 
 // Middleware to extract user details from token
 const extractUserDetails = (req, res, next) => {
@@ -419,6 +421,37 @@ v1Router.get("/countries", authenticateJWT, async (req, res) => {
       message: "Error fetching countries",
       error: error.message,
     });
+  }
+});
+
+// Get Currency
+v1Router.get("/currency",authenticateJWT, async (req, res) => {
+  try {
+  const currency = await Currency.findAll({where: { status: "active" },attributes:["id","company_id","currency_name","currency_symbol","currency_code","status"]});
+  return res.status(200).json({
+      success: true,
+      message:"Currencies fetched Successfully",
+      data: currency,
+  });
+  } catch (error) {
+  console.error("Error fetching departments:", error);
+  return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get ModuleSettings
+v1Router.get("/module",authenticateJWT, async (req, res) => {
+  try {
+  const settings = await ModuleSettings.findAll({where: { status: "active" },attributes:["id","company_id","module_name","status"]});
+
+  return res.status(200).json({
+      success: true,
+      message:"Module Fetched Successfully",
+      data: settings,
+  });
+  } catch (error) {
+  console.error("Error fetching Module Settings:", error);
+  return res.status(500).json({ success: false, error: error.message });
   }
 });
 
