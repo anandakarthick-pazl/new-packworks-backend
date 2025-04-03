@@ -20,7 +20,8 @@
     "role": "nodemon services/role/server.js",
     "storage": "nodemon services/storage/server.js",
     "company-address": "nodemon services/company-address/server.js",
-    "fil-view": "nodemon services/upload-view/server.js"
+    "fil-view": "nodemon services/upload-view/server.js",
+    "package": "nodemon services/package/server.js"
   },
   "keywords": [],
   "author": "",

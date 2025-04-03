@@ -112,5 +112,12 @@ module.exports = {
         PORT: 3015,
       },
     },
+    {
+      name: "package",
+      script: "./services/package/server.js",
+      env: {
+        PORT: 3016,
+      },
+    },
   ],
 };
