@@ -19,7 +19,10 @@ const v1Router = Router();
 const DropdownName = db.DropdownName;
 const DropdownValue = db.DropdownValue;
 const Currency=db.Currency;
+const Flute=db.Flute;
 const ModuleSettings=db.ModuleSettings;
+const Module = db.Module;
+const Company = db.Company;
 
 // Middleware to extract user details from token
 const extractUserDetails = (req, res, next) => {
@@ -440,9 +443,9 @@ v1Router.get("/currency",authenticateJWT, async (req, res) => {
 });
 
 // Get ModuleSettings
-v1Router.get("/module",authenticateJWT, async (req, res) => {
+v1Router.get("/module-setting",authenticateJWT, async (req, res) => {
   try {
-  const settings = await ModuleSettings.findAll({where: { status: "active" },attributes:["id","company_id","module_name","status"]});
+  const settings = await ModuleSettings.findAll({where: { status: "active",type: "admin" },attributes:["id","company_id","module_name","status"],group: ["module_name"],order: [["id", "ASC"]],});
 
   return res.status(200).json({
       success: true,
@@ -454,6 +457,220 @@ v1Router.get("/module",authenticateJWT, async (req, res) => {
   return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+
+// Get Module
+v1Router.get("/module",authenticateJWT, async (req, res) => {
+  try {
+  const module = await Module.findAll({where: { status: "active",is_superadmin: 0 ,module_name: { [Op.ne]: "dashboards" }},attributes:["id","module_name","description"]});
+
+  return res.status(200).json({
+      success: true,
+      message:"Module Fetched Successfully",
+      data: module,
+  });
+  } catch (error) {
+  console.error("Error fetching Module:", error);
+  return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+// Get Flute
+  v1Router.get("/flute", authenticateJWT, async (req, res) => {
+    try {
+        const { search = "", page = "1", limit = "10" } = req.query;
+        const pageNumber = parseInt(page) || 1;
+        const limitNumber = parseInt(limit) || 10;
+        const offset = (pageNumber - 1) * limitNumber;
+        let whereCondition = { status: "active" };
+        if (search) {   
+          whereCondition = {
+            ...whereCondition,
+            name: { [Op.like]: `%${search}%` }, 
+          };
+        }
+        const totalflutes = await Flute.count({ where: whereCondition });
+        const flutes = await Flute.findAll({where: whereCondition, limit: limitNumber, offset });
+        const formattedFlutes = flutes.map(flt => ({
+          ...flt.toJSON(), 
+        }));
+        return res.status(200).json({
+          success: true,
+          message:"Flutes Fetched Successfully",
+          total: totalflutes, 
+          page, 
+          totalPages: Math.ceil(totalflutes / limit), 
+          data:formattedFlutes
+        }); 
+      } catch (error) {
+        console.error("Error fetching flutes:", error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+
+
+  //create flute  
+  v1Router.post("/flute/create", authenticateJWT, async (req, res) => {
+    const transaction = await sequelize.transaction();
+    try {
+      const userId = req.user.id;
+      const { fluteData, ...rest } = req.body;
+  
+      rest.created_by = userId;
+      rest.updated_by = userId;
+      rest.created_at = new Date();
+      rest.updated_at = new Date();
+      rest.company_id = req.user.company_id;
+
+  
+      // Save flute data
+      const flute = await Flute.create(rest, { transaction });
+  
+      await transaction.commit();
+  
+      return res.status(201).json({
+        success: true,
+        message: "Flute created successfully",
+        data: flute.toJSON(),
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Error creating Flute:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+
+
+  // Get id based flute
+  v1Router.get("/flute/edit/:fluteId", authenticateJWT, async (req, res) => {
+    try {
+      const fluteId = parseInt(req.params.fluteId);
+  
+      if (isNaN(fluteId)) {
+        return res.status(400).json({ success: false, message: "Invalid flute ID" });
+      }
+  
+      const flute = await Flute.findOne({ where: { id: fluteId } });
+  
+      if (!flute) {
+        return res.status(404).json({ success: false, message: "Flute not found", data: {} });
+      }
+  
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...flute.toJSON(),
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching flute:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+
+  //update flute
+  v1Router.put("/flute/update/:id", authenticateJWT, async (req,res) => {
+    const transaction = await sequelize.transaction();
+    try{
+      const fulteId=req.params.id;
+      const userId=req.user.id;
+      const { ...rest} = req.body;
+
+    const existingFlute=await Flute.findByPk(fulteId,{transaction});
+    if(!existingFlute){
+        await transaction.rollback();
+        return res.status(404).json({ success: false, message: "Flute not found" });
+    }      
+
+      rest.updated_by=userId;
+
+      rest.created_at = existingFlute.created_at;  
+
+      rest.updated_at = new Date();
+
+      rest.company_id = req.user.company_id;
+
+      await Flute.update( rest,{ where: { id: fulteId }, transaction });
+
+      const updatedFlute = await Flute.findByPk(fulteId, { transaction });
+
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "Flute updated successfully",
+        data: {
+          ...updatedFlute.toJSON(),
+        },
+      });
+
+    }catch(error){
+      await transaction.rollback();
+      console.error("Error updating Flute:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+
+
+  // Delete Flute
+    v1Router.delete("/flute/delete/:id", authenticateJWT, async (req,res) =>{
+          const transaction = await sequelize.transaction(); 
+          try{
+            const fluteId = req.params.id;
+            const userId = req.user.id;
+
+            const Flutes = await Flute.findOne({ where:{ id: fluteId } });
+            
+                  if (!Flutes) {
+                    return res.status(404).json({
+                      success: false,
+                      message: "Flutes not found",
+                    });
+                  }
+
+                  await Flute.update(
+                    {
+                    status: 'inactive',
+                    updated_at: new Date(),
+                    updated_by: userId
+                  },
+                  { where: { id: fluteId }, transaction }
+                );
+
+                  await transaction.commit();
+
+                  return res.status(200).json({
+                    status: true,
+                    message: "Flute deleted successfully",
+                    data: [],
+                  });      
+
+
+          }catch(error){
+            await transaction.rollback();
+            console.error("Error Deleted Packages:", error);
+            return res.status(500).json({ success: false, error: error.message });
+          }
+    });
+  
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Basic Health Check Endpoint
 app.get("/health", (req, res) => {

@@ -18,6 +18,8 @@ import MachineProcessValue from "./machine/processValue.model.js";
 import Package from "../models/package.model.js";
 import Currency from "../models/currency.model.js";
 import ModuleSettings from "../models/moduleSettings.model.js";
+import Flute from "../models/flute.model.js";
+import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
 
 const db = {
@@ -41,7 +43,7 @@ const db = {
   MachineProcessField,
   Package,
   Currency,
-  ModuleSettings,
+  ModuleSettings,Flute,Module,
 };
 
 export default db;
