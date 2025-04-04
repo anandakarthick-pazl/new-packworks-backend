@@ -606,6 +606,10 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     let statusReplacement = {};
 
     if (status) {
+      if(status=='Inactive'){
+        status = 'deactive';
+
+      }
       statusCondition = "AND u.status = :status";
       statusReplacement = { status };
     }
