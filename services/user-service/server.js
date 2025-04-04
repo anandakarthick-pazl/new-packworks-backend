@@ -688,9 +688,19 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           SUM(CASE WHEN u.status = 'inactive' THEN 1 ELSE 0 END) AS inactive_count
       FROM employee_details e
       JOIN users u ON e.user_id = u.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN designations des ON e.designation_id = des.id
+      LEFT JOIN role_user ru ON u.id = ru.user_id
+      LEFT JOIN roles r ON ru.role_id = r.id
+      LEFT JOIN users rm ON e.reporting_to = rm.id
       WHERE 
-          u.name LIKE :search OR 
-          u.email LIKE :search`,
+          (u.name LIKE :search OR 
+          u.email LIKE :search OR 
+          d.department_name LIKE :search OR 
+          des.name LIKE :search OR 
+          r.name LIKE :search) 
+          ${statusCondition}
+      ORDER BY e.employee_id`,
       {
         replacements: { search: `%${search}%` },
         type: sequelize.QueryTypes.SELECT,
