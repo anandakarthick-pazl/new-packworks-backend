@@ -70,7 +70,7 @@ const User = sequelize.define('User', {
         defaultValue: 'en',
     },
     status: {
-        type: DataTypes.ENUM('active', 'deactive'),
+        type: DataTypes.ENUM('active', 'inactive'),
         defaultValue: 'active',
     },
     login: {

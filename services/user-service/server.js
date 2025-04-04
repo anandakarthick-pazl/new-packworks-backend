@@ -284,7 +284,7 @@ v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
     });
     if (user) {
       await user.update({
-        status: "deactive",
+        status: "inactive",
         updated_by: req.user.id,
         updated_at: new Date(),
       });
@@ -606,10 +606,10 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     let statusReplacement = {};
 
     if (status) {
-      if(status=='Inactive'){
-        status = 'deactive';
+      // if(status==='Inactive'){
+      //   status = 'deactive';
 
-      }
+      // }
       statusCondition = "AND u.status = :status";
       statusReplacement = { status };
     }
@@ -651,7 +651,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           des.name AS designation,
           r.name AS role,
           CASE
-          WHEN u.status='deactive' THEN 'Inactive'
+          WHEN u.status='inactive' THEN 'Inactive'
           WHEN u.status='active' THEN 'Active'
           END AS user_status,
           rm.name AS reporting_manager
@@ -685,7 +685,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     const statusCounts = await sequelize.query(
       `SELECT 
           SUM(CASE WHEN u.status = 'active' THEN 1 ELSE 0 END) AS active_count,
-          SUM(CASE WHEN u.status = 'deactive' THEN 1 ELSE 0 END) AS inactive_count
+          SUM(CASE WHEN u.status = 'inactive' THEN 1 ELSE 0 END) AS inactive_count
       FROM employee_details e
       JOIN users u ON e.user_id = u.id
       WHERE 
@@ -731,7 +731,7 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
           u.country_id AS country_id,
           u.image AS image,
           CASE
-          WHEN u.status='deactive' THEN 'Inactive'
+          WHEN u.status='inactive' THEN 'Inactive'
           WHEN u.status='active' THEN 'Active'
           END AS user_status
       FROM employee_details e
