@@ -30,26 +30,41 @@ import { QueryTypes } from "sequelize";
 
 
 // 🔹 Get All billing (GET) with Addresses - Only active billing
-v1Router.get("/billing", async (req, res) => {
+v1Router.get("/billing",authenticateJWT, async (req, res) => {
   try {
     let {
       page = 1,
       limit = 10,
       search,
-      includeInactive = false,
-      entity_type,
+      
     } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
 
     console.log("pages", page);
     console.log("object", limit);
+  
+
+    const whereClause = {};
+
+    if (search) {
+      whereClause[Op.or] = [
+        { transaction_id: { [Op.like]: `%${search}%` } },
+        { package_type: { [Op.like]: `%${search}%` } },
+        { gateway_name: { [Op.like]: `%${search}%` } },
+        { pay_date: { [Op.like]: `%${search}%` } },
+        { next_pay_date: { [Op.like]: `%${search}%` } },
+        { amount: { [Op.like]: `%${search}%` } },
+        { company_id: { [Op.like]: `%${search}%` } },
+      ];
+    }
 
     
   
     const query = `
     SELECT 
       gi.id,
+      ci.company_name,
       gi.package_type,
       gi.pay_date,
       gi.next_pay_date,
@@ -58,6 +73,7 @@ v1Router.get("/billing", async (req, res) => {
       gi.gateway_name,
       gc.currency_symbol
     FROM global_invoices AS gi
+    LEFT JOIN companies AS ci ON gi.company_id = ci.id
     LEFT JOIN global_currencies AS gc ON gi.currency_id = gc.id
     ORDER BY gi.id ASC
     LIMIT :limit OFFSET :offset;
@@ -71,11 +87,13 @@ v1Router.get("/billing", async (req, res) => {
     },
   });
   
-  console.log("Billing Data:", billing);
   var count = billing.length;
+  console.log("Billing Data:", billing);
+
   
   var data =  billing.map((bill) => ({
     id: bill.id,
+    company: bill.company_name,
     package: bill.package_type,
     payment_date: bill.pay_date
       ? new Date(bill.pay_date).toLocaleString("en-GB", {
