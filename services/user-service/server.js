@@ -713,7 +713,8 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
           u.mobile AS mobile,
           u.country_phonecode AS country_phonecode,
           u.country_id AS country_id,
-          u.image AS image
+          u.image AS image,
+          u.status AS user_status,
       FROM employee_details e
       JOIN users u ON e.user_id = u.id
       JOIN role_user r ON u.id = r.user_id
