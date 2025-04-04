@@ -23,8 +23,361 @@ app.use(cors());
 const v1Router = Router();
 
 const Sku = db.Sku;
+const SkuVersion = db.SkuVersion;
+const User = db.User;
 const SkuType = db.SkuType;
 const Client = db.Client;
+
+v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    // Check if the referenced SKU exists
+    const existingSku = await Sku.findByPk(req.body.sku_id);
+    if (!existingSku) {
+      await t.rollback();
+      return res.status(404).json({ message: "Referenced SKU not found" });
+    }
+
+    // Prepare the data for creation with user info
+    const skuVersionData = {
+      ...req.body,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      status: "active",
+    };
+
+    // Convert sku_values to string if it's an object or array
+    if (
+      skuVersionData.sku_values &&
+      typeof skuVersionData.sku_values === "object"
+    ) {
+      skuVersionData.sku_values = JSON.stringify(skuVersionData.sku_values);
+    }
+
+    const newSkuVersion = await SkuVersion.create(skuVersionData, {
+      transaction: t,
+    });
+    await t.commit();
+
+    // Publish to queue if needed
+    await publishToQueue({
+      operation: "CREATE_VERSION",
+      skuVersionId: newSkuVersion.id,
+      skuId: newSkuVersion.sku_id,
+      timestamp: new Date(),
+      data: newSkuVersion,
+    });
+
+    res.status(201).json({
+      message: "SKU Version created successfully",
+      skuVersion: newSkuVersion,
+    });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({
+      message: "Error creating SKU Version",
+      error: error.message,
+    });
+  }
+});
+
+// 🔹 Get SKU Versions (GET)
+v1Router.get(
+  "/sku-details/sku-version/get",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search = "",
+        sku_id,
+        client_id,
+        status = "active",
+      } = req.query;
+
+      const offset = (page - 1) * limit;
+
+      // Build the where condition for search
+      let whereCondition = {
+        status: status,
+      };
+
+      // Apply specific filters if provided
+      if (sku_id) whereCondition.sku_id = sku_id;
+      if (client_id) whereCondition.client_id = client_id;
+
+      // Handle generic search across multiple fields
+      if (search) {
+        whereCondition = {
+          [Op.and]: [
+            { status: status },
+            {
+              [Op.or]: [
+                { sku_version: { [Op.like]: `%${search}%` } },
+                // Add other searchable fields as needed
+              ],
+            },
+          ],
+        };
+      }
+
+      // Get total count for pagination metadata
+      const totalCount = await SkuVersion.count({ where: whereCondition });
+
+      // Fetch sku versions with pagination and search
+      const skuVersions = await SkuVersion.findAll({
+        where: whereCondition,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: Sku,
+            attributes: ["id", "sku_name"],
+            required: false,
+          },
+          {
+            model: Client,
+            attributes: ["client_id", "company_name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      const formattedSkuVersions = skuVersions.map((skuVersion) => ({
+        ...skuVersion.toJSON(),
+        sku_values: skuVersion.sku_values
+          ? JSON.parse(skuVersion.sku_values)
+          : null,
+        created_at: skuVersion.created_at,
+        updated_at: skuVersion.updated_at,
+      }));
+
+      const totalPages = Math.ceil(totalCount / limit);
+
+      const responseData = {
+        data: formattedSkuVersions,
+        pagination: {
+          totalCount,
+          totalPages,
+          currentPage: parseInt(page),
+          pageSize: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+        },
+      };
+
+      res.status(200).json(responseData);
+    } catch (error) {
+      logger.error("Error fetching SKU Versions:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// 🔹 Get SKU Versions by SKU ID (GET)
+v1Router.get(
+  "/sku-details/sku-version/sku/:skuId",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { page = 1, limit = 10, status = "active" } = req.query;
+
+      const skuId = req.params.skuId;
+      const offset = (page - 1) * limit;
+
+      // Check if the SKU exists
+      const existingSku = await Sku.findByPk(skuId);
+      if (!existingSku) {
+        return res.status(404).json({ message: "SKU not found" });
+      }
+
+      // Get total count for pagination metadata
+      const totalCount = await SkuVersion.count({
+        where: {
+          sku_id: skuId,
+          status: status,
+        },
+      });
+
+      // Fetch all versions for a specific SKU
+      const skuVersions = await SkuVersion.findAll({
+        where: {
+          sku_id: skuId,
+          status: status,
+        },
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: User,
+            as: "version_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      const formattedSkuVersions = skuVersions.map((skuVersion) => ({
+        ...skuVersion.toJSON(),
+        sku_values: skuVersion.sku_values
+          ? JSON.parse(skuVersion.sku_values)
+          : null,
+        created_at: skuVersion.created_at,
+        updated_at: skuVersion.updated_at,
+      }));
+
+      const totalPages = Math.ceil(totalCount / limit);
+
+      const responseData = {
+        data: formattedSkuVersions,
+        pagination: {
+          totalCount,
+          totalPages,
+          currentPage: parseInt(page),
+          pageSize: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+        },
+      };
+
+      res.status(200).json(responseData);
+    } catch (error) {
+      logger.error("Error fetching SKU Versions:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// 🔹 Get SKU Version by ID (GET)
+// v1Router.get(
+//   "/sku-details/sku-version/:id",
+//   authenticateJWT,
+//   async (req, res) => {
+//     try {
+//       const skuVersion = await SkuVersion.findByPk(req.params.id, {
+//         include: [
+//           {
+//             model: Sku,
+//             attributes: ["id", "sku_name"],
+//             required: false,
+//           },
+//           {
+//             model: Client,
+//             attributes: ["client_id", "client_name"],
+//             required: false,
+//           },
+//           {
+//             model: User,
+//             as: "version_creator",
+//             attributes: ["id", "name"],
+//             required: false,
+//           },
+//           {
+//             model: User,
+//             as: "version_updater",
+//             attributes: ["id", "name"],
+//             required: false,
+//           },
+//         ],
+//       });
+
+//       if (!skuVersion) {
+//         return res.status(404).json({ message: "SKU Version not found" });
+//       }
+
+//       // Format the response data
+//       const formattedSkuVersion = {
+//         ...skuVersion.toJSON(),
+//         sku_values: skuVersion.sku_values
+//           ? JSON.parse(skuVersion.sku_values)
+//           : null,
+//       };
+
+//       res.status(200).json(formattedSkuVersion);
+//     } catch (error) {
+//       logger.error("Error fetching SKU Version:", error);
+//       res.status(500).json({
+//         message: "Internal Server Error",
+//         error: error.message,
+//       });
+//     }
+//   }
+// );
+
+// 🔹 Soft Delete SKU Version (DELETE) - changes status to inactive
+v1Router.delete(
+  "/sku-details/sku-version/:id",
+  authenticateJWT,
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      // Update status to inactive instead of deleting
+      const updatedSkuVersion = await SkuVersion.update(
+        {
+          status: "inactive",
+          updated_at: new Date(),
+          updated_by: req.user.id,
+        },
+        {
+          where: { id: req.params.id },
+          transaction: t,
+        }
+      );
+
+      if (!updatedSkuVersion[0]) {
+        await t.rollback();
+        return res.status(404).json({ message: "SKU Version not found" });
+      }
+
+      await t.commit();
+
+      // Publish to queue if needed
+      await publishToQueue({
+        operation: "SOFT_DELETE_VERSION",
+        skuVersionId: req.params.id,
+        timestamp: new Date(),
+        data: { status: "inactive" },
+      });
+
+      res
+        .status(200)
+        .json({ message: "SKU Version marked as inactive successfully" });
+    } catch (error) {
+      await t.rollback();
+      res.status(500).json({
+        message: "Error deactivating SKU Version",
+        error: error.message,
+      });
+    }
+  }
+);
 
 // 🔹 Create a SKU (POST)
 v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
@@ -147,7 +500,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       // Map SKU type to a more readable key if needed (with lowercase keys)
       const keyMap = {
         "RSC box": "rscBox",
-        "Board": "board",
+        Board: "board",
         "Die Cut box": "dieCutBox",
       };
 
@@ -194,45 +547,6 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   }
 });
 // 🔹 Get SKU by ID (GET)
-v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
-  console.log("req.params.id", req.params.id);
-  try {
-    const sku = await Sku.findByPk(req.params.id, {
-      include: [
-        {
-          model: db.User,
-          as: "sku_creator",
-          attributes: ["id", "name"],
-          required: false,
-        },
-        {
-          model: db.User,
-          as: "sku_updater",
-          attributes: ["id", "name"],
-          required: false,
-        },
-      ],
-    });
-
-    if (!sku) {
-      return res.status(404).json({ message: "SKU not found" });
-    }
-
-    // Parse sku_values if it's stored as a JSON string
-    const formattedSku = {
-      ...sku.toJSON(),
-      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
-    };
-
-    res.status(200).json(formattedSku);
-  } catch (error) {
-    logger.error("Error fetching SKU by ID:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-});
 
 v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -416,6 +730,46 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
     res
       .status(500)
       .json({ message: "Error deactivating SKU", error: error.message });
+  }
+});
+
+v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
+  console.log("req.params.id", req.params.id);
+  try {
+    const sku = await Sku.findByPk(req.params.id, {
+      include: [
+        {
+          model: db.User,
+          as: "sku_creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "sku_updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    if (!sku) {
+      return res.status(404).json({ message: "SKU not found" });
+    }
+
+    // Parse sku_values if it's stored as a JSON string
+    const formattedSku = {
+      ...sku.toJSON(),
+      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+    };
+
+    res.status(200).json(formattedSku);
+  } catch (error) {
+    logger.error("Error fetching SKU by ID:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
