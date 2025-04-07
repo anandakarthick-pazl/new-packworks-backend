@@ -49,7 +49,7 @@ const Sku = sequelize.define(
     flap_width: { type: DataTypes.FLOAT, allowNull: true },
     flap_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     length_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
-    // width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
+    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true }, //add new
     strict_adherence: {
       type: DataTypes.BOOLEAN,
       allowNull: true,
@@ -68,6 +68,23 @@ const Sku = sequelize.define(
       type: Sequelize.JSON,
       allowNull: true,
     },
+
+    sku_version_limit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    }, //add
+    composite_type: {
+      type: DataTypes.ENUM("Partition", "Panel"),
+      allowNull: false,
+    }, //add new
+    part_count: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    }, // add new
+    part_value: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    }, //add new
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
