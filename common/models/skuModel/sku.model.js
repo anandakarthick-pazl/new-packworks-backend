@@ -34,7 +34,7 @@ const Sku = sequelize.define(
     },
     sku_name: { type: DataTypes.STRING, allowNull: false },
     client: { type: DataTypes.STRING, allowNull: false },
-    ply: { type: DataTypes.INTEGER, allowNull: false },
+    ply: { type: DataTypes.INTEGER, allowNull: true },
     length: { type: DataTypes.FLOAT, allowNull: true },
     width: { type: DataTypes.FLOAT, allowNull: true },
     height: { type: DataTypes.FLOAT, allowNull: true },
@@ -75,7 +75,7 @@ const Sku = sequelize.define(
     }, //add
     composite_type: {
       type: DataTypes.ENUM("Partition", "Panel"),
-      allowNull: false,
+      allowNull: true,
     }, //add new
     part_count: {
       type: DataTypes.INTEGER,
