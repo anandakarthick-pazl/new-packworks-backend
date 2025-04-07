@@ -21,7 +21,7 @@ const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
 // POST create new sales order - with SalesSkuDetails table
-v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
+v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
 
   if (
@@ -130,7 +130,7 @@ v1Router.post("/sales-order", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.get("/sales-order", authenticateJWT, async (req, res) => {
+v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
@@ -242,7 +242,7 @@ v1Router.get("/sales-order", authenticateJWT, async (req, res) => {
   }
 });
 // GET single sales order by ID (including associated records)
-v1Router.get("/sales-order/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -299,7 +299,7 @@ v1Router.get("/sales-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing sales order - modified to update existing records
-v1Router.put("/sales-order/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { salesDetails, skuDetails, workDetails } = req.body;
 
@@ -547,7 +547,7 @@ v1Router.put("/sales-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // DELETE sales order - changed to soft delete including associated records
-v1Router.delete("/sales-order/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const transaction = await sequelize.transaction();
 
