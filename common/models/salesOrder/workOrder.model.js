@@ -15,7 +15,7 @@ const WorkOrder = sequelize.define(
     },
     sales_order_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: SalesOrder,
         key: "id",

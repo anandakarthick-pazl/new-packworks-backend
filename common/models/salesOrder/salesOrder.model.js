@@ -50,12 +50,28 @@ const SalesOrder = sequelize.define(
       allowNull: false,
     },
     confirmation: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    sku_details: {
-      type: DataTypes.JSON,
+      type: DataTypes.ENUM("Email", "Oral"),
       allowNull: false,
+    },
+    sales_status:{
+      type: DataTypes.ENUM("Approved", "Pending", "Rejected"),
+      allowNull: false,
+    },
+    total_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    sgst: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    cgst: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    total_incl_gst: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,
