@@ -22,8 +22,9 @@
     "company-address": "nodemon services/company-address/server.js",
     "fil-view": "nodemon services/upload-view/server.js",
     "billing": "nodemon services/billing/server.js",
-    "package": "nodemon services/package/server.js"
-
+    "package" : "nodemon services/package/server.js",
+    "swagger" : "nodemon config/swagger.js",
+    "taxes" : "nodemon services/taxes/server.js"
   },
   "keywords": [],
   "author": "",
@@ -48,6 +49,8 @@
     "nodemailer": "^6.10.0",
     "sequelize": "^6.37.6",
     "sequelize-cli": "^6.6.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xlsx": "^0.18.5"

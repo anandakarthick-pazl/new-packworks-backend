@@ -21,7 +21,7 @@ import ModuleSettings from "../models/moduleSettings.model.js";
 import Flute from "../models/flute.model.js";
 import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
-
+import Taxes from "../models/taxes.model.js";
 const db = {
   sequelize,
   User,
@@ -43,7 +43,10 @@ const db = {
   MachineProcessField,
   Package,
   Currency,
-  ModuleSettings,Flute,Module,
+  ModuleSettings,
+  Flute,
+  Module,
+  Taxes
 };
 
 export default db;
