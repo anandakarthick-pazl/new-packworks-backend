@@ -22,7 +22,10 @@
     "company-address": "nodemon services/company-address/server.js",
     "fil-view": "nodemon services/upload-view/server.js",
     "billing": "nodemon services/billing/server.js",
-    "package": "nodemon services/package/server.js"
+    "package": "nodemon services/package/server.js",
+    "faqs": "nodemon services/faqs/server.js",
+    "faq_categories":"nodemon services/faq-categories/server.js"
+
 
   },
   "keywords": [],
