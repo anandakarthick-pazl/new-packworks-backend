@@ -7,6 +7,8 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 const Package = db.Package;
 const Currency =db.Currency;
+const Module = db.Module;
+
 
 
 dotenv.config();
@@ -15,59 +17,94 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
-// Search Package with paginate
-
 
 
 // Get Packages
-  v1Router.get("/", authenticateJWT, async (req, res) => {
-    try {
-        // const search = "";
-        // const page =  1; 
-        // const limit =  10; 
-        // const offset = (page - 1) * limit; 
-        const { search = "", page = "1", limit = "10" } = req.query;
+v1Router.get("/", authenticateJWT, async (req, res) => {
+  try {
+      const { search = "", page = "1", limit = "10" } = req.query;
 
-        // Convert page & limit to numbers
-        const pageNumber = parseInt(page) || 1;
-        const limitNumber = parseInt(limit) || 10;
-        const offset = (pageNumber - 1) * limitNumber;
+      const pageNumber = Math.max(1, parseInt(page)) || 1;
+      const limitNumber = Math.max(1, parseInt(limit)) || 10;
+      const offset = (pageNumber - 1) * limitNumber;
 
+      let whereCondition = { status: "active" };
 
-        let whereCondition = { status: "active" };
-
-        if (search) {   
+      if (search) {   
           whereCondition = {
-            ...whereCondition,
-            name: { [Op.like]: `%${search}%` }, 
+              ...whereCondition,
+              name: { [Op.like]: `%${search}%` }, 
           };
-        }
-
-
-        const totalPackages = await Package.count({ where: whereCondition });
-        const packages = await Package.findAll({where: whereCondition, limit: limitNumber, offset });
-
-
-
-
-        const formattedPackages = packages.map(pkg => ({
-          ...pkg.toJSON(), 
-          module_in_package: JSON.parse(pkg.module_in_package) 
-        }));
-
-        return res.status(200).json({
-          success: true,
-          message:"Packages Fetched Successfully",
-          total: totalPackages, 
-          page, 
-          totalPages: Math.ceil(totalPackages / limit), 
-          data:formattedPackages
-        }); 
-      } catch (error) {
-        console.error("Error fetching packages:", error);
-        return res.status(500).json({ success: false, error: error.message });
       }
-    });
+
+      const packages = await Package.findAll({
+          where: whereCondition, 
+          limit: limitNumber, 
+          offset
+      });
+
+      const totalPackages = await Package.count({ where: whereCondition });
+
+      const formattedPackages = packages.map(pkg => ({
+          ...pkg.toJSON(), 
+          module_in_package: JSON.parse(pkg.module_in_package || "[]") 
+      }));
+
+      const modules = await Module.findAll({
+          where: {
+              status: "active",
+              is_superadmin: 0,
+              module_name: { [Op.ne]: "dashboards" }
+          },
+          attributes: ["module_name"]
+      });
+      
+      const responsePackages = formattedPackages.map(pkg => {
+          const packageModules = pkg.module_in_package || [];
+
+          
+          
+          const availableModules = [];
+          const notAvailableModules = [];
+
+          modules.forEach(mod => {
+              const isAvailable = packageModules.some(pkgModule =>
+                mod.module_name.toLowerCase().startsWith(pkgModule.toLowerCase())
+              );          
+              if (isAvailable) {
+                  availableModules.push(mod.module_name);
+              } else {
+                  notAvailableModules.push(mod.module_name);
+              }
+          });
+          return {
+
+              package: {
+                  ...pkg,
+                  
+              },
+              availableModules,
+              notAvailableModules
+          };
+      });
+
+      return res.status(200).json({
+          success: true,
+          message: "Packages Fetched Successfully",
+          total: totalPackages, 
+          page: pageNumber, 
+          limit: limitNumber,
+          totalPages: Math.ceil(totalPackages / limitNumber), 
+          data: responsePackages
+      }); 
+  } catch (error) {
+      console.error("Error fetching packages:", error);
+      return res.status(500).json({ 
+          success: false, 
+          message: "Internal server error",
+      });
+  }
+});
 
 
 
@@ -120,34 +157,82 @@ const v1Router = Router();
 
 
 //Get id based packages    
-  v1Router.get("/edit/:packagesId", authenticateJWT,async (req, res) => {
-    try {
+v1Router.get("/edit/:packagesId", authenticateJWT, async (req, res) => {
+  try {
       const { packagesId } = req.params;
+      
+      // Find the package by ID
       const packages = await Package.findOne({
-        where: { id: packagesId },
+          where: { id: packagesId },
       });
 
       if (!packages) {
-        return res.json({
-          success: true,
-          message: 'Packages not found',
-          data: {}
-        });
+          return res.status(404).json({
+              success: false,
+              message: 'Package not found',
+              data: null
+          });
       }
 
-      return res.json({
-        success: true,
-        data: {
-          ...packages.toJSON(), 
-          module_in_package: JSON.parse(packages.module_in_package)
-        } 
+      // Parse the module_in_package field
+      const formattedPackage = {
+          ...packages.toJSON(),
+          module_in_package: JSON.parse(packages.module_in_package || "[]")
+      };
+
+      // Get all active modules from DB
+      const modules = await Module.findAll({
+          where: {
+              status: "active",
+              is_superadmin: 0,
+              module_name: { [Op.ne]: "dashboards" }
+          },
+          attributes: ["module_name"]
+      });
+      
+      // Prepare available and not available modules
+      const packageModules = formattedPackage.module_in_package || [];
+      const availableModules = [];
+      const notAvailableModules = [];
+
+      modules.forEach(mod => {
+          const isAvailable = packageModules.some(pkgModule =>
+              mod.module_name.toLowerCase().startsWith(pkgModule.toLowerCase())
+          );
+          
+          if (isAvailable) {
+              availableModules.push(mod.module_name);
+          } else {
+              notAvailableModules.push(mod.module_name);
+          }
       });
 
-    } catch (error) {
-      console.error("Error fetching packages:", error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
+      // Prepare the response object
+      const responseData = {
+          package: {
+              ...formattedPackage,
+              // Remove if you don't want to expose the raw module_in_package
+              // module_in_package: undefined
+          },
+          availableModules,
+          notAvailableModules
+      };
+
+      return res.json({
+          success: true,
+          message: 'Package fetched successfully',
+          data: responseData
+      });
+
+  } catch (error) {
+      console.error("Error fetching package:", error);
+      return res.status(500).json({ 
+          success: false, 
+          message: "Internal server error",
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+  }
+});
 
 
 
