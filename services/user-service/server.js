@@ -29,7 +29,7 @@ app.use(cors());
 
 const v1Router = Router();
 // app.use(logRequestResponse);
-const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
+const RABBITMQ_URL = process.env.RABBITMQ_URL;
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
 // Register API with Transaction

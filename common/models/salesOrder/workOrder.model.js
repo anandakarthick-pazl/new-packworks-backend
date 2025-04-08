@@ -49,39 +49,39 @@ const WorkOrder = sequelize.define(
     },
     sku_name: {
       type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     sku_version: {
       type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     qty: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     edd: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     description: {
       type: DataTypes.TEXT,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     acceptable_excess_units: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     planned_start_date: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     planned_end_date: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     outsource_name: {
       type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      allowNull: true, 
     },
     created_at: {
       type: DataTypes.DATE,
