@@ -52,8 +52,10 @@ const GlobalInvoices = sequelize.define('GlobalInvoices', {
     allowNull: false
   },
   package_type: {
-    type: DataTypes.STRING(191),
-    allowNull: false
+    type: DataTypes.ENUM('large', 'annual'),
+    defaultValue: 'default',
+   
+
   },
   sub_total: {
     type: DataTypes.DOUBLE,
