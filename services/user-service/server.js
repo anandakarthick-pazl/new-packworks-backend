@@ -606,12 +606,8 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     let statusReplacement = {};
 
     if (status) {
-      // if(status==='Inactive'){
-      //   status = 'deactive';
-
-      // }
       statusCondition = "AND u.status = :status";
-      statusReplacement = { status };
+      statusReplacement = { status: status.toLowerCase() };
     }
 
     // Get total count of records matching the search criteria
@@ -702,7 +698,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           ${statusCondition}
       ORDER BY e.employee_id`,
       {
-        replacements: { search: `%${search}%` },
+        replacements: { search: `%${search}%`, ...statusReplacement },
         type: sequelize.QueryTypes.SELECT,
       }
     );

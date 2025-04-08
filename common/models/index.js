@@ -23,6 +23,7 @@ import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
 import SalesSkuDetails from "./salesOrder/salesSku.model.js";
 
+import Taxes from "../models/taxes.model.js";
 const db = {
   sequelize,
   User,
@@ -45,7 +46,10 @@ const db = {
   MachineProcessField,
   Package,
   Currency,
-  ModuleSettings,Flute,Module,
+  ModuleSettings,
+  Flute,
+  Module,
+  Taxes
 };
 
 export default db;

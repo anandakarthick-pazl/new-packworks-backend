@@ -112,7 +112,7 @@ module.exports = {
       },
     },
     {
-   
+
       name: "package",
       script: "./services/package/server.js",
 
@@ -121,7 +121,7 @@ module.exports = {
       },
     },
     {
-   
+
       name: "billing-Service",
       script: "./services/billing/server.js",
 
@@ -129,6 +129,38 @@ module.exports = {
         PORT: 3017,
       },
     },
-    
+    {
+      name: "faqs-Service",
+      script: "./services/faqs/server.js",
+
+      env: {
+        PORT: 3018,
+      },
+    },
+    {
+
+      name: "faq_categories-Service",
+      script: "./services/faq-categories/server.js",
+
+      env: {
+        PORT: 3019,
+      },
+    },
+    {
+      name: "swagger",
+      script: "./config/swagger.js",
+      env: {
+        PORT: 3020,
+      },
+    },
+    {
+      name: "taxes",
+      script: "./services/taxes/server.js",
+      env: {
+        PORT: 3021,
+      },
+    },
+
+
   ],
 };

@@ -50,5 +50,40 @@ INSERT INTO sales_sku_details (
     1, 1
 );
 
+CREATE TABLE sku_version (
+  id int(11) NOT NULL,
+  company_id int(11) NOT NULL,
+  sku_id int(11) NOT NULL,
+  sku_version varchar(100) DEFAULT NULL,
+  client_id int(11) NOT NULL,
+  created_at timestamp NOT NULL DEFAULT current_timestamp(),
+  updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  sku_values longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(sku_values)),
+  status varchar(50) NOT NULL DEFAULT 'active',
+  created_by int(11) DEFAULT NULL,
+  updated_by int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table sku_version
+--
+ALTER TABLE sku_version
+  ADD PRIMARY KEY (id);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table sku_version
+--
+ALTER TABLE sku_version
+  MODIFY id int(11) NOT NULL AUTO_INCREMENT;
+COMMIT;
+
 
 
