@@ -129,6 +129,20 @@ module.exports = {
         PORT: 3017,
       },
     },
+    {
+      name: "swagger",
+      script: "./config/swagger.js",
+      env: {
+        PORT: 3020,
+      },
+    },
+    {
+      name: "taxes",
+      script: "./services/taxes/server.js",
+      env: {
+        PORT: 3021,
+      },
+    },
     
   ],
 };
