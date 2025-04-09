@@ -10,7 +10,7 @@ import Sku from "./skuModel/sku.model.js";
 import SalesOrder from "./salesOrder/salesOrder.model.js";
 import WorkOrder from "./salesOrder/workOrder.model.js";
 import Machine from "./machine/machine.model.js";
-import MachineProcessName from "./machine/processName.model.js";
+import ProcessName from "./machine/processName.model.js";
 import MachineProcessField from "./machine/processField.model.js";
 import DropdownName from "./commonModel/dropdown.model.js";
 import DropdownValue from "./commonModel/dropdownValues.model.js";
@@ -41,7 +41,7 @@ const db = {
   DropdownName,
   DropdownValue,
   Machine,
-  MachineProcessName,
+  ProcessName,
   MachineProcessValue,
   MachineProcessField,
   Package,

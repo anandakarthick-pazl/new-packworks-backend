@@ -1,4 +1,49 @@
 -- 09/04/2025
+DROP TABLE machine_process_name;
+DROP TABLE machine_process_values;
+DROP TABLE machine_process_fields;
+
+CREATE TABLE process_name (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+CREATE TABLE machine_process_values (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name_id INT UNSIGNED NOT NULL,
+  process_value JSON NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+
+CREATE TABLE machine_process_fields (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name_id INT UNSIGNED NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  field_type VARCHAR(255) NOT NULL,
+  required TINYINT(1) NULL,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+
+
+-- add above to db
 
 ALTER TABLE sales_order
 ADD COLUMN confirmation_email VARCHAR(255);

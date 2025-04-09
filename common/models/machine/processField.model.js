@@ -2,6 +2,8 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import MachineProcessName from "./processName.model.js";
 import User from "../user.model.js";
+import Company from "../company.model.js";
+import ProcessName from "./processName.model.js";
 
 const MachineProcessField = sequelize.define(
   "MachineProcessField",
@@ -11,32 +13,40 @@ const MachineProcessField = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    company_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
     process_name_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
-        model: MachineProcessName,
+        model: ProcessName,
         key: "id",
       },
       onUpdate: "CASCADE",
-      onDelete: "CASCADE",
+    },
+    label: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
     },
     field_type: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    label: {
-      type: DataTypes.STRING(255),
+    required: {
+      type: DataTypes.TINYINT(1),
       allowNull: false,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
       defaultValue: "active",
-    },
-    required: {
-      type: DataTypes.TINYINT(1),
-      allowNull: false,
     },
     created_at: {
       type: DataTypes.DATE,
@@ -45,13 +55,7 @@ const MachineProcessField = sequelize.define(
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW, 
-
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active",
+      onUpdate: DataTypes.NOW,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -72,9 +76,12 @@ const MachineProcessField = sequelize.define(
   },
   {
     tableName: "machine_process_fields",
-    timestamps: true,
+    timestamps: false,
   }
 );
+
+Company.hasMany(MachineProcessField, { foreignKey: "company_id" });
+MachineProcessField.belongsTo(Company, { foreignKey: "company_id" });
 
 MachineProcessField.belongsTo(MachineProcessName, {
   foreignKey: "process_name_id",
