@@ -3,7 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
-import Sku from "./sku.model.js"; 
+import Sku from "./sku.model.js";
 
 const SkuVersion = sequelize.define(
   "SkuVersion",

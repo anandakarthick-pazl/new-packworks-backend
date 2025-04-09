@@ -21,7 +21,8 @@ import ModuleSettings from "../models/moduleSettings.model.js";
 import Flute from "../models/flute.model.js";
 import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
-import Taxes from "../models/taxes.model.js";
+import SalesSkuDetails from "./salesOrder/salesSku.model.js";
+
 const db = {
   sequelize,
   User,
@@ -34,6 +35,7 @@ const db = {
   Sku,
   SkuVersion,
   SalesOrder,
+  SalesSkuDetails,
   WorkOrder,
   DropdownName,
   DropdownValue,
