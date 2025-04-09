@@ -33,6 +33,10 @@ const SalesOrder = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+    sales_ui_id:{
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     estimated: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -56,6 +60,7 @@ const SalesOrder = sequelize.define(
     sales_status:{
       type: DataTypes.ENUM("Approved", "Pending", "Rejected"),
       allowNull: false,
+      defaultValue: "Pending",
     },
     total_amount: {
       type: DataTypes.DECIMAL(10, 2),

@@ -1,3 +1,57 @@
+-- 09/04/2025
+
+ALTER TABLE sales_order
+ADD COLUMN sales_ui_id VARCHAR(150) NULL;
+
+CREATE TABLE sku_invoice_history (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,  
+  company_id INT UNSIGNED NOT NULL,
+  client_id INT UNSIGNED NOT NULL,
+  sku_id INT UNSIGNED NOT NULL,
+  invoice_number VARCHAR(255) NOT NULL UNIQUE,
+  date DATE NOT NULL,
+  quantity INT NOT NULL,
+  rate_per_sku DECIMAL(10, 2) NOT NULL,
+  cost DECIMAL(10, 2) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+INSERT INTO sku_invoice_history (
+  company_id,
+  client_id,
+  sku_id,
+  invoice_number,
+  date,
+  quantity,
+  rate_per_sku,
+  cost,
+  created_at,
+  updated_at,
+  status,
+  created_by,
+  updated_by
+) VALUES (
+  8,                         -- company_id
+  1,                         -- client_id
+  1,                         -- sku_id
+  'INV-1001',                -- invoice_number
+  '2025-04-09',              -- date
+  100,                       -- quantity
+  25.50,                     -- rate_per_sku
+  2550.00,                   -- cost (quantity * rate)
+  NOW(),                     -- created_at
+  NOW(),                     -- updated_at
+  'active',                  -- status
+  3,                         -- created_by
+  3                          -- updated_by
+);
+
+
+
+
 -- 07/04/2025
 
 ALTER TABLE sales_order

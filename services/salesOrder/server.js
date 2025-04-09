@@ -40,7 +40,8 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
     // Create Sales Order - get company_id and user info from JWT token
     const newSalesOrder = await SalesOrder.create(
       {
-        company_id: req.user.company_id, // Get from token
+        company_id: req.user.company_id,
+        sales_ui_id: salesDetails.sales_ui_id || null, 
         client_id: salesDetails.client_id,
         estimated: salesDetails.estimated,
         client: salesDetails.client,
@@ -146,7 +147,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
 
     // Build base filter conditions for SalesOrder
     const where = {
-      status: status, // Only fetch records with specified status (default is active)
+      status: status,
       company_id: req.user.company_id, // Filter by the company ID from JWT token
     };
 
@@ -336,6 +337,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
     await salesOrder.update(
       {
         client_id: salesDetails.client_id,
+        sales_ui_id: salesDetails.sales_ui_id || null, // Update if provided
         estimated: salesDetails.estimated,
         client: salesDetails.client,
         credit_period: salesDetails.credit_period,

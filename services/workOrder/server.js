@@ -6,7 +6,6 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import companyScope from "../../common/middleware/companyScope.js";
 
 dotenv.config();
 
@@ -263,5 +262,5 @@ app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3006;
 app.listen(PORT, () => {
-  console.log(`Sales order Service running on port ${PORT}`);
+  console.log(`work order Service running on port ${PORT}`);
 });
