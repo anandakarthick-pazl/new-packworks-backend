@@ -1,6 +1,16 @@
 -- 09/04/2025
 
 ALTER TABLE sales_order
+ADD COLUMN confirmation_email VARCHAR(255);
+
+ALTER TABLE sales_order
+ADD COLUMN confirmation_name VARCHAR(255);
+
+ALTER TABLE sales_order
+ADD COLUMN confirmation_mobile BIGINT;
+
+
+ALTER TABLE sales_order
 ADD COLUMN sales_ui_id VARCHAR(150) NULL;
 
 CREATE TABLE sku_invoice_history (

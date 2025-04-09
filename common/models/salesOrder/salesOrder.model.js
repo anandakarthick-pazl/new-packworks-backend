@@ -62,6 +62,18 @@ const SalesOrder = sequelize.define(
       allowNull: false,
       defaultValue: "Pending",
     },
+    confirmation_email:{
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    confirmation_name:{
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    confirmation_mobile:{
+      type: DataTypes.NUMBER,
+      allowNull: true,
+    },
     total_amount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
