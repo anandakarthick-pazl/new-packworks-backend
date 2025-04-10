@@ -29,184 +29,6 @@ const SkuType = db.SkuType;
 const Client = db.Client;
 
 // 🔹 Create a SKU (POST)
-/**
- * @swagger
- * /sku-details:
- *   post:
- *     summary: Create a new SKU
- *     description: Creates a new SKU entry for the authenticated user's company and publishes the event to a queue.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/SkuInput'
- *     responses:
- *       201:
- *         description: SKU created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU created successfully
- *                 sku:
- *                   $ref: '#/components/schemas/Sku'
- *       500:
- *         description: Error creating SKU
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error creating SKU
- *                 error:
- *                   type: string
- *                   example: Detailed error message
- */
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     SkuInput:
- *       type: object
- *       required:
- *         - client_id
- *         - sku_name
- *         - client
- *         - ply
- *         - composite_type
- *       properties:
- *         client_id:
- *           type: integer
- *           example: 1
- *         sku_name:
- *           type: string
- *           example: 3-Ply Brown Carton
- *         client:
- *           type: string
- *           example: TATA Inc.
- *         ply:
- *           type: integer
- *           example: 3
- *         length:
- *           type: number
- *           example: 45.5
- *         width:
- *           type: number
- *           example: 30.0
- *         height:
- *           type: number
- *           example: 25.0
- *         unit:
- *           type: string
- *           example: cm
- *         joints:
- *           type: integer
- *           example: 2
- *         ups:
- *           type: integer
- *           example: 4
- *         select_dies:
- *           type: string
- *           example: D1,D2
- *         inner_outer_dimension:
- *           type: string
- *           enum: [Inner, Outer]
- *           example: Outer
- *         flap_width:
- *           type: number
- *           example: 1.5
- *         flap_tolerance:
- *           type: number
- *           example: 0.2
- *         length_trimming_tolerance:
- *           type: number
- *           example: 0.3
- *         width_trimming_tolerance:
- *           type: number
- *           example: 0.3
- *         strict_adherence:
- *           type: boolean
- *           example: false
- *         customer_reference:
- *           type: string
- *           example: REF-CUST-001
- *         reference_number:
- *           type: string
- *           example: REF123456
- *         internal_id:
- *           type: string
- *           example: INT-SKU-789
- *         length_board_size_cm2:
- *           type: string
- *           example: 1200
- *         width_board_size_cm2:
- *           type: string
- *           example: 800
- *         board_size_cm2:
- *           type: string
- *           example: 960000
- *         deckle_size:
- *           type: number
- *           example: 55.0
- *         minimum_order_level:
- *           type: integer
- *           example: 100
- *         sku_type:
- *           type: string
- *           example: Master Carton
- *         sku_values:
- *           type: object
- *           example: { "gsm": 120, "bf": 22 }
- *         sku_version_limit:
- *           type: integer
- *           example: 3
- *         composite_type:
- *           type: string
- *           enum: [Partition, Panel]
- *           example: Partition
- *         part_count:
- *           type: integer
- *           example: 3
- *         part_value:
- *           type: object
- *           example: { "parts": [{ "part": "A", "length": 10 }, { "part": "B", "length": 20 }] }
-
- *     Sku:
- *       allOf:
- *         - $ref: '#/components/schemas/SkuInput'
- *         - type: object
- *           properties:
- *             id:
- *               type: integer
- *               example: 101
- *             status:
- *               type: string
- *               example: active
- *             created_by:
- *               type: integer
- *               example: 5
- *             updated_by:
- *               type: integer
- *               example: 5
- *             created_at:
- *               type: string
- *               format: date-time
- *             updated_at:
- *               type: string
- *               format: date-time
- */
-
 
 v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -236,116 +58,6 @@ v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
       .json({ message: "Error creating SKU", error: error.message });
   }
 });
-
-
-/**
- * @swagger
- * /sku-details:
- *   get:
- *     summary: Get SKU details with search, filters, pagination, and dashboard insights
- *     description: Fetches SKU list with optional filters (name, client, ply, type, status) and search. Returns paginated results and dashboard stats by SKU type.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Current page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of records per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: General search query across sku_name, client, ply, and sku_type
- *       - in: query
- *         name: sku_name
- *         schema:
- *           type: string
- *         description: Filter by SKU name
- *       - in: query
- *         name: client
- *         schema:
- *           type: string
- *         description: Filter by client name
- *       - in: query
- *         name: ply
- *         schema:
- *           type: string
- *         description: Filter by ply type
- *       - in: query
- *         name: sku_type
- *         schema:
- *           type: string
- *         description: Filter by SKU type
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           default: active
- *         description: Filter by SKU status
- *     responses:
- *       200:
- *         description: SKU list with pagination and dashboard counts
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Sku'
- *                 dashboard:
- *                   type: object
- *                   additionalProperties:
- *                     type: integer
- *                   example:
- *                     rscBox: 10
- *                     board: 15
- *                     dieCutBox: 5
- *                     composite: 2
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     totalCount:
- *                       type: integer
- *                       example: 42
- *                     totalPages:
- *                       type: integer
- *                       example: 5
- *                     currentPage:
- *                       type: integer
- *                       example: 1
- *                     pageSize:
- *                       type: integer
- *                       example: 10
- *                     hasNextPage:
- *                       type: boolean
- *                       example: true
- *                     hasPrevPage:
- *                       type: boolean
- *                       example: false
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- */
 
 v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   try {
@@ -488,118 +200,6 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   }
 });
 // 🔹 Get SKU by ID (GET)
-
-/**
- * @swagger
- * /sku-details/{id}:
- *   put:
- *     summary: Update an existing SKU
- *     description: Updates allowed fields of an SKU by ID. Validates for duplicates, restricted client change, and parses JSON fields.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the SKU to update
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               client_id:
- *                 type: integer
- *               sku_name:
- *                 type: string
- *               ply:
- *                 type: string
- *               length:
- *                 type: number
- *               width:
- *                 type: number
- *               height:
- *                 type: number
- *               joints:
- *                 type: string
- *               ups:
- *                 type: string
- *               select_dies:
- *                 type: string
- *               inner_outer_dimension:
- *                 type: string
- *               flap_width:
- *                 type: number
- *               flap_tolerance:
- *                 type: number
- *               length_trimming_tolerance:
- *                 type: number
- *               width_trimming_tolerance:
- *                 type: number
- *               strict_adherence:
- *                 type: boolean
- *               customer_reference:
- *                 type: string
- *               reference_number:
- *                 type: string
- *               internal_id:
- *                 type: string
- *               length_board_size_cm2:
- *                 type: number
- *               width_board_size_cm2:
- *                 type: number
- *               board_size_cm2:
- *                 type: number
- *               deckle_size:
- *                 type: number
- *               minimum_order_level:
- *                 type: number
- *               sku_type:
- *                 type: string
- *               sku_values:
- *                 type: string
- *                 description: JSON string
- *               sku_version_limit:
- *                 type: number
- *               composite_type:
- *                 type: string
- *               part_count:
- *                 type: number
- *               part_value:
- *                 type: string
- *                 description: JSON string
- *     responses:
- *       200:
- *         description: SKU updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU updated successfully.
- *                 updatedData:
- *                   $ref: '#/components/schemas/Sku'
- *       400:
- *         description: Invalid update request
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       404:
- *         description: SKU not found
- *       500:
- *         description: Server error while updating SKU
- */
 
 v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -772,59 +372,6 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Soft Delete SKU (DELETE) - changes status to inactive
-
-/**
- * @swagger
- * /sku-details/{id}:
- *   delete:
- *     summary: Soft delete an SKU
- *     description: Marks an SKU as inactive instead of permanently deleting it.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the SKU to mark as inactive
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: SKU marked as inactive successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU marked as inactive successfully
- *       404:
- *         description: SKU not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU not found
- *       500:
- *         description: Server error during SKU soft delete
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- */
-
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -859,87 +406,6 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Error deactivating SKU", error: error.message });
   }
 });
-
-
-/**
- * @swagger
- * /sku-details/{id}:
- *   get:
- *     summary: Get SKU details by ID
- *     description: Fetches a specific SKU by its ID, including creator and updater details.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the SKU
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: SKU details fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                 sku_name:
- *                   type: string
- *                 sku_values:
- *                   type: object
- *                 part_value:
- *                   type: object
- *                 created_by:
- *                   type: integer
- *                 updated_by:
- *                   type: integer
- *                 created_at:
- *                   type: string
- *                   format: date-time
- *                 updated_at:
- *                   type: string
- *                   format: date-time
- *                 sku_creator:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     name:
- *                       type: string
- *                 sku_updater:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     name:
- *                       type: string
- *       404:
- *         description: SKU not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU not found
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- */
 
 v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
   console.log("req.params.id", req.params.id);
@@ -981,68 +447,6 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-/**
- * @swagger
- * /sku-details/download/excel:
- *   get:
- *     summary: Download SKU details as an Excel file
- *     description: Generates and downloads an Excel sheet of SKU details with optional filters.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Text to search across SKU fields
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive]
- *           default: active
- *         description: Filter by SKU status
- *       - in: query
- *         name: sku_type
- *         schema:
- *           type: string
- *         description: Filter by SKU type
- *       - in: query
- *         name: client
- *         schema:
- *           type: string
- *         description: Filter by client
- *       - in: query
- *         name: includeInactive
- *         schema:
- *           type: boolean
- *           default: false
- *         description: Include inactive SKUs in the export
- *     responses:
- *       200:
- *         description: Excel file downloaded successfully
- *         content:
- *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
- *             schema:
- *               type: string
- *               format: binary
- *       500:
- *         description: Internal Server Error during Excel generation
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error message
- */
 
 v1Router.get(
   "/sku-details/download/excel",
@@ -1351,80 +755,6 @@ v1Router.get(
   }
 );
 
-/**
- * @swagger
- * /sku-details/sku-version:
- *   post:
- *     summary: Create a new SKU version
- *     description: Creates a new version of an existing SKU and saves it in the database.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - sku_id
- *             properties:
- *               sku_id:
- *                 type: integer
- *                 description: ID of the existing SKU to version
- *                 example: 101
- *               sku_values:
- *                 type: object
- *                 description: JSON data representing SKU attributes
- *                 example: { length: 50, width: 30, height: 20 }
- *               reference_number:
- *                 type: string
- *                 example: REF-2025-001
- *               comment:
- *                 type: string
- *                 example: "Updated dimensions for better packaging"
- *               additional_fields:
- *                 type: object
- *                 description: Any extra fields specific to SKU versioning
- *     responses:
- *       201:
- *         description: SKU version created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Version created successfully
- *                 skuVersion:
- *                   $ref: '#/components/schemas/SkuVersion'
- *       404:
- *         description: Referenced SKU not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Referenced SKU not found
- *       500:
- *         description: Error creating SKU version
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error creating SKU Version
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-
 v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -1491,154 +821,107 @@ v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
   }
 });
 
-// 🔹 Get SKU Versions (GET)
-/**
- * @swagger
- * /sku-details/sku-version/get:
- *   get:
- *     summary: Get SKU Versions
- *     description: Retrieves a paginated list of SKU versions with optional filters for search, SKU ID, client ID, and status.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of records per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Keyword to search by SKU version
- *       - in: query
- *         name: sku_id
- *         schema:
- *           type: integer
- *         description: Filter by SKU ID
- *       - in: query
- *         name: client_id
- *         schema:
- *           type: integer
- *         description: Filter by Client ID
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           default: active
- *         description: Filter by status (e.g., active/inactive)
- *     responses:
- *       200:
- *         description: List of SKU versions
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 1
- *                       sku_id:
- *                         type: integer
- *                         example: 101
- *                       client_id:
- *                         type: integer
- *                         example: 202
- *                       sku_values:
- *                         type: object
- *                         example: { "gsm": 120, "bf": 22 }
- *                       created_at:
- *                         type: string
- *                         format: date-time
- *                       updated_at:
- *                         type: string
- *                         format: date-time
- *                       Sku:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 101
- *                           sku_name:
- *                             type: string
- *                             example: 3-Ply Brown Carton
- *                       Client:
- *                         type: object
- *                         properties:
- *                           client_id:
- *                             type: integer
- *                             example: 202
- *                           company_name:
- *                             type: string
- *                             example: TATA Inc.
- *                       version_creator:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 5
- *                           name:
- *                             type: string
- *                             example: John Doe
- *                       version_updater:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 6
- *                           name:
- *                             type: string
- *                             example: Jane Smith
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     totalCount:
- *                       type: integer
- *                       example: 25
- *                     totalPages:
- *                       type: integer
- *                       example: 3
- *                     currentPage:
- *                       type: integer
- *                       example: 1
- *                     pageSize:
- *                       type: integer
- *                       example: 10
- *                     hasNextPage:
- *                       type: boolean
- *                       example: true
- *                     hasPrevPage:
- *                       type: boolean
- *                       example: false
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Internal Server Error
- *                 error:
- *                   type: string
- *                   example: Error details message
- */
+v1Router.put(
+  "/sku-details/sku-version/:id",
+  authenticateJWT,
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      // Check if the SKU version exists
+      const existingSkuVersion = await SkuVersion.findByPk(req.params.id);
+      if (!existingSkuVersion) {
+        await t.rollback();
+        return res.status(404).json({ message: "SKU Version not found" });
+      }
 
+      // Prepare the data for update with user info
+      const updateData = {
+        ...req.body,
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      };
+
+      // Convert sku_values to string if it's an object or array
+      if (updateData.sku_values && typeof updateData.sku_values === "object") {
+        updateData.sku_values = JSON.stringify(updateData.sku_values);
+      }
+
+      // Update the SKU Version
+      await SkuVersion.update(updateData, {
+        where: { id: req.params.id },
+        transaction: t,
+      });
+
+      // Fetch the updated version to return in response
+      const updatedSkuVersion = await SkuVersion.findByPk(req.params.id, {
+        transaction: t,
+        include: [
+          {
+            model: Sku,
+            attributes: ["id", "sku_name"],
+            required: false,
+          },
+          {
+            model: Client,
+            attributes: ["client_id", "company_name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+      });
+
+      await t.commit();
+
+      // Publish to queue if needed
+      await publishToQueue({
+        operation: "UPDATE_VERSION",
+        skuVersionId: updatedSkuVersion.id,
+        skuId: updatedSkuVersion.sku_id,
+        timestamp: new Date(),
+        data: updatedSkuVersion,
+      });
+
+      // Parse sku_values back to an object before sending response
+      let responseData = updatedSkuVersion.toJSON();
+      if (
+        responseData.sku_values &&
+        typeof responseData.sku_values === "string"
+      ) {
+        try {
+          responseData.sku_values = JSON.parse(responseData.sku_values);
+        } catch (parseError) {
+          console.error("Error parsing sku_values:", parseError);
+          // Keep as string if parsing fails
+        }
+      }
+
+      res.status(200).json({
+        message: "SKU Version updated successfully",
+        skuVersion: responseData,
+      });
+    } catch (error) {
+      await t.rollback();
+      logger.error("Error updating SKU Version:", error);
+      res.status(500).json({
+        message: "Error updating SKU Version",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// 🔹 Get SKU Versions (GET)
 
 v1Router.get(
   "/sku-details/sku-version/get",
@@ -1750,103 +1033,6 @@ v1Router.get(
 );
 
 // 🔹 Get SKU Versions by SKU ID (GET)
-/**
- * @swagger
- * /sku-details/sku-version/sku/{skuId}:
- *   get:
- *     summary: Get SKU versions by SKU ID
- *     description: Retrieves a paginated list of SKU versions for a specific SKU.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: skuId
- *         in: path
- *         required: true
- *         description: ID of the SKU
- *         schema:
- *           type: integer
- *           example: 101
- *       - name: page
- *         in: query
- *         required: false
- *         description: Page number for pagination
- *         schema:
- *           type: integer
- *           example: 1
- *       - name: limit
- *         in: query
- *         required: false
- *         description: Number of records per page
- *         schema:
- *           type: integer
- *           example: 10
- *       - name: status
- *         in: query
- *         required: false
- *         description: Filter by status (default is "active")
- *         schema:
- *           type: string
- *           enum: [active, inactive, archived]
- *           example: active
- *     responses:
- *       200:
- *         description: List of SKU versions for the given SKU ID
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/SkuVersion'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     totalCount:
- *                       type: integer
- *                       example: 5
- *                     totalPages:
- *                       type: integer
- *                       example: 1
- *                     currentPage:
- *                       type: integer
- *                       example: 1
- *                     pageSize:
- *                       type: integer
- *                       example: 10
- *                     hasNextPage:
- *                       type: boolean
- *                       example: false
- *                     hasPrevPage:
- *                       type: boolean
- *                       example: false
- *       404:
- *         description: SKU not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU not found
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Internal Server Error
- *                 error:
- *                   type: string
- *                   example: Error details
- */
 
 v1Router.get(
   "/sku-details/sku-version/sku/:skuId",
@@ -1932,115 +1118,60 @@ v1Router.get(
 );
 
 // 🔹 Get SKU Version by ID (GET)
-// v1Router.get(
-//   "/sku-details/sku-version/:id",
-//   authenticateJWT,
-//   async (req, res) => {
-//     try {
-//       const skuVersion = await SkuVersion.findByPk(req.params.id, {
-//         include: [
-//           {
-//             model: Sku,
-//             attributes: ["id", "sku_name"],
-//             required: false,
-//           },
-//           {
-//             model: Client,
-//             attributes: ["client_id", "client_name"],
-//             required: false,
-//           },
-//           {
-//             model: User,
-//             as: "version_creator",
-//             attributes: ["id", "name"],
-//             required: false,
-//           },
-//           {
-//             model: User,
-//             as: "version_updater",
-//             attributes: ["id", "name"],
-//             required: false,
-//           },
-//         ],
-//       });
+v1Router.get(
+  "/sku-details/sku-version/:id",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const skuVersion = await SkuVersion.findByPk(req.params.id, {
+        include: [
+          {
+            model: Sku,
+            attributes: ["id", "sku_name"],
+            required: false,
+          },
+          {
+            model: Client,
+            attributes: ["client_id", "company_name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: User,
+            as: "version_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+      });
 
-//       if (!skuVersion) {
-//         return res.status(404).json({ message: "SKU Version not found" });
-//       }
+      if (!skuVersion) {
+        return res.status(404).json({ message: "SKU Version not found" });
+      }
 
-//       // Format the response data
-//       const formattedSkuVersion = {
-//         ...skuVersion.toJSON(),
-//         sku_values: skuVersion.sku_values
-//           ? JSON.parse(skuVersion.sku_values)
-//           : null,
-//       };
+      // Format the response data
+      const formattedSkuVersion = {
+        ...skuVersion.toJSON(),
+        sku_values: skuVersion.sku_values
+          ? JSON.parse(skuVersion.sku_values)
+          : null,
+      };
 
-//       res.status(200).json(formattedSkuVersion);
-//     } catch (error) {
-//       logger.error("Error fetching SKU Version:", error);
-//       res.status(500).json({
-//         message: "Internal Server Error",
-//         error: error.message,
-//       });
-//     }
-//   }
-// );
-
-// 🔹 Soft Delete SKU Version (DELETE) - changes status to inactive
-/**
- * @swagger
- * /sku-details/sku-version/{id}:
- *   delete:
- *     summary: Soft delete SKU Version
- *     description: Marks the SKU Version as inactive instead of permanently deleting it.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the SKU Version to deactivate
- *         schema:
- *           type: integer
- *           example: 123
- *     responses:
- *       200:
- *         description: SKU Version marked as inactive successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Version marked as inactive successfully
- *       404:
- *         description: SKU Version not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Version not found
- *       500:
- *         description: Error deactivating SKU Version
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error deactivating SKU Version
- *                 error:
- *                   type: string
- *                   example: Error details
- */
+      res.status(200).json(formattedSkuVersion);
+    } catch (error) {
+      logger.error("Error fetching SKU Version:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
 
 v1Router.delete(
   "/sku-details/sku-version/:id",
@@ -2090,100 +1221,6 @@ v1Router.delete(
 );
 
 // sku-type apis
-/**
- * @swagger
- * /sku-details/sku-type/get:
- *   get:
- *     summary: Get all SKU Types
- *     description: Retrieve all SKU Types with optional filters like status and company_id.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           default: active
- *         description: Filter SKU Types by status (e.g., active, inactive)
- *       - in: query
- *         name: company_id
- *         schema:
- *           type: integer
- *         description: Filter SKU Types by company ID
- *     responses:
- *       200:
- *         description: List of SKU Types retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 1
- *                       name:
- *                         type: string
- *                         example: Electronics
- *                       status:
- *                         type: string
- *                         example: active
- *                       company_id:
- *                         type: integer
- *                         example: 101
- *                       created_at:
- *                         type: string
- *                         format: date-time
- *                       updated_at:
- *                         type: string
- *                         format: date-time
- *                       creator_sku_types:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *                       updater_sku_types:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *       404:
- *         description: No SKU types found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: No SKU types found
- *                 data:
- *                   type: array
- *                   example: []
- *       500:
- *         description: Internal server error while fetching SKU Types
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Internal Server Error
- *                 error:
- *                   type: string
- *                   example: Error message details
- */
 
 v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   try {
@@ -2245,81 +1282,6 @@ v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   }
 });
 // 🔹 Create SKU Type
-/**
- * @swagger
- * /sku-details/sku-type:
- *   post:
- *     summary: Create a new SKU Type
- *     description: Creates a new SKU Type associated with the authenticated user's company.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               type_name:
- *                 type: string
- *                 example: Electronics
- *               description:
- *                 type: string
- *                 example: Devices and gadgets
- *             required:
- *               - type_name
- *     responses:
- *       201:
- *         description: SKU Type created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Type created successfully
- *                 skuType:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                       example: 1
- *                     type_name:
- *                       type: string
- *                       example: Electronics
- *                     company_id:
- *                       type: integer
- *                       example: 101
- *                     status:
- *                       type: string
- *                       example: active
- *                     created_by:
- *                       type: integer
- *                     updated_by:
- *                       type: integer
- *                     created_at:
- *                       type: string
- *                       format: date-time
- *                     updated_at:
- *                       type: string
- *                       format: date-time
- *       500:
- *         description: Error creating SKU Type
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error creating SKU Type
- *                 error:
- *                   type: string
- *                   example: Detailed error message
- */
 
 v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -2346,97 +1308,6 @@ v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Update SKU Type
-/**
- * @swagger
- * /sku-details/sku-type/{id}:
- *   put:
- *     summary: Update an existing SKU Type
- *     description: Updates the sku_type field of a specific SKU Type by ID.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the SKU Type to update
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               sku_type:
- *                 type: string
- *                 example: Updated Electronics
- *             required:
- *               - sku_type
- *     responses:
- *       200:
- *         description: SKU Type updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Type updated successfully
- *                 updated_sku_type:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                       example: 1
- *                     sku_type:
- *                       type: string
- *                       example: Updated Electronics
- *                     company_id:
- *                       type: integer
- *                       example: 101
- *                     updated_by:
- *                       type: integer
- *                     updated_at:
- *                       type: string
- *                       format: date-time
- *       400:
- *         description: sku_type is required
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: sku_type is required
- *       404:
- *         description: SKU Type not found or no changes made
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Type not found or no changes made
- *       500:
- *         description: Error updating SKU Type
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error updating SKU Type
- *                 error:
- *                   type: string
- *                   example: Detailed error message
- */
 
 v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -2484,60 +1355,6 @@ v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Error updating SKU Type", error: error.message });
   }
 });
-
-// 🔹 Soft Delete SKU Type
-/**
- * @swagger
- * /sku-details/sku-type/{id}:
- *   delete:
- *     summary: Soft delete a SKU Type
- *     description: Marks a SKU Type as inactive instead of permanently deleting it.
- *     tags:
- *       - SKU
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the SKU Type to deactivate
- *     responses:
- *       200:
- *         description: SKU Type marked as inactive successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Type marked as inactive successfully
- *       404:
- *         description: SKU Type not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: SKU Type not found
- *       500:
- *         description: Error deactivating SKU Type
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error deactivating SKU Type
- *                 error:
- *                   type: string
- *                   example: Detailed error message
- */
 
 v1Router.delete(
   "/sku-details/sku-type/:id",
