@@ -754,8 +754,6 @@ v1Router.get(
   }
 );
 
-// sku versions
-
 v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -795,6 +793,19 @@ v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
       timestamp: new Date(),
       data: newSkuVersion,
     });
+
+    // Parse sku_values back to an object before sending response
+    if (
+      newSkuVersion.sku_values &&
+      typeof newSkuVersion.sku_values === "string"
+    ) {
+      try {
+        newSkuVersion.sku_values = JSON.parse(newSkuVersion.sku_values);
+      } catch (parseError) {
+        console.error("Error parsing sku_values:", parseError);
+        // Keep as string if parsing fails
+      }
+    }
 
     res.status(201).json({
       message: "SKU Version created successfully",
@@ -903,8 +914,8 @@ v1Router.get(
           totalPages,
           currentPage: parseInt(page),
           pageSize: parseInt(limit),
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1,
+          // hasNextPage: parseInt(page) < totalPages,
+          // hasPrevPage: parseInt(page) > 1,
         },
       };
 
@@ -987,8 +998,8 @@ v1Router.get(
           totalPages,
           currentPage: parseInt(page),
           pageSize: parseInt(limit),
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1,
+          // hasNextPage: parseInt(page) < totalPages,
+          // hasPrevPage: parseInt(page) > 1,
         },
       };
 
