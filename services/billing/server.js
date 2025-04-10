@@ -28,6 +28,67 @@ const v1Router = Router();
 
 import { QueryTypes } from "sequelize";
 
+/**
+ * @swagger
+ * /billing:
+ *   get:
+ *     summary: Get paginated list of billing records
+ *     tags:
+ *       - Billing
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Optional search keyword (currently unused)
+ *       - in: query
+ *         name: includeInactive
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include inactive billing records (currently unused)
+ *       - in: query
+ *         name: entity_type
+ *         schema:
+ *           type: string
+ *         description: Optional filter for entity type (currently unused)
+ *     responses:
+ *       200:
+ *         description: Billing fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/BillingRecord'
+ *                 totalPages:
+ *                   type: integer
+ *                 currentPage:
+ *                   type: integer
+ *                 totalRecords:
+ *                   type: integer
+ *       500:
+ *         description: Server error while fetching billing
+ */
 
 // 🔹 Get All billing (GET) with Addresses - Only active billing
 v1Router.get("/billing",authenticateJWT, async (req, res) => {

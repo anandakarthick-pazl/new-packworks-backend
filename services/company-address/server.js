@@ -27,6 +27,64 @@ const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 app.use(logRequestResponse)
 // 🔹 Create a Company (POST)
 
+/**
+ * @swagger
+ * /companies-address:
+ *   get:
+ *     summary: Get a list of all company addresses
+ *     tags:
+ *       - Company Address
+ *     responses:
+ *       200:
+ *         description: A list of company addresses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       company_id:
+ *                         type: integer
+ *                         example: 10
+ *                       address_line_1:
+ *                         type: string
+ *                         example: 123 Business St
+ *                       city:
+ *                         type: string
+ *                         example: New York
+ *                       state:
+ *                         type: string
+ *                         example: NY
+ *                       country:
+ *                         type: string
+ *                         example: USA
+ *                       zip_code:
+ *                         type: string
+ *                         example: 10001
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
 
 v1Router.get("/companies-address", async (req, res) => {
     try {
@@ -40,6 +98,85 @@ v1Router.get("/companies-address", async (req, res) => {
 /**
  * 🔹 GET Single Address by ID
  */
+/**
+ * @swagger
+ * /companies-address/{id}:
+ *   get:
+ *     summary: Get a company address by ID
+ *     tags:
+ *       - Company Address
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the company address
+ *     responses:
+ *       200:
+ *         description: Company address details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     company_id:
+ *                       type: integer
+ *                       example: 10
+ *                     address_line_1:
+ *                       type: string
+ *                       example: 123 Business St
+ *                     city:
+ *                       type: string
+ *                       example: New York
+ *                     state:
+ *                       type: string
+ *                       example: NY
+ *                     country:
+ *                       type: string
+ *                       example: USA
+ *                     zip_code:
+ *                       type: string
+ *                       example: 10001
+ *       404:
+ *         description: Address not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Address not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 v1Router.get("/companies-address/:id", authenticateJWT,async (req, res) => {
     try {
         const address = await CompanyAddress.findByPk(req.params.id);
@@ -55,6 +192,113 @@ v1Router.get("/companies-address/:id", authenticateJWT,async (req, res) => {
 /**
  * 🔹 CREATE a New Address
  */
+/**
+ * @swagger
+ * /companies-address:
+ *   post:
+ *     summary: Create a new company address
+ *     tags:
+ *       - Company Address
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - company_id
+ *               - country_id
+ *               - address
+ *             properties:
+ *               company_id:
+ *                 type: integer
+ *                 example: 1
+ *               country_id:
+ *                 type: integer
+ *                 example: 101
+ *               address:
+ *                 type: string
+ *                 example: "123 Business St, Suite 400"
+ *               tax_number:
+ *                 type: string
+ *                 example: "TAX123456"
+ *               tax_name:
+ *                 type: string
+ *                 example: "GST"
+ *               location:
+ *                 type: string
+ *                 example: "Downtown"
+ *               latitude:
+ *                 type: number
+ *                 format: float
+ *                 example: 37.7749
+ *               longitude:
+ *                 type: number
+ *                 format: float
+ *                 example: -122.4194
+ *     responses:
+ *       201:
+ *         description: Address created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Address created successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 10
+ *                     company_id:
+ *                       type: integer
+ *                       example: 1
+ *                     address:
+ *                       type: string
+ *                       example: "123 Business St, Suite 400"
+ *                     tax_number:
+ *                       type: string
+ *                       example: "TAX123456"
+ *                     tax_name:
+ *                       type: string
+ *                       example: "GST"
+ *                     location:
+ *                       type: string
+ *                       example: "Downtown"
+ *                     latitude:
+ *                       type: number
+ *                       example: 37.7749
+ *                     longitude:
+ *                       type: number
+ *                       example: -122.4194
+ *                     is_default:
+ *                       type: integer
+ *                       example: 0
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 v1Router.post("/companies-address", authenticateJWT,validateCompanyAddress, async (req, res) => {
     try {
         const { company_id, country_id, address, tax_number, tax_name, location, latitude, longitude } = req.body;
@@ -82,6 +326,100 @@ v1Router.post("/companies-address", authenticateJWT,validateCompanyAddress, asyn
 /**
  * 🔹 UPDATE an Address by ID
  */
+/**
+ * @swagger
+ * /companies-address/{id}:
+ *   put:
+ *     summary: Update an existing company address
+ *     tags:
+ *       - Company Address
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the address to update
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               address:
+ *                 type: string
+ *                 example: "456 Updated Ave, Floor 5"
+ *               tax_number:
+ *                 type: string
+ *                 example: "TAX987654"
+ *               company_id:
+ *                 type: integer
+ *                 example: 1
+ *               country_id:
+ *                 type: integer
+ *                 example: 101
+ *               tax_name:
+ *                 type: string
+ *                 example: "VAT"
+ *               location:
+ *                 type: string
+ *                 example: "Business Bay"
+ *               latitude:
+ *                 type: number
+ *                 format: float
+ *                 example: 25.2048
+ *               longitude:
+ *                 type: number
+ *                 format: float
+ *                 example: 55.2708
+ *     responses:
+ *       200:
+ *         description: Address updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Address updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/CompanyAddress'
+ *       404:
+ *         description: Address not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Address not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 v1Router.put("/companies-address/:id",authenticateJWT,validateCompanyAddress, async (req, res) => {
     try {
         const { address, tax_number, tax_name, location, latitude, longitude } = req.body;
@@ -110,6 +448,65 @@ v1Router.put("/companies-address/:id",authenticateJWT,validateCompanyAddress, as
 /**
  * 🔹 DELETE an Address (Update Status)
  */
+/**
+ * @swagger
+ * /companies-address/{id}:
+ *   delete:
+ *     summary: Mark a company address as inactive
+ *     tags:
+ *       - Company Address
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the address to deactivate
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     responses:
+ *       200:
+ *         description: Address status updated to inactive
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Address status updated to inactive
+ *       404:
+ *         description: Address not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Address not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 v1Router.delete("/companies-address/:id",authenticateJWT, async (req, res) => {
     try {
         const addressToDelete = await CompanyAddress.findByPk(req.params.id);

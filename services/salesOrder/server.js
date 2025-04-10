@@ -21,6 +21,147 @@ const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
 // POST create new sales order - with SalesSkuDetails table
+/**
+ * @swagger
+ * /sale-order:
+ *   post:
+ *     summary: Create a new Sales Order with SKU and Work Details
+ *     description: Creates a new sales order, associated SKU details, and work orders in a single transaction.
+ *     tags:
+ *       - Sales Orders
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               salesDetails:
+ *                 type: object
+ *                 required:
+ *                   - client_id
+ *                   - estimated
+ *                   - sales_status
+ *                   - total_amount
+ *                 properties:
+ *                   client_id:
+ *                     type: integer
+ *                   estimated:
+ *                     type: string
+ *                     format: date
+ *                   client:
+ *                     type: string
+ *                   credit_period:
+ *                     type: integer
+ *                   freight_paid:
+ *                     type: boolean
+ *                   confirmation:
+ *                     type: string
+ *                   sales_status:
+ *                     type: string
+ *                   total_amount:
+ *                     type: number
+ *                   sgst:
+ *                     type: number
+ *                   cgst:
+ *                     type: number
+ *                   total_incl_gst:
+ *                     type: number
+ *               skuDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     sku:
+ *                       type: string
+ *                     quantity_required:
+ *                       type: integer
+ *                     rate_per_sku:
+ *                       type: number
+ *                     acceptable_sku_units:
+ *                       type: integer
+ *                     total_amount:
+ *                       type: number
+ *                     sgst:
+ *                       type: number
+ *                     sgst_amount:
+ *                       type: number
+ *                     cgst:
+ *                       type: number
+ *                     cgst_amount:
+ *                       type: number
+ *                     total_incl__gst:
+ *                       type: number
+ *               workDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     client_id:
+ *                       type: integer
+ *                     manufacture:
+ *                       type: string
+ *                     sku_name:
+ *                       type: string
+ *                     sku_version:
+ *                       type: string
+ *                     qty:
+ *                       type: number
+ *                     edd:
+ *                       type: string
+ *                       format: date
+ *                     description:
+ *                       type: string
+ *                     acceptable_excess_units:
+ *                       type: integer
+ *                     planned_start_date:
+ *                       type: string
+ *                       format: date
+ *                     planned_end_date:
+ *                       type: string
+ *                       format: date
+ *                     outsource_name:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: Sales Order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Sales Order created successfully
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid input data
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal Server Error
+ *                 error:
+ *                   type: string
+ *                   example: Detailed error message
+ */
+
 v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
 
@@ -134,6 +275,97 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   }
 });
 
+
+
+/**
+ * @swagger
+ * /sale-order:
+ *   get:
+ *     summary: Get paginated list of Sales Orders
+ *     description: Fetches a list of sales orders along with associated SKU details and work orders. Supports filters and pagination.
+ *     tags:
+ *       - Sales Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *       - in: query
+ *         name: client
+ *         schema:
+ *           type: string
+ *         description: Filter by client name (partial match)
+ *       - in: query
+ *         name: sku
+ *         schema:
+ *           type: string
+ *         description: Filter by SKU (partial match)
+ *       - in: query
+ *         name: manufacture
+ *         schema:
+ *           type: string
+ *         description: Filter by manufacturer (partial match)
+ *       - in: query
+ *         name: confirmation
+ *         schema:
+ *           type: string
+ *         description: Filter by confirmation status
+ *       - in: query
+ *         name: sales_status
+ *         schema:
+ *           type: string
+ *         description: Filter by sales status
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           default: active
+ *         description: Filter by record status
+ *     responses:
+ *       200:
+ *         description: List of sales orders
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal Server Error
+ *                 error:
+ *                   type: string
+ *                   example: Error message details
+ */
+
 v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   try {
     const {
@@ -246,6 +478,101 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   }
 });
 // GET single sales order by ID (including associated records)
+
+/**
+ * @swagger
+ * /sale-order/{id}:
+ *   get:
+ *     summary: Get a single Sales Order by ID
+ *     description: Retrieves detailed information about a specific sales order, including associated work orders and SKU details.
+ *     tags:
+ *       - Sales Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the sales order
+ *     responses:
+ *       200:
+ *         description: Sales order details fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 client_id:
+ *                   type: integer
+ *                 total_amount:
+ *                   type: number
+ *                 total_incl_gst:
+ *                   type: number
+ *                 sales_status:
+ *                   type: string
+ *                 creator_sales:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                 updater_sales:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                 workOrders:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 SalesSkuDetails:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       403:
+ *         description: Access denied to this sales order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Access denied to this sales order
+ *       404:
+ *         description: Sales order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Sales order not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
@@ -303,6 +630,148 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing sales order - modified to update existing records
+/**
+ * @swagger
+ * /sale-order/{id}:
+ *   put:
+ *     summary: Update a sales order and its related SKU and Work Order details
+ *     description: Updates an existing sales order including SKU details and work order information. Handles both updates and creation of new records.
+ *     tags:
+ *       - Sales Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the sales order to update
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - salesDetails
+ *               - skuDetails
+ *               - workDetails
+ *             properties:
+ *               salesDetails:
+ *                 type: object
+ *                 properties:
+ *                   client_id:
+ *                     type: integer
+ *                   estimated:
+ *                     type: string
+ *                   client:
+ *                     type: string
+ *                   credit_period:
+ *                     type: string
+ *                   freight_paid:
+ *                     type: string
+ *                   confirmation:
+ *                     type: boolean
+ *                   sales_status:
+ *                     type: string
+ *                   total_amount:
+ *                     type: number
+ *                   sgst:
+ *                     type: number
+ *                   cgst:
+ *                     type: number
+ *                   total_incl_gst:
+ *                     type: number
+ *                   status:
+ *                     type: string
+ *               skuDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     sku:
+ *                       type: string
+ *                     quantity_required:
+ *                       type: number
+ *                     rate_per_sku:
+ *                       type: number
+ *                     acceptable_sku_units:
+ *                       type: number
+ *                     total_amount:
+ *                       type: number
+ *                     sgst:
+ *                       type: number
+ *                     sgst_amount:
+ *                       type: number
+ *                     cgst:
+ *                       type: number
+ *                     cgst_amount:
+ *                       type: number
+ *                     total_incl__gst:
+ *                       type: number
+ *               workDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     client_id:
+ *                       type: integer
+ *                     manufacture:
+ *                       type: string
+ *                     sku_name:
+ *                       type: string
+ *                     sku_version:
+ *                       type: string
+ *                     qty:
+ *                       type: number
+ *                     edd:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     acceptable_excess_units:
+ *                       type: number
+ *                     planned_start_date:
+ *                       type: string
+ *                     planned_end_date:
+ *                       type: string
+ *                     outsource_name:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Sales order updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Sales Order updated successfully
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid input data
+ *       403:
+ *         description: Access denied to this sales order
+ *       404:
+ *         description: Sales order not found
+ *       500:
+ *         description: Internal server error
+ */
+
 v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { salesDetails, skuDetails, workDetails } = req.body;
@@ -555,6 +1024,71 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // DELETE sales order - changed to soft delete including associated records
+/**
+ * @swagger
+ * /sale-order/{id}:
+ *   delete:
+ *     summary: Soft delete a sales order
+ *     description: Marks the sales order and its associated SKU and work orders as inactive (soft delete).
+ *     tags:
+ *       - Sales Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the sales order to delete
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Sales order and associated records marked as inactive
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Sales Order and associated records set to inactive
+ *                 data:
+ *                   type: object
+ *                   description: The sales order data with updated status
+ *       403:
+ *         description: Access denied to this sales order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Access denied to this sales order
+ *       404:
+ *         description: Sales order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Sales order not found
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
+
 v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const transaction = await sequelize.transaction();

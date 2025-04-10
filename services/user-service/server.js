@@ -33,6 +33,142 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL;
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
 // Register API with Transaction
+/**
+ * @swagger
+ * /user/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: Registers a new user and assigns department, designation, and role. Also queues a welcome email.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *               - role_id
+ *               - department_id
+ *               - designation_id
+ *               - reporting_to
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: John Doe
+ *               email:
+ *                 type: string
+ *                 example: john@example.com
+ *               password:
+ *                 type: string
+ *                 example: Secret@123
+ *               mobile:
+ *                 type: string
+ *                 example: "9876543210"
+ *               role_id:
+ *                 type: integer
+ *                 example: 2
+ *               department_id:
+ *                 type: integer
+ *                 example: 3
+ *               designation_id:
+ *                 type: integer
+ *                 example: 1
+ *               reporting_to:
+ *                 type: integer
+ *                 example: 1
+ *               image:
+ *                 type: string
+ *                 example: "profile.jpg"
+ *               country_phonecode:
+ *                 type: string
+ *                 example: "+91"
+ *               country_id:
+ *                 type: integer
+ *                 example: 101
+ *               employee_id:
+ *                 type: string
+ *                 example: EMP001
+ *               address:
+ *                 type: string
+ *                 example: "123 Business St."
+ *               hourly_rate:
+ *                 type: number
+ *                 example: 25.5
+ *               slack_username:
+ *                 type: string
+ *                 example: "john_doe"
+ *               joining_date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-04-01"
+ *               date_of_birth:
+ *                 type: string
+ *                 format: date
+ *               last_date:
+ *                 type: string
+ *                 format: date
+ *               attendance_reminder:
+ *                 type: string
+ *                 format: date
+ *               employment_type:
+ *                 type: string
+ *                 example: "Full-time"
+ *               marital_status:
+ *                 type: string
+ *                 example: "single"
+ *               marriage_anniversary_date:
+ *                 type: string
+ *                 format: date
+ *               probation_end_date:
+ *                 type: string
+ *                 format: date
+ *               contract_end_date:
+ *                 type: string
+ *                 format: date
+ *               internship_end_date:
+ *                 type: string
+ *                 format: date
+ *               notice_period_start_date:
+ *                 type: string
+ *                 format: date
+ *               notice_period_end_date:
+ *                 type: string
+ *                 format: date
+ *               company_address_id:
+ *                 type: integer
+ *               overtime_hourly_rate:
+ *                 type: number
+ *               skills:
+ *                 type: string
+ *                 example: "Node.js, React"
+ *     responses:
+ *       200:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User registered successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid input or existing user
+ *       500:
+ *         description: Server error
+ */
+
 v1Router.post(
   "/register",
   validateRegister,
@@ -260,6 +396,75 @@ v1Router.post(
   }
 );
 
+/**
+ * @swagger
+ * /user/employees/{userId}:
+ *   delete:
+ *     summary: Delete an employee (mark user as inactive)
+ *     description: Marks a user associated with an employee as inactive instead of deleting from DB.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: userId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the employee to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully (marked as inactive)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User deleted successfully
+ *                 data:
+ *                   type: array
+ *                   example: []
+ *       404:
+ *         description: Employee or user not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Employee details not found
+ *                 data:
+ *                   type: array
+ *                   example: []
+ *       500:
+ *         description: Server error while deleting employee
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 file:
+ *                   type: string
+ *                 line:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ */
+
 v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
   console.log("Delete user details...");
   const transaction = await sequelize.transaction();
@@ -327,6 +532,130 @@ v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
     return res.status(500).json(errorMessage);
   }
 });
+
+/**
+ * @swagger
+ * /user/employees/{userId}:
+ *   put:
+ *     summary: Update user and employee details
+ *     description: Updates the user and associated employee records, including roles and departments.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               mobile:
+ *                 type: string
+ *               role_id:
+ *                 type: integer
+ *               image:
+ *                 type: string
+ *               department_id:
+ *                 type: integer
+ *               designation_id:
+ *                 type: integer
+ *               employee_id:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               hourly_rate:
+ *                 type: number
+ *               slack_username:
+ *                 type: string
+ *               joining_date:
+ *                 type: string
+ *                 format: date
+ *               last_date:
+ *                 type: string
+ *                 format: date
+ *               added_by:
+ *                 type: integer
+ *               last_updated_by:
+ *                 type: integer
+ *               attendance_reminder:
+ *                 type: boolean
+ *               date_of_birth:
+ *                 type: string
+ *                 format: date
+ *               calendar_view:
+ *                 type: string
+ *               about_me:
+ *                 type: string
+ *               reporting_to:
+ *                 type: integer
+ *               contract_end_date:
+ *                 type: string
+ *                 format: date
+ *               internship_end_date:
+ *                 type: string
+ *                 format: date
+ *               employment_type:
+ *                 type: string
+ *               marriage_anniversary_date:
+ *                 type: string
+ *                 format: date
+ *               marital_status:
+ *                 type: string
+ *               notice_period_end_date:
+ *                 type: string
+ *                 format: date
+ *               notice_period_start_date:
+ *                 type: string
+ *                 format: date
+ *               probation_end_date:
+ *                 type: string
+ *                 format: date
+ *               company_address_id:
+ *                 type: integer
+ *               overtime_hourly_rate:
+ *                 type: number
+ *               skills:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User and employee updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User and employee updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                     employee:
+ *                       type: object
+ *       400:
+ *         description: Validation failed (e.g. invalid role or department)
+ *       404:
+ *         description: User or employee not found
+ *       500:
+ *         description: Internal server error
+ */
 
 v1Router.put("/employees/:userId", authenticateJWT, async (req, res) => {
   console.log("Updating user details...");
@@ -523,6 +852,85 @@ v1Router.put("/employees/:userId", authenticateJWT, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /user/login:
+ *   post:
+ *     summary: User login
+ *     description: Authenticates user with email and password and returns a JWT token.
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - staticTokenAuth: []  # If you're using a static token header for this route
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: yourpassword123
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                 user:
+ *                   type: object
+ *                   description: User object returned after successful login
+ *       400:
+ *         description: Invalid email or password / Missing credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid email or password
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ *                 file:
+ *                   type: string
+ *                   example: at Object.<anonymous> (/app/routes/auth.js:32:15)
+ */
+
 v1Router.post(
   "/login",
   authenticateStaticToken,
@@ -597,6 +1005,112 @@ v1Router.post(
     }
   }
 );
+
+/**
+ * @swagger
+ * /user/employees:
+ *   get:
+ *     summary: Get paginated employee list
+ *     description: Retrieves a paginated list of employees with filtering by search term and status.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Current page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search keyword for name, email, department, role, etc.
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive]
+ *         description: Filter by user status
+ *     responses:
+ *       200:
+ *         description: Paginated list of employees with metadata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 totalRecords:
+ *                   type: integer
+ *                   example: 100
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 10
+ *                 currentPage:
+ *                   type: integer
+ *                   example: 1
+ *                 pageSize:
+ *                   type: integer
+ *                   example: 10
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       employee_id:
+ *                         type: string
+ *                       user_id:
+ *                         type: integer
+ *                       employee_name:
+ *                         type: string
+ *                       image:
+ *                         type: string
+ *                         format: uri
+ *                       department:
+ *                         type: string
+ *                       designation:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                       user_status:
+ *                         type: string
+ *                         enum: [Active, Inactive]
+ *                       reporting_manager:
+ *                         type: string
+ *                 activeEmployees:
+ *                   type: integer
+ *                   example: 60
+ *                 inactiveEmployees:
+ *                   type: integer
+ *                   example: 40
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal Server Error
+ */
+
 v1Router.get("/employees", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "", status } = req.query;
@@ -720,6 +1234,94 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+
+/**
+ * @swagger
+ * /user/employees/{employeeId}:
+ *   get:
+ *     summary: Get single employee details
+ *     description: Retrieve detailed information about a specific employee using the employee ID.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The unique identifier of the employee
+ *     responses:
+ *       200:
+ *         description: Employee detail retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Employee not found
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     user_id:
+ *                       type: integer
+ *                     employee_id:
+ *                       type: string
+ *                     address:
+ *                       type: string
+ *                     department_id:
+ *                       type: integer
+ *                     designation_id:
+ *                       type: integer
+ *                     role_id:
+ *                       type: integer
+ *                     joining_date:
+ *                       type: string
+ *                       format: date
+ *                     last_date:
+ *                       type: string
+ *                       format: date
+ *                     user_name:
+ *                       type: string
+ *                     user_email:
+ *                       type: string
+ *                     mobile:
+ *                       type: string
+ *                     country_phonecode:
+ *                       type: string
+ *                     country_id:
+ *                       type: integer
+ *                     image:
+ *                       type: string
+ *                       format: uri
+ *                     user_status:
+ *                       type: string
+ *                       enum: [Active, Inactive]
+ *       404:
+ *         description: Employee not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error message
+ */
 
 v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
   try {

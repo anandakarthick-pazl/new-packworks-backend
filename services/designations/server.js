@@ -27,6 +27,87 @@ const v1Router = Router();
 
 // GET single work order by ID
 
+/**
+ * @swagger
+ * /designations:
+ *   post:
+ *     summary: Create a new designation
+ *     tags:
+ *       - Designations
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - added_by
+ *               - last_updated_by
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Project Manager
+ *               parent_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 1
+ *               added_by:
+ *                 type: integer
+ *                 example: 101
+ *               last_updated_by:
+ *                 type: integer
+ *                 example: 101
+ *     responses:
+ *       201:
+ *         description: Designation created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Designation created successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     parent_id:
+ *                       type: integer
+ *                       nullable: true
+ *                     added_by:
+ *                       type: integer
+ *                     last_updated_by:
+ *                       type: integer
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error creating Designation
+ */
 
 v1Router.post("/designations", authenticateJWT, async (req, res) => {
   try {
@@ -52,6 +133,68 @@ v1Router.post("/designations", authenticateJWT, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /designations:
+ *   get:
+ *     summary: Get all designations
+ *     tags:
+ *       - Designations
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all designations
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: Project Manager
+ *                       parent_id:
+ *                         type: integer
+ *                         nullable: true
+ *                         example: null
+ *                       added_by:
+ *                         type: integer
+ *                         example: 101
+ *                       last_updated_by:
+ *                         type: integer
+ *                         example: 101
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error fetching Designations
+ */
+
 v1Router.get("/designations", authenticateJWT, async (req, res) => {
   try {
     const Designations = await Designation.findAll();
@@ -64,6 +207,86 @@ v1Router.get("/designations", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /designations/{id}:
+ *   get:
+ *     summary: Get a designation by ID
+ *     tags:
+ *       - Designations
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Designation ID
+ *     responses:
+ *       200:
+ *         description: Designation found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     name:
+ *                       type: string
+ *                       example: Senior Developer
+ *                     parent_id:
+ *                       type: integer
+ *                       nullable: true
+ *                       example: null
+ *                     added_by:
+ *                       type: integer
+ *                       example: 101
+ *                     last_updated_by:
+ *                       type: integer
+ *                       example: 102
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *       404:
+ *         description: Designation not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Designation not found
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error fetching Designation
+ */
 
 v1Router.get("/designations/:id", authenticateJWT, async (req, res) => {
   try {
@@ -87,6 +310,83 @@ v1Router.get("/designations/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /designations/{id}:
+ *   put:
+ *     summary: Update a designation by ID
+ *     tags:
+ *       - Designations
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Designation ID
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Lead Developer
+ *               parent_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: null
+ *               last_updated_by:
+ *                 type: integer
+ *                 example: 102
+ *     responses:
+ *       200:
+ *         description: Designation updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Designation updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Designation'
+ *       404:
+ *         description: Designation not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Designation not found
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error updating Designation
+ */
 
 v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
   try {
@@ -119,6 +419,64 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /designations/{id}:
+ *   delete:
+ *     summary: Delete a designation by ID
+ *     tags:
+ *       - Designations
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Designation ID
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Designation deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Designation deleted successfully
+ *       404:
+ *         description: Designation not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Designation not found
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error deleting Designation
+ */
 
 v1Router.delete("/designations/:id", authenticateJWT, async (req, res) => {
   try {
