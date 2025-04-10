@@ -4,6 +4,7 @@ import SalesOrder from "./salesOrder.model.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
+import SkuVersion from "../skuModel/skuVersion.js";
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -49,39 +50,43 @@ const WorkOrder = sequelize.define(
     },
     sku_name: {
       type: DataTypes.STRING,
-      allowNull: true, 
+      allowNull: true,
     },
     sku_version: {
-      type: DataTypes.STRING,
-      allowNull: true, 
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: SkuVersion,
+        key: "id",
+      },
     },
     qty: {
       type: DataTypes.INTEGER,
-      allowNull: true, 
+      allowNull: true,
     },
     edd: {
       type: DataTypes.DATE,
-      allowNull: true, 
+      allowNull: true,
     },
     description: {
       type: DataTypes.TEXT,
-      allowNull: true, 
+      allowNull: true,
     },
     acceptable_excess_units: {
       type: DataTypes.INTEGER,
-      allowNull: true, 
+      allowNull: true,
     },
     planned_start_date: {
       type: DataTypes.DATE,
-      allowNull: true, 
+      allowNull: true,
     },
     planned_end_date: {
       type: DataTypes.DATE,
-      allowNull: true, 
+      allowNull: true,
     },
     outsource_name: {
       type: DataTypes.STRING,
-      allowNull: true, 
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,
@@ -129,6 +134,15 @@ WorkOrder.belongsTo(SalesOrder, {
   foreignKey: "sales_order_id",
   as: "salesOrder",
 });
+
+WorkOrder.belongsTo(SkuVersion, {
+  foreignKey: "sku_version",
+  as: "skuVersion",
+});
+SkuVersion.hasMany(WorkOrder, {
+  foreignKey: "sku_version",
+  as: "workOrders",
+});       
 
 Company.hasMany(WorkOrder, { foreignKey: "company_id" });
 WorkOrder.belongsTo(Company, { foreignKey: "company_id" });
