@@ -63,6 +63,13 @@ const Sku = sequelize.define(
     board_size_cm2: { type: DataTypes.STRING, allowNull: true },
     deckle_size: { type: DataTypes.FLOAT, allowNull: true },
     minimum_order_level: { type: DataTypes.INTEGER, allowNull: true },
+
+    estimate_composite_item: { type: DataTypes.STRING, allowNull: true },
+    description: { type: DataTypes.STRING, allowNull: true },
+    default_sku_details: { type: DataTypes.STRING, allowNull: true },
+    tags: { type: DataTypes.JSON, allowNull: true },
+
+    
     sku_type: { type: DataTypes.STRING, allowNull: true },
     sku_values: {
       type: Sequelize.JSON,

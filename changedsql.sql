@@ -41,7 +41,11 @@ CREATE TABLE machine_process_fields (
   updated_by INT UNSIGNED NOT NULL
 );
 
-
+ALTER TABLE sku
+ADD COLUMN estimate_composite_item VARCHAR(255),
+ADD COLUMN description VARCHAR(255),
+ADD COLUMN default_sku_details VARCHAR(255),
+ADD COLUMN tags VARCHAR(255);
 
 -- add above to db
 

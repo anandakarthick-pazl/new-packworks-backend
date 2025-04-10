@@ -152,6 +152,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
         Board: "board",
         "Die Cut box": "dieCutBox",
         Composite: "composite",
+        "Custom Item": "customItem",
       };
 
       // Use the mapped key or fallback to a camelCased version of the sku_type
@@ -232,6 +233,10 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "composite_type",
       "part_count",
       "part_value",
+      "estimate_composite_item",
+      "description",
+      "default_sku_details",
+      "tags",
       // "status",
     ];
 
@@ -514,6 +519,18 @@ v1Router.get(
         { header: "Width (cm)", key: "width", width: 12 },
         { header: "Height (cm)", key: "height", width: 12 },
         { header: "Unit", key: "unit", width: 10 },
+        {
+          estimate_composite_item: "estimate_composite_item",
+          key: "estimate_composite_item",
+          width: 20,
+        },
+        { header: "description", key: "description", width: 20 },
+        {
+          header: "default_sku_details",
+          key: "default_sku_details",
+          width: 20,
+        },
+        { header: "tags", key: "tags", width: 20 },
         { header: "Joints", key: "joints", width: 10 },
         { header: "UPS", key: "ups", width: 10 },
         { header: "select_dies", key: "select_dies", width: 10 },
@@ -596,6 +613,10 @@ v1Router.get(
           width: sku.width,
           height: sku.height,
           unit: sku.unit,
+          estimate_composite_item: sku.estimate_composite_item,
+          description: sku.description,
+          default_sku_details: sku.default_sku_details,
+          tags: sku.tags,
           joints: sku.joints,
           ups: sku.ups,
           select_dies: sku.select_dies,
