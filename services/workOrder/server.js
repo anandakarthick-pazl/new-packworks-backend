@@ -46,6 +46,109 @@ const WORK_ORDER_QUEUES = {
 };
 
 // POST create new work order
+/**
+ * @swagger
+ * /work-order:
+ *   post:
+ *     summary: Create a new work order
+ *     description: Creates a new work order record. Sends a message to RabbitMQ and clears related caches.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - created_by
+ *               - updated_by
+ *             properties:
+ *               company_id:
+ *                 type: integer
+ *               client_id:
+ *                 type: integer
+ *               sales_order_id:
+ *                 type: integer
+ *                 nullable: true
+ *               manufacture:
+ *                 type: string
+ *                 enum: [inhouse, outsource]
+ *               sku_name:
+ *                 type: string
+ *                 nullable: true
+ *               sku_version:
+ *                 type: string
+ *                 nullable: true
+ *               qty:
+ *                 type: number
+ *                 nullable: true
+ *               edd:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *               acceptable_excess_units:
+ *                 type: number
+ *                 nullable: true
+ *               planned_start_date:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *               planned_end_date:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *               outsource_name:
+ *                 type: string
+ *                 nullable: true
+ *               status:
+ *                 type: string
+ *                 default: active
+ *               created_by:
+ *                 type: integer
+ *               updated_by:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Work Order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Work Order created successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/WorkOrder'
+ *       400:
+ *         description: Invalid input data or missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid input data
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   const workDetails = req.body;
 
@@ -114,6 +217,90 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 });
 
 // GET all work orders with pagination and filtering
+/**
+ * @swagger
+ * /work-order:
+ *   get:
+ *     summary: Get list of work orders
+ *     description: Retrieves a paginated list of work orders with optional filters like SKU name, manufacture type, client, sales order, and status. Cached for 5 minutes.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of items per page
+ *       - in: query
+ *         name: sku_name
+ *         schema:
+ *           type: string
+ *         description: Filter by SKU name (partial match)
+ *       - in: query
+ *         name: manufacture
+ *         schema:
+ *           type: string
+ *           enum: [inhouse, outsource]
+ *         description: Filter by manufacture type
+ *       - in: query
+ *         name: client_id
+ *         schema:
+ *           type: integer
+ *         description: Filter by client ID
+ *       - in: query
+ *         name: sales_order_id
+ *         schema:
+ *           type: integer
+ *         description: Filter by associated sales order ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive, all]
+ *           default: active
+ *         description: Filter by status
+ *     responses:
+ *       200:
+ *         description: List of work orders
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/WorkOrder'
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.get("/work-order", authenticateJWT,companyScope, async (req, res) => {
   try {
     const {
@@ -183,6 +370,52 @@ v1Router.get("/work-order", authenticateJWT,companyScope, async (req, res) => {
 });
 
 // GET single work order by ID
+/**
+ * @swagger
+ * /work-order/{id}:
+ *   get:
+ *     summary: Get work order by ID
+ *     description: Retrieves detailed information of a single work order by its ID. Response is cached.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Work order ID
+ *     responses:
+ *       200:
+ *         description: Work order details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/WorkOrder'
+ *       404:
+ *         description: Work order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
@@ -217,6 +450,113 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing work order
+/**
+ * @swagger
+ * /work-order/{id}:
+ *   put:
+ *     summary: Update a work order
+ *     description: Updates an existing work order by its ID. Clears relevant caches and sends update event to RabbitMQ.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the work order to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - updated_by
+ *             properties:
+ *               company_id:
+ *                 type: integer
+ *               client_id:
+ *                 type: integer
+ *               sales_order_id:
+ *                 type: integer
+ *                 nullable: true
+ *               manufacture:
+ *                 type: string
+ *                 enum: [inhouse, outsource]
+ *               sku_name:
+ *                 type: string
+ *               sku_version:
+ *                 type: string
+ *               qty:
+ *                 type: number
+ *               edd:
+ *                 type: string
+ *                 format: date
+ *               description:
+ *                 type: string
+ *               acceptable_excess_units:
+ *                 type: number
+ *               planned_start_date:
+ *                 type: string
+ *                 format: date
+ *               planned_end_date:
+ *                 type: string
+ *                 format: date
+ *               outsource_name:
+ *                 type: string
+ *                 nullable: true
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *               updated_by:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Work order updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Work Order updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/WorkOrder'
+ *       400:
+ *         description: Missing required fields or invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Work order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const workDetails = req.body;
@@ -304,6 +644,78 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // DELETE work order (soft delete)
+/**
+ * @swagger
+ * /work-order/{id}:
+ *   delete:
+ *     summary: Soft delete a work order
+ *     description: Marks the work order as inactive instead of permanently deleting it. Clears related caches and publishes event to RabbitMQ.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the work order to delete
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - updated_by
+ *             properties:
+ *               updated_by:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Work Order successfully marked as inactive
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Work Order successfully marked as inactive
+ *                 data:
+ *                   $ref: '#/components/schemas/WorkOrder'
+ *       400:
+ *         description: Missing required fields or invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Work order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { updated_by } = req.body;
@@ -362,6 +774,61 @@ v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // GET work orders by sales order ID
+/**
+ * @swagger
+ * /sales-order/{salesOrderId}/work-orders:
+ *   get:
+ *     summary: Get work orders by Sales Order ID
+ *     description: Retrieve all work orders associated with a given sales order. Supports filtering by status.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: salesOrderId
+ *         required: true
+ *         description: ID of the sales order
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         description: Filter by work order status (e.g., active, inactive, or all)
+ *         schema:
+ *           type: string
+ *           default: active
+ *     responses:
+ *       200:
+ *         description: List of work orders for the sales order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/WorkOrder'
+ *       404:
+ *         description: Sales order not found or no work orders associated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.get(
   "/sales-order/:sales-orderId/work-orders",
   authenticateJWT,
@@ -408,6 +875,79 @@ v1Router.get(
 );
 
 // Bulk update work orders status
+/**
+ * @swagger
+ * /work-order/bulk-update:
+ *   patch:
+ *     summary: Bulk update work order statuses
+ *     description: Updates the status (and optionally reason) of multiple work orders at once.
+ *     tags:
+ *       - Work Orders
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - ids
+ *               - status
+ *               - updated_by
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: List of Work Order IDs to update
+ *               status:
+ *                 type: string
+ *                 description: New status to apply
+ *               status_reason:
+ *                 type: string
+ *                 description: Optional reason for status update
+ *               updated_by:
+ *                 type: integer
+ *                 description: User ID performing the update
+ *     responses:
+ *       200:
+ *         description: Work orders updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 updatedIds:
+ *                   type: array
+ *                   items:
+ *                     type: integer
+ *                 updatedCount:
+ *                   type: integer
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.patch("/work-order/bulk-update", authenticateJWT, async (req, res) => {
   const { ids, status, status_reason, updated_by } = req.body;
 

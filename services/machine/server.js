@@ -38,6 +38,102 @@ const clearMachineCache = async () => {
   }
 };
 
+/**
+ * @swagger
+ * /machines:
+ *   post:
+ *     summary: Create a new machine with processes and process values
+ *     description: Creates a new machine and its associated process names and values.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - company_id
+ *               - machine_name
+ *               - created_by
+ *               - updated_by
+ *             properties:
+ *               company_id:
+ *                 type: integer
+ *                 description: ID of the company the machine belongs to
+ *               machine_name:
+ *                 type: string
+ *                 description: Name of the machine
+ *               description:
+ *                 type: string
+ *                 description: Description of the machine
+ *               created_by:
+ *                 type: integer
+ *                 description: ID of the user creating the machine
+ *               updated_by:
+ *                 type: integer
+ *                 description: ID of the user updating the machine
+ *               process_name:
+ *                 type: array
+ *                 description: List of processes and their values
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     process_name:
+ *                       type: string
+ *                       description: Name of the process
+ *                     status:
+ *                       type: string
+ *                       description: Status of the process
+ *                     created_by:
+ *                       type: integer
+ *                     updated_by:
+ *                       type: integer
+ *                     process_values:
+ *                       type: object
+ *                       additionalProperties: true
+ *     responses:
+ *       201:
+ *         description: Machine created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Server error while creating the machine
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+
 v1Router.post("/machines", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction(); // Start transaction
 
@@ -182,6 +278,89 @@ v1Router.post("/machines", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+/**
+ * @swagger
+ * /machines/{id}:
+ *   put:
+ *     summary: Update machine and its processes
+ *     description: Updates a machine record and associated process names and values.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the machine to update
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               machine_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               company_id:
+ *                 type: integer
+ *               updated_by:
+ *                 type: integer
+ *               processes:
+ *                 type: array
+ *                 description: List of processes to be updated or added
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     process_name:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     process_values:
+ *                       type: object
+ *                       additionalProperties: true
+ *     responses:
+ *       200:
+ *         description: Machine updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       404:
+ *         description: Machine or company not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Server error while updating machine
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
 
 v1Router.put("/machines/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -358,6 +537,82 @@ v1Router.put("/machines/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get All Machines (GET)
+/**
+ * @swagger
+ * /machines:
+ *   get:
+ *     summary: Get a list of machines
+ *     description: Retrieves a paginated list of machines with optional filters like search, company_id, and status.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *       - name: search
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Search term to match against machine name, type, manufacturer, serial number, or model number
+ *       - name: company_id
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Filter by company ID
+ *       - name: status
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by machine status
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved machines
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Machine'
+ *                 totalPages:
+ *                   type: integer
+ *                 currentPage:
+ *                   type: integer
+ *                 totalRecords:
+ *                   type: integer
+ *       500:
+ *         description: Server error while fetching machines
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.get("/machines", authenticateJWT, async (req, res) => {
   try {
     let { page = 1, limit = 10, search, company_id, status } = req.query;
@@ -437,6 +692,101 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get a Single Machine by ID with Processes and Values (GET)
+/**
+ * @swagger
+ * /machines/{id}:
+ *   get:
+ *     summary: Get machine details by ID
+ *     description: Retrieves a single machine's details, including related company, processes, process values, and creator/updater info.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the machine to retrieve
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved machine details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     machine_name:
+ *                       type: string
+ *                     machine_type:
+ *                       type: string
+ *                     manufacturer:
+ *                       type: string
+ *                     serial_number:
+ *                       type: string
+ *                     model_number:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     created_by:
+ *                       type: integer
+ *                     updated_by:
+ *                       type: integer
+ *                     processes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           process_name:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                           created_by:
+ *                             type: integer
+ *                           updated_by:
+ *                             type: integer
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                           process_values:
+ *                             type: object
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Server error while fetching machine
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.get("/machines/:id", authenticateJWT, async (req, res) => {
   try {
     const machineId = req.params.id;
@@ -528,6 +878,61 @@ v1Router.get("/machines/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Delete a Machine with all its Processes and Values (DELETE)
+/**
+ * @swagger
+ * /machines/{id}:
+ *   delete:
+ *     summary: Delete a machine and its associated processes
+ *     description: Deletes a machine by ID. Associated process names and values are also deleted via cascade (foreign key constraint).
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the machine to delete
+ *     responses:
+ *       200:
+ *         description: Machine deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: Machine and all associated processes deleted successfully
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: Machine not found
+ *       500:
+ *         description: Server error while deleting machine
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.delete("/machines/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -564,6 +969,83 @@ v1Router.delete("/machines/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get Machines by Company ID (GET)
+/**
+ * @swagger
+ * /companies/{companyId}/machines:
+ *   get:
+ *     summary: Get machines for a specific company
+ *     description: Retrieve a paginated list of machines that belong to a given company. Supports optional filtering by status.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: companyId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the company
+ *       - name: page
+ *         in: query
+ *         schema:
+ *           type: integer
+ *         description: Page number for pagination (default is 1)
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *         description: Number of items per page (default is 10)
+ *       - name: status
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Filter machines by status (e.g., "active", "inactive")
+ *     responses:
+ *       200:
+ *         description: List of machines for the company
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Machine'
+ *                 totalPages:
+ *                   type: integer
+ *                 currentPage:
+ *                   type: integer
+ *                 totalRecords:
+ *                   type: integer
+ *       404:
+ *         description: Company not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: Company not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.get(
   "/companies/:companyId/machines",
   authenticateJWT,
@@ -628,6 +1110,101 @@ v1Router.get(
 );
 
 // 🔹 Update Machine Status (PATCH)
+/**
+ * @swagger
+ * /machines/{id}/status:
+ *   patch:
+ *     summary: Update machine status
+ *     description: Update the status (`active` or `inactive`) of a specific machine.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the machine to update
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *               - updated_by
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *                 description: New status for the machine
+ *               updated_by:
+ *                 type: integer
+ *                 description: ID of the user who updated the status
+ *     responses:
+ *       200:
+ *         description: Machine status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Machine status updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                       enum: [active, inactive]
+ *       400:
+ *         description: Invalid request (missing fields or bad status)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Machine not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.patch("/machines/:id/status", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -686,6 +1263,88 @@ v1Router.patch("/machines/:id/status", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get Machine Process Names and Values (GET)
+/**
+ * @swagger
+ * /machines/{id}/processes:
+ *   get:
+ *     summary: Get machine processes and values
+ *     description: Retrieve all process names and their latest values for a specific machine.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Machine ID
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of processes and their values for the machine
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 machine_id:
+ *                   type: integer
+ *                 machine_name:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       process_name:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       created_by:
+ *                         type: integer
+ *                       updated_by:
+ *                         type: integer
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       process_values:
+ *                         type: object
+ *                         description: Latest process value
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Machine not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.get("/machines/:id/processes", authenticateJWT, async (req, res) => {
   try {
     const machineId = req.params.id;
@@ -763,6 +1422,125 @@ v1Router.get("/machines/:id/processes", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Add or Update Machine Process (POST)
+/**
+ * @swagger
+ * /machines/{id}/processes:
+ *   post:
+ *     summary: Add or update a machine process and its values
+ *     description: Create a new process for a specific machine or update an existing one. Optionally include process values.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the machine
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - process_name
+ *               - status
+ *               - updated_by
+ *             properties:
+ *               process_name:
+ *                 type: string
+ *                 example: "Temperature Control"
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *                 example: "active"
+ *               created_by:
+ *                 type: integer
+ *                 example: 1
+ *               updated_by:
+ *                 type: integer
+ *                 example: 1
+ *               process_values:
+ *                 type: object
+ *                 additionalProperties: true
+ *                 example:
+ *                   temperature: 70
+ *                   unit: "Celsius"
+ *     responses:
+ *       200:
+ *         description: Machine process added/updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Machine process added/updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 5
+ *                     process_name:
+ *                       type: string
+ *                       example: "Temperature Control"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     created_by:
+ *                       type: integer
+ *                       example: 1
+ *                     updated_by:
+ *                       type: integer
+ *                       example: 1
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     process_values:
+ *                       type: object
+ *                       example:
+ *                         temperature: 70
+ *                         unit: "Celsius"
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Machine not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unexpected error occurred
+ */
+
 v1Router.post("/machines/:id/processes", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -904,6 +1682,116 @@ v1Router.post("/machines/:id/processes", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Delete a Machine Process (DELETE)
+/**
+ * @swagger
+ * /machines/{id}/processes:
+ *   post:
+ *     summary: Add or update machine process and values
+ *     description: Create a new process for a machine or update an existing one, including optional process values.
+ *     tags:
+ *       - Machines
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Machine ID
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - process_name
+ *               - status
+ *               - updated_by
+ *             properties:
+ *               process_name:
+ *                 type: string
+ *                 example: Temperature Control
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *               created_by:
+ *                 type: integer
+ *                 example: 1
+ *               updated_by:
+ *                 type: integer
+ *                 example: 1
+ *               process_values:
+ *                 type: object
+ *                 description: Key-value pairs of process values
+ *                 example:
+ *                   temperature: 70
+ *                   unit: "Celsius"
+ *     responses:
+ *       200:
+ *         description: Process created or updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Machine process added/updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     process_name:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     created_by:
+ *                       type: integer
+ *                     updated_by:
+ *                       type: integer
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     process_values:
+ *                       type: object
+ *                       example:
+ *                         temperature: 70
+ *                         unit: "Celsius"
+ *       404:
+ *         description: Machine not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Machine not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
 v1Router.delete(
   "/machines/:machineId/processes/:processId",
   authenticateJWT,
