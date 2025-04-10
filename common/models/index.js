@@ -22,6 +22,8 @@ import Flute from "../models/flute.model.js";
 import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
 import SalesSkuDetails from "./salesOrder/salesSku.model.js";
+import Taxes from "./taxes.model.js";
+import Die from "./die.model.js";
 
 import Taxes from "../models/taxes.model.js";
 const db = {
@@ -49,7 +51,8 @@ const db = {
   ModuleSettings,
   Flute,
   Module,
-  Taxes
+  Taxes,
+  Die
 };
 
 export default db;

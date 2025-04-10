@@ -17,6 +17,66 @@ const v1Router = Router();
 
 
 // Get taxes
+/**
+ * @swagger
+ * /taxes:
+ *   get:
+ *     summary: Get a list of active taxes
+ *     tags:
+ *       - Taxes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search keyword to filter taxes by name
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *     responses:
+ *       200:
+ *         description: Taxes fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Taxes Fetched Successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Tax'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: internal server error
+ */
+    
 v1Router.get('/',authenticateJWT, async (req,res)=>{
     try{
         const { search="" , page = 1, limit = 10 }=req.query;
@@ -55,6 +115,62 @@ v1Router.get('/',authenticateJWT, async (req,res)=>{
 
 
 //Create Taxes
+/**
+ * @swagger
+ * /taxes/create:
+ *   post:
+ *     summary: Create a new tax
+ *     tags:
+ *       - Taxes
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tax_name
+ *               - rate_percent
+ *             properties:
+ *               tax_name:
+ *                 type: string
+ *                 example: GST
+ *               rate_percent:
+ *                 type: number
+ *                 example: 18
+ *     responses:
+ *       201:
+ *         description: Tax created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 Success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Taxes Created Successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Tax'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 v1Router.post("/create",authenticateJWT,async(req,res)=>{
     const transaction = await sequelize.transaction();
     try{
@@ -82,6 +198,56 @@ v1Router.post("/create",authenticateJWT,async(req,res)=>{
 });
 
 //edit
+/**
+ * @swagger
+ * /taxes/edit/{tax_id}:
+ *   get:
+ *     summary: Get tax details by ID
+ *     tags:
+ *       - Taxes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tax_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the tax to retrieve
+ *     responses:
+ *       200:
+ *         description: Tax data fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: taxes data fetched successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Tax'
+ *       404:
+ *         description: Tax not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Taxes not found
+ *                 data:
+ *                   type: string
+ *                   example: null
+ */
+
 v1Router.get("/edit/:tax_id",authenticateJWT,async(req,res)=>{
 
     const { tax_id }= req.params;
@@ -104,6 +270,79 @@ v1Router.get("/edit/:tax_id",authenticateJWT,async(req,res)=>{
 
 
 //update
+/**
+ * @swagger
+ * /taxes/update/{tax_id}:
+ *   put:
+ *     summary: Update tax details by ID
+ *     tags:
+ *       - Taxes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tax_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the tax to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tax_name:
+ *                 type: string
+ *               rate_percent:
+ *                 type: number
+ *             example:
+ *               tax_name: GST
+ *               rate_percent: 18
+ *     responses:
+ *       200:
+ *         description: Tax updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Taxes updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Tax'
+ *       400:
+ *         description: Invalid tax ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: invalid tax id
+ *       404:
+ *         description: Tax not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Taxes Not Found
+ *       500:
+ *         description: Internal server error
+ */
+
 v1Router.put("/update/:tax_id",authenticateJWT,async(req,res)=>{
     const transaction = await sequelize.transaction();
     try{
@@ -144,6 +383,58 @@ v1Router.put("/update/:tax_id",authenticateJWT,async(req,res)=>{
 
 
 //delete
+/**
+ * @swagger
+ * /taxes/delete/{id}:
+ *   delete:
+ *     summary: Soft delete a tax record by ID
+ *     tags:
+ *       - Taxes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Tax ID to be deleted
+ *     responses:
+ *       200:
+ *         description: Taxes deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Taxes deleted successfully
+ *                 data:
+ *                   type: array
+ *                   example: []
+ *       400:
+ *         description: Invalid tax ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid tax
+ *       404:
+ *         description: Tax not found
+ *       500:
+ *         description: Internal server error
+ */
+
 v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
     try {
       const taxId = parseInt(req.params.id);
