@@ -92,7 +92,7 @@ MachineProcessName.hasMany(MachineProcessField, {
 
 User.hasMany(MachineProcessField, { foreignKey: "created_by" });
 User.hasMany(MachineProcessField, { foreignKey: "updated_by" });
-MachineProcessField.belongsTo(User, { foreignKey: "created_by" });
-MachineProcessField.belongsTo(User, { foreignKey: "updated_by" });
+MachineProcessField.belongsTo(User, { foreignKey: "created_by" , as: "creator" });
+MachineProcessField.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
 export default MachineProcessField;
