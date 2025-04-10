@@ -25,7 +25,6 @@ import SalesSkuDetails from "./salesOrder/salesSku.model.js";
 import Taxes from "./taxes.model.js";
 import Die from "./die.model.js";
 
-import Taxes from "../models/taxes.model.js";
 const db = {
   sequelize,
   User,
