@@ -87,9 +87,10 @@ MachineProcessValue.belongsTo(ProcessName, {
   foreignKey: "process_name_id",
 });
 
-User.hasMany(MachineProcessValue, { foreignKey: "created_by" });
-User.hasMany(MachineProcessValue, { foreignKey: "updated_by" });
-MachineProcessValue.belongsTo(User, { foreignKey: "created_by" });
-MachineProcessValue.belongsTo(User, { foreignKey: "updated_by" });
+// In MachineProcessValue.js model file
+User.hasMany(MachineProcessValue, { foreignKey: "created_by", as: "created_by_user" });
+User.hasMany(MachineProcessValue, { foreignKey: "updated_by", as: "updated_by_user" });
+MachineProcessValue.belongsTo(User, { foreignKey: "created_by", as: "created_by_user" });
+MachineProcessValue.belongsTo(User, { foreignKey: "updated_by", as: "updated_by_user" });
 
 export default MachineProcessValue;
