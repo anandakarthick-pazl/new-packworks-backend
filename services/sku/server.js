@@ -13,6 +13,7 @@ import {
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
+import validateUniqueKey from "../../common/inputvalidation/validteUniquKey.js";
 
 dotenv.config();
 
@@ -30,7 +31,7 @@ const Client = db.Client;
 
 // 🔹 Create a SKU (POST)
 
-v1Router.post("/sku-details", authenticateJWT, async (req, res) => {
+v1Router.post("/sku-details", authenticateJWT,validateUniqueKey(Sku, ['sku_name']), async (req, res) => {
   const t = await sequelize.transaction();
   try {
     // Add created_by and updated_by from the authenticated user
