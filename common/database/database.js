@@ -2,6 +2,7 @@ import { Sequelize } from 'sequelize';
 import dotenv from "dotenv";
 dotenv.config();
 import logger from '../helper/logger.js';  
+import mysql2 from 'mysql2';
 
 console.log("🔍 DB Config:");
 console.log("  Host:", process.env.DATABASE_HOST);
@@ -13,6 +14,7 @@ const sequelize = new Sequelize(process.env.DATABASE_NAME, process.env.DATABASE_
     host: process.env.DATABASE_HOST,
     port: process.env.DATABASE_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     logging: (query) => logger.info(`SQL Query: ${query}`), // ✅ Logs all queries to file
 
 });
