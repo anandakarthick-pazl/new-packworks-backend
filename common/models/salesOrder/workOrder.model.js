@@ -98,6 +98,16 @@ const WorkOrder = sequelize.define(
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
+    priority: {
+      type: DataTypes.ENUM("High", "Medium", "Low"),
+      allowNull: false,
+      defaultValue:"low"
+    },
+    progress: {
+      type: DataTypes.ENUM("Pending","Product Planning", "Procurement Sourcing", "Production Planning", "Production", "Quality Control", "Packaging", "Shipping"),
+      allowNull: false,
+      defaultValue: "Pending",
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,

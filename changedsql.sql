@@ -1,3 +1,9 @@
+--11/04/2025
+
+ALTER TABLE work_order
+ADD COLUMN `priority` ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'Low',
+ADD COLUMN `progress` ENUM('Pending','Product Planning', 'Procurement Sourcing', 'Production Planning', 'Production', 'Quality Control', 'Packaging', 'Shipping') NOT NULL DEFAULT 'Pending';
+
 -- 09/04/2025
 DROP TABLE machine_process_name;
 DROP TABLE machine_process_values;

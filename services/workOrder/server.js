@@ -131,7 +131,6 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing work order
-
 v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const workDetails = req.body;
@@ -181,7 +180,6 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // DELETE work order (soft delete)
-
 v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { updated_by } = req.user.id;
@@ -252,6 +250,87 @@ v1Router.get(
   }
 );
 
+// PUT update work order status (priority and progress only)
+v1Router.put("/work-order/status/:workOrderId", authenticateJWT, async (req, res) => {
+  try {
+    const { workOrderId } = req.params;
+    const { priority, progress } = req.body;
+    
+    // Get user details from authentication
+    const userId = req.user.id;
+    const companyId = req.user.company_id;
+
+    // Validate input
+    if (!priority && !progress) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one field (priority or progress) is required"
+      });
+    }
+
+    // Validate priority value if provided
+    if (priority && !["High", "Medium", "Low"].includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: "Priority must be High, Medium, or Low"
+      });
+    }
+
+    // Validate progress value if provided
+    const validProgressValues = [
+      "Pending", "Product Planning", "Procurement Sourcing",
+      "Production Planning", "Production", "Quality Control",
+      "Packaging", "Shipping"
+    ];
+    
+    if (progress && !validProgressValues.includes(progress)) {
+      return res.status(400).json({
+        success: false,
+        message: `Progress must be one of: ${validProgressValues.join(", ")}`
+      });
+    }
+
+    // Find the work order
+    const workOrder = await WorkOrder.findOne({
+      where: { 
+        id: workOrderId,
+        company_id: companyId
+      }
+    });
+    
+    if (!workOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Work order not found or you don't have access to it"
+      });
+    }
+
+    // Create update object with only the provided fields
+    const updateData = {};
+    if (priority) updateData.priority = priority;
+    if (progress) updateData.progress = progress;
+    
+    // Add audit fields
+    updateData.updated_by = userId;
+    updateData.updated_at = sequelize.literal("CURRENT_TIMESTAMP");
+
+    // Update the work order with new status information
+    await workOrder.update(updateData);
+
+    return res.status(200).json({
+      success: true,
+      message: "Work order status updated successfully",
+      data: workOrder.get({ plain: true })
+    });
+  } catch (error) {
+    logger.error("Error updating work order status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+});
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
