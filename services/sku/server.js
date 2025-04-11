@@ -172,6 +172,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       ...sku.toJSON(),
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
       part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+      tags: sku.tags ? JSON.parse(sku.tags) : null,
       created_at: sku.created_at, // Include created_at timestamp
       updated_at: sku.updated_at, // Include updated_at timestamp
     }));
