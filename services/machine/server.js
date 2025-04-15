@@ -5,12 +5,9 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-
 // Import the Redis and RabbitMQ configurations
 import { authenticateJWT } from "../../common/middleware/auth.js";
-
 dotenv.config();
-
 const app = express();
 app.use(json());
 app.use(cors());
@@ -23,6 +20,534 @@ const MachineProcessValue = db.MachineProcessValue;
 const MachineProcessField = db.MachineProcessField;
 const Company = db.Company;
 const User = db.User;
+
+// Get all machines with pagination and search
+v1Router.get("/master/get", authenticateJWT, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, machine_status } = req.query;
+    const offset = (page - 1) * limit;
+    const where = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
+
+    // Apply search filter if provided
+    if (search) {
+      where[Op.or] = [
+        { machine_name: { [Op.like]: `%${search}%` } },
+        { serial_number: { [Op.like]: `%${search}%` } },
+        { model_number: { [Op.like]: `%${search}%` } },
+        { manufacturer: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    // Apply machine status filter if provided
+    if (machine_status) {
+      where.machine_status = machine_status;
+    }
+
+    // Get total count for pagination
+    const count = await Machine.count({ where });
+
+    // Fetch machines with company and user info
+    const machines = await Machine.findAll({
+      where,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["updated_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      status: "success",
+      data: machines,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    logger.error(`Error fetching machines: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to fetch machines",
+      error: error.message,
+    });
+  }
+});
+
+// Get a single machine by ID
+v1Router.get("/master/get/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const company_id = req.user.company_id;
+
+    const machine = await Machine.findOne({
+      where: {
+        id,
+        company_id,
+        status: "active",
+      },
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    if (!machine) {
+      return res.status(404).json({
+        status: "error",
+        message: "Machine not found or access denied",
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data: machine,
+    });
+  } catch (error) {
+    logger.error(`Error fetching machine: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to fetch machine",
+      error: error.message,
+    });
+  }
+});
+
+// Create a new machine
+v1Router.post("/master/create", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+
+    // Validate required fields
+    const requiredFields = [
+      "machine_name",
+      "machine_type",
+      "model_number",
+      "serial_number",
+      "manufacturer",
+      "purchase_date",
+      "installation_date",
+      "location",
+    ];
+
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    // Check for duplicate serial number
+    const existingMachine = await Machine.findOne({
+      where: {
+        serial_number: req.body.serial_number,
+        status: "active",
+      },
+    });
+
+    if (existingMachine) {
+      return res.status(409).json({
+        status: "error",
+        message: "Serial number already exists",
+      });
+    }
+
+    // Set default values for specific fields
+    const defaultValues = {
+      machine_status: "Active",
+      connectivity_status: true,
+      status: "active",
+      created_by: user_id,
+      updated_by: user_id,
+      company_id,
+    };
+
+    // Create the machine by combining req.body with default values
+    const machine = await Machine.create(
+      {
+        ...req.body,
+        ...defaultValues,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    // After successful commit, fetch the created machine details
+    const createdMachine = await Machine.findByPk(machine.id, {
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message: "Machine created successfully",
+      data: createdMachine,
+    });
+  } catch (error) {
+    // Only rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    logger.error(`Error creating machine: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to create machine",
+      error: error.message,
+    });
+  }
+});
+
+// Update a machine
+v1Router.put("/master/update/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+
+    // Find the machine and ensure it belongs to the user's company
+    const machine = await Machine.findOne({
+      where: {
+        id,
+        company_id,
+        status: "active",
+      },
+    });
+
+    if (!machine) {
+      return res.status(404).json({
+        status: "error",
+        message: "Machine not found or access denied",
+      });
+    }
+
+    const {
+      machine_name,
+      machine_type,
+      model_number,
+      serial_number,
+      manufacturer,
+      purchase_date,
+      installation_date,
+      machine_status,
+      location,
+      last_maintenance,
+      next_maintenance_due,
+      assigned_operator,
+      power_rating,
+      connectivity_status,
+      ip_address,
+      warranty_expiry,
+      remarks_notes,
+    } = req.body;
+
+    // Check for duplicate serial number if it's being changed
+    if (serial_number && serial_number !== machine.serial_number) {
+      const existingMachine = await Machine.findOne({
+        where: {
+          serial_number,
+          id: { [Op.ne]: id },
+          status: "active",
+        },
+      });
+
+      if (existingMachine) {
+        return res.status(409).json({
+          status: "error",
+          message: "Serial number already exists",
+        });
+      }
+    }
+
+    // Update the machine with only provided fields
+    const updateData = {
+      ...(machine_name && { machine_name }),
+      ...(machine_type && { machine_type }),
+      ...(model_number && { model_number }),
+      ...(serial_number && { serial_number }),
+      ...(manufacturer && { manufacturer }),
+      ...(purchase_date && { purchase_date }),
+      ...(installation_date && { installation_date }),
+      ...(machine_status && { machine_status }),
+      ...(location && { location }),
+      ...(last_maintenance && { last_maintenance }),
+      ...(next_maintenance_due && { next_maintenance_due }),
+      ...(assigned_operator !== undefined && { assigned_operator }),
+      ...(power_rating !== undefined && { power_rating }),
+      ...(connectivity_status !== undefined && { connectivity_status }),
+      ...(ip_address !== undefined && { ip_address }),
+      ...(warranty_expiry !== undefined && { warranty_expiry }),
+      ...(remarks_notes !== undefined && { remarks_notes }),
+      updated_by: user_id,
+    };
+
+    await machine.update(updateData, { transaction });
+
+    await transaction.commit();
+
+    const updatedMachine = await Machine.findByPk(id, {
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Machine updated successfully",
+      data: updatedMachine,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error(`Error updating machine: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to update machine",
+      error: error.message,
+    });
+  }
+});
+
+// Delete (soft delete) a machine
+v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+
+    // Check if the machine exists for the given company
+    const machine = await Machine.findOne({
+      where: {
+        id,
+        company_id,
+        status: "active",
+      },
+    });
+
+    if (!machine) {
+      return res.status(404).json({
+        status: "error",
+        message: "Machine not found or access denied",
+      });
+    }
+
+    // Soft delete: update status to inactive
+    await machine.update(
+      {
+        status: "inactive",
+        updated_by: user_id,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      status: "success",
+      message: "Machine deleted successfully",
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error(`Error deleting machine: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to delete machine",
+      error: error.message,
+    });
+  }
+});
+
+// Update machine status (Active, Inactive, Under Maintenance)
+v1Router.patch("/master/:id/status", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { machine_status } = req.body;
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+
+    if (
+      !machine_status ||
+      !["Active", "Inactive", "Under Maintenance"].includes(machine_status)
+    ) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Invalid machine status. Must be one of: Active, Inactive, Under Maintenance",
+      });
+    }
+
+    // Find the machine
+    const machine = await Machine.findOne({
+      where: {
+        id,
+        company_id,
+        status: "active",
+      },
+    });
+
+    if (!machine) {
+      return res.status(404).json({
+        status: "error",
+        message: "Machine not found or access denied",
+      });
+    }
+
+    // Update machine status
+    await machine.update(
+      {
+        machine_status,
+        updated_by: user_id,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      status: "success",
+      message: `Machine status updated to ${machine_status}`,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error(`Error updating machine status: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to update machine status",
+      error: error.message,
+    });
+  }
+});
+
+// Get machines by status
+v1Router.get("/machine/status/:status", authenticateJWT, async (req, res) => {
+  try {
+    const { status } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    const company_id = req.user.company_id;
+
+    if (!["Active", "Inactive", "Under Maintenance"].includes(status)) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Invalid machine status. Must be one of: Active, Inactive, Under Maintenance",
+      });
+    }
+
+    const where = {
+      company_id,
+      machine_status: status,
+      status: "active", // Only active records
+    };
+
+    // Get total count for pagination
+    const count = await Machine.count({ where });
+
+    // Fetch machines
+    const machines = await Machine.findAll({
+      where,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator",
+          foreignKey: "created_by",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater",
+          foreignKey: "updated_by",
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["updated_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      status: "success",
+      data: machines,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    logger.error(`Error fetching machines by status: ${error.message}`);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to fetch machines by status",
+      error: error.message,
+    });
+  }
+});
+
 // process crud api's
 v1Router.get("/process", authenticateJWT, async (req, res) => {
   try {
@@ -78,10 +603,6 @@ v1Router.get("/process", authenticateJWT, async (req, res) => {
 // Create a new process
 v1Router.post("/process", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
-});
-v1Router.post("/machines", authenticateJWT, async (req, res) => {
-  const t = await sequelize.transaction(); // Start transaction
-
   try {
     const { process_name, status = "active" } = req.body;
     const company_id = req.user.company_id;
@@ -282,6 +803,74 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+// Get all values for a specific process
+v1Router.get(
+  "/process/:process_id/values",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { process_id } = req.params;
+      const company_id = req.user.company_id;
+
+      // Verify the process exists and belongs to the company
+      const process = await ProcessName.findOne({
+        where: {
+          id: process_id,
+          company_id,
+          status: "active",
+        },
+      });
+
+      if (!process) {
+        return res.status(404).json({
+          status: "error",
+          message: "Process not found or access denied",
+        });
+      }
+
+      // Fetch all active values for this process
+      const processValues = await MachineProcessValue.findAll({
+        where: {
+          process_name_id: process_id,
+          company_id,
+          status: "active",
+        },
+        include: [
+          {
+            model: User,
+            as: "created_by_user",
+            foreignKey: "created_by",
+            attributes: ["id", "name"],
+          },
+          {
+            model: User,
+            as: "updated_by_user",
+            foreignKey: "updated_by",
+            attributes: ["id", "name"],
+          },
+        ],
+        order: [["updated_at", "DESC"]],
+      });
+
+      return res.status(200).json({
+        status: "success",
+        data: processValues,
+        process: {
+          id: process.id,
+          name: process.process_name,
+        },
+      });
+    } catch (error) {
+      logger.error(`Error fetching process values: ${error.message}`);
+      return res.status(500).json({
+        status: "error",
+        message: "Failed to fetch process values",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // Get all machine process fields with pagination and search
 v1Router.get("/process-fields", authenticateJWT, async (req, res) => {
   try {
@@ -760,7 +1349,6 @@ v1Router.get(
     }
   }
 );
-
 // Get all machine process values with pagination and search
 v1Router.get("/process-values", authenticateJWT, async (req, res) => {
   try {
@@ -836,7 +1424,6 @@ v1Router.get("/process-values", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // Get a specific process value by ID
 v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
   try {
@@ -899,7 +1486,6 @@ v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // Create a new process value
 v1Router.post("/process-values", authenticateJWT, async (req, res) => {
   let transaction;
@@ -1172,74 +1758,6 @@ v1Router.delete("/process-values/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-// Get all values for a specific process
-v1Router.get(
-  "/process/:process_id/values",
-  authenticateJWT,
-  async (req, res) => {
-    try {
-      const { process_id } = req.params;
-      const company_id = req.user.company_id;
-
-      // Verify the process exists and belongs to the company
-      const process = await ProcessName.findOne({
-        where: {
-          id: process_id,
-          company_id,
-          status: "active",
-        },
-      });
-
-      if (!process) {
-        return res.status(404).json({
-          status: "error",
-          message: "Process not found or access denied",
-        });
-      }
-
-      // Fetch all active values for this process
-      const processValues = await MachineProcessValue.findAll({
-        where: {
-          process_name_id: process_id,
-          company_id,
-          status: "active",
-        },
-        include: [
-          {
-            model: User,
-            as: "created_by_user",
-            foreignKey: "created_by",
-            attributes: ["id", "name"],
-          },
-          {
-            model: User,
-            as: "updated_by_user",
-            foreignKey: "updated_by",
-            attributes: ["id", "name"],
-          },
-        ],
-        order: [["updated_at", "DESC"]],
-      });
-
-      return res.status(200).json({
-        status: "success",
-        data: processValues,
-        process: {
-          id: process.id,
-          name: process.process_name,
-        },
-      });
-    } catch (error) {
-      logger.error(`Error fetching process values: ${error.message}`);
-      return res.status(500).json({
-        status: "error",
-        message: "Failed to fetch process values",
-        error: error.message,
-      });
-    }
-  }
-);
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {

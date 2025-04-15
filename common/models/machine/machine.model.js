@@ -149,10 +149,10 @@ User.hasMany(Machine, {
   foreignKey: "updated_by",
 });
 Machine.belongsTo(User, {
-  foreignKey: "created_by",
+  foreignKey: "created_by", as:"creator_machine",
 });
 Machine.belongsTo(User, {
-  foreignKey: "updated_by",
+  foreignKey: "updated_by", as:"updater_machine",
 });
 
 export default Machine;
