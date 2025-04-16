@@ -25,6 +25,13 @@ import SalesSkuDetails from "./salesOrder/salesSku.model.js";
 import Taxes from "./taxes.model.js";
 import Die from "./die.model.js";
 import MachineFlow from "./machine/machineFlow.model.js";
+import ItemMaster from "./item.model.js";
+import PurchaseOrder from "../models/po/purchase_order.model.js";
+import PurchaseOrderItem from "./po/purchase_order_item.model.js";
+import GRN from "./grn/grn.model.js";
+import GRNItem from "./grn/grn_item.model.js";
+import Inventory from "./inventory/inventory.model.js";
+import InventoryType from "./inventory/inventory_type.model.js";
 
 const db = {
   sequelize,
@@ -53,7 +60,14 @@ const db = {
   Flute,
   Module,
   Taxes,
-  Die
+  Die,
+  ItemMaster,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  GRN,
+  GRNItem,
+  Inventory,
+  InventoryType
 };
 
 export default db;
