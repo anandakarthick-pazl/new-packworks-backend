@@ -24,6 +24,7 @@ import SkuVersion from "./skuModel/skuVersion.js";
 import SalesSkuDetails from "./salesOrder/salesSku.model.js";
 import Taxes from "./taxes.model.js";
 import Die from "./die.model.js";
+import MachineFlow from "./machine/machineFlow.model.js";
 
 const db = {
   sequelize,
@@ -42,6 +43,7 @@ const db = {
   DropdownName,
   DropdownValue,
   Machine,
+  MachineFlow,
   ProcessName,
   MachineProcessValue,
   MachineProcessField,
