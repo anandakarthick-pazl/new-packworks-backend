@@ -182,12 +182,12 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
         separate: true, // Use separate query to ensure SKU details are properly fetched
       },
       {
-        model: db.User,
+        model: User,
         as: "creator_sales",
         attributes: ["id", "name", "email"],
       },
       {
-        model: db.User,
+        model: User,
         as: "updater_sales",
         attributes: ["id", "name", "email"],
       },
@@ -269,13 +269,13 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
           required: false,
         },
         {
-          model: db.User,
+          model: User,
           as: "creator_sales",
           attributes: ["id", "name", "email"],
           foreignKey: "created_by",
         },
-        {
-          model: db.User,
+        { 
+          model: User,
           as: "updater_sales",
           attributes: ["id", "name", "email"],
           foreignKey: "updated_by",
