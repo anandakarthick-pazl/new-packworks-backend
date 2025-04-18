@@ -112,7 +112,7 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   deletedAt: "deleted_at",
-  paranoid: true,
+  // paranoid: true,
   underscored: true,
 });
 

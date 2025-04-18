@@ -17,443 +17,184 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
-////////////////////////////////////////////////////// Purchase Order //////////////////////////////////////////////////////////
+//Create Po
+v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { items, ...poData } = req.body;
+    poData.created_by = req.user.id;
+    poData.updated_by = req.user.id;
+    poData.company_id = req.user.company_id;
 
-// get PurchaseOrder  //supplier_name based search
+    const newPO = await PurchaseOrder.create(poData, { transaction });
+    for (const item of items) {
+      const isValid = await ItemMaster.findOne({
+        where: { item_id: item.item_id, status: "active" },
+        transaction,
+      });
+
+      if (!isValid) throw new Error(`Item ID ${item.item_id} is invalid or inactive`);
+
+      await PurchaseOrderItem.create({
+        ...item,
+        po_id: newPO.po_id,
+        company_id: poData.company_id,
+        created_by: poData.created_by,
+        updated_by: poData.updated_by
+      }, { transaction });
+    }
+
+    await transaction.commit();
+    return res.status(200).json({
+      success: true,
+      message: "Purchase Order with items created successfully",
+      data: newPO
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    return res.status(500).json({
+      success: false,
+      message: `Creation Failed: ${error.message}`
+    });
+  }
+});
+
+//get all Po
 v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
   try {
     const { search = "", page = "1", limit = "10" } = req.query;
-    const pageNumber = Math.max(1, parseInt(page) || 1);
-    const limitNumber = Math.max(10, parseInt(limit) || 10);
+    const pageNumber = Math.max(1, parseInt(page));
+    const limitNumber = Math.max(1, parseInt(limit));
     const offset = (pageNumber - 1) * limitNumber;
-    let whereCondition = { status: "active", decision: "approve" };
-    if (search.trim() !== "") {
-      whereCondition = {
-        ...whereCondition,
-        supplier_name: { [Op.like]: `%${search}%` },
-      };
+
+    let where = { status: "active", decision: "approve" };
+    if (search.trim()) {
+      where.supplier_name = { [Op.like]: `%${search}%` };
     }
-    const purchaseOrder = await PurchaseOrder.findAll({
-      where: whereCondition,
+
+    const data = await PurchaseOrder.findAll({
+      where,
       limit: limitNumber,
       offset,
+      include: [{ model: PurchaseOrderItem }]  // Optional: include items
     });
-    const totalPurchaseOrders = await PurchaseOrder.count({ where: whereCondition }); 
+
+    const totalCount = await PurchaseOrder.count({ where });
+
     return res.status(200).json({
       success: true,
-      message: "Purchase Orders Fetched Successfully",
-      data: purchaseOrder,
-      totalCount: totalPurchaseOrders,
+      message: "Purchase orders fetched",
+      data,
+      totalCount,
     });
+
   } catch (error) {
-    console.error(error.message);
     return res.status(500).json({
       success: false,
-      message: "Purchase Orders not found",
+      message: `Fetching failed: ${error.message}`,
     });
   }
 });
 
-
-//create purchase order
-v1Router.post("/purchase-order",authenticateJWT,async(req,res)=>{
-  const transaction=await sequelize.transaction();
-  try{
-    const {...rest}=req.body;
-    rest.created_by = req.user.id;
-    rest.updated_by = req.user.id;
-    rest.company_id = req.user.company_id;
-    const createPurchaseOrder = await PurchaseOrder.create(rest,{transaction});
-    await transaction.commit();
-    return res.status(200).json({
-      success : true,
-      message : `Purchase order Created Successfully`,
-      data : createPurchaseOrder
-    });
-  }catch(error){
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success:false,
-      message:`Purchase Order Created Error : ${error.message}`
-    })
-  }
-});
-
-//edit purchase order
-v1Router.get("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
+//get one po
+v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
   try {
-    const purchaseOrderId = req.params.id;
-
-    if (!purchaseOrderId) {
-      return res.status(400).json({
-        success: false,
-        message: "Purchase Order ID is required",
-      });
-    }
-
-    const purchaseOrderData = await PurchaseOrder.findOne({
-      where: { po_id: purchaseOrderId },
+    const po = await PurchaseOrder.findOne({
+      where: { po_id: req.params.id, status: "active" },
+      include: [{ model: PurchaseOrderItem }],
     });
 
-    if (!purchaseOrderData) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase Order not found",
-      });
-    }
+    if (!po) return res.status(404).json({ success: false, message: "Not found" });
 
     return res.status(200).json({
       success: true,
-      message: "Purchase Order Details Fetched Successfully",
-      data: purchaseOrderData,
+      message: "Purchase Order fetched",
+      data: po,
     });
 
   } catch (error) {
-    console.error("Error fetching Purchase Order:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Something went wrong: ${error.message}`,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
-
-//update purchase order
-v1Router.put("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const poId = req.params.id;
-    // const poId = parseInt(req.params.id);
-
-    const { ...rest } = req.body;
-    if (!poId) {
-      return res.status(400).json({
-        success: false,
-        message: `Purchase Order ID is required`
+//update po
+v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
+    const transaction = await sequelize.transaction();
+    try {
+      const { items, ...poData } = req.body;
+      const poId = req.params.id;
+  
+      const po = await PurchaseOrder.findOne({
+        where: { po_id: poId },
+        transaction
       });
-    }
-    const purchaseOrderData = await PurchaseOrder.findOne({ where: { po_id: poId } });
-    if (!purchaseOrderData) {
-      return res.status(404).json({
-        success: false,
-        message: `Purchase Order not found`
-      });
-    }
-    rest.updated_by = req.user.id;
-    rest.updated_at = new Date();
-    rest.company_id = req.user.company_id;
-    await PurchaseOrder.update(rest, {
-      where: { po_id: poId },
-      transaction
-    });
-    const updatedData = await PurchaseOrder.findByPk(poId, { transaction });
-    await transaction.commit();
-    return res.status(200).json({
-      success: true,
-      message: `Purchase Order Updated Successfully`,
-      data: updatedData
-    });
-  } catch (error) {
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Purchase Order update error: ${error.message}`
-    });
-  }
-});
-
-
-// Delete purchase order
-v1Router.delete("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const poId = req.params.id;
-    if (!poId) {
-      return res.status(400).json({
-        success: false,
-        message: `ID is required`
-      });
-    }
-    const purchaseOrderData = await PurchaseOrder.findOne({ where: { po_id: poId } });
-    if (!purchaseOrderData) {
-      return res.status(404).json({
-        success: false,
-        message: `Purchase Order not found`
-      });
-    }
-    await PurchaseOrder.update(
-      {
-        status: "inactive",
-        decision: "disapprove",
-        updated_by: req.user.id,
-        deleted_at: new Date()
-      },
-      { where: { po_id: poId }, transaction }
-    );
-    await transaction.commit();
-    return res.status(200).json({
-      success: true,
-      message: `Purchase Order deleted (soft) successfully`,
-      data: []
-    });
-  } catch (error) {
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Purchase Order delete error: ${error.message}`
-    });
-  }
-});
-
-//////////////////////////////////////////////////////// Purchase Order Items//////////////////////////////////////////////////////
-
-// get Purchase Order Items
-v1Router.get("/purchase-order/items",authenticateJWT,async(req,res)=>{
-  try{
-    const {search="",page="1",limit="10"}=req.params;
-    const pageNumber = Math.max(1,parseInt(page)||1);
-    const limitNumber = Math.max(10,parseInt(limit)||10);
-    const offset = (pageNumber-1)*limitNumber;
-    const whereCondition = {status:"active"};
-    if(search.trim()!=""){
-      whereCondition={
-        ...whereCondition,po_item_name:{[Op.like]:`%${search}%`}
+  
+      if (!po) {
+        return res.status(404).json({
+          success: false,
+          message: "Purchase Order not found"
+        });
       }
-    }
-    const purchaseOrderItem = await PurchaseOrderItem.findAll({
-      where:whereCondition,
-      limit:limitNumber,
-      offset
-    });
-    const totalPurchaseOrderItem = await PurchaseOrderItem.count({where:whereCondition});
-    return res.status(200).json({
-      success : true,
-      message : ` purchase order items Fetching Successfully`,
-      data : purchaseOrderItem,
-      totalCount : totalPurchaseOrderItem
-    });
-  }catch(error){
-    console.error(error.message);
-    return res.status(500).json({
-      success : false,
-      message : ` purchase order items Fetching error : ${error.message}`
-    });
-  }
-});
-
-// Create po item
-v1Router.post("/purchase-order/item", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction(); 
-  try {
-    const { ...rest } = req.body;
-    rest.created_by = req.user.id;
-    rest.updated_by = req.user.id;
-    rest.company_id = req.user.company_id;
-
-
-    // Validate po_id
-    const poId = req.body.po_id;
-    const validatePo = await PurchaseOrder.findOne({
-      where: { po_id: poId, status: "active" }
-    });
-
-    if (!validatePo) {
-      return res.status(400).json({
-        success: false,
-        message: `Purchase Order is not valid or inactive.`
+  
+      // Update purchase order
+      poData.updated_by = req.user.id;
+      await po.update(poData, { transaction });
+  
+      console.log("po Id ", poId)
+      // Delete old purchase order items
+     const deletePOId= await PurchaseOrderItem.destroy({
+        where: { po_id: poId },
+        transaction
       });
-    }
-
-    // Validate item_id
-    const itemId = req.body.item_id;
-    const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
-    });
-
-    if (!validateItem) {
-      return res.status(400).json({
-        success: false,
-        message: `Item is not valid or inactive.`
-      });
-    }
-
-    const createPo = await PurchaseOrderItem.create(rest, { transaction });
-    await transaction.commit();
-    return res.status(200).json({
-      success: true,
-      message: `Purchase order item created successfully`,
-      data: createPo
-    });
-  } catch (error) {
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Purchase Order Item creation error: ${error.message}`
-    });
-  }
-});
-
-
-// edit po item
-v1Router.get("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
-  try {
-    const poItemId = req.params.id;
-    if (!poItemId) {
-      return res.status(400).json({
-        success: false,
-        message: "Purchase Order Item ID is required",
-      });
-    }
-    const poItemData = await PurchaseOrderItem.findOne({
-      where: { po_item_id: poItemId },
-    });
-    if (!poItemData) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase Order Item not found",
-      });
-    }
-    return res.status(200).json({
-      success: true,
-      message: "Purchase Order Item fetched successfully",
-      data: poItemData,
-    });
-  } catch (error) {
-    console.error("Error fetching PO item:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Error fetching Purchase Order Item: ${error.message}`,
-    });
-  }
-});
-
-// update po item 
-v1Router.put("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const poItemId = req.params.id;
-    const { ...rest } = req.body;
-
-    // Validate po_id
-    const poId = req.body.po_id;
-    const validatePo = await PurchaseOrder.findOne({
-      where: { po_id: poId, status: "active" }
-    });
-
-    if (!validatePo) {
-      return res.status(400).json({
-        success: false,
-        message: `Purchase Order is not valid or inactive.`
-      });
-    }
-
-    // Validate item_id
-    const itemId = req.body.item_id;
-    const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
-    });
-    if (!validateItem) {
-      return res.status(400).json({
-        success: false,
-        message: `Item is not valid or inactive.`
-      });
-    }
-    if (!poItemId) {
-      return res.status(400).json({
-        success: false,
-        message: "Purchase Order Item ID is required",
-      });
-    }
-    const existingData = await PurchaseOrderItem.findOne({
-      where: { po_item_id: poItemId },
-    });
-    if (!existingData) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase Order Item not found",
-      });
-    }
-    rest.updated_by = req.user.id;
-    rest.updated_at = new Date();
-    rest.company_id = req.user.company_id;
-    await PurchaseOrderItem.update(rest, {
-      where: { po_item_id: poItemId },
-      transaction,
-    });
-    const updatedpoItem = await PurchaseOrderItem.findByPk(poItemId, { transaction });
-    await transaction.commit();
-    return res.status(200).json({
-      success: true,
-      message: "Purchase Order Item updated successfully",
-      data: updatedpoItem,
-    });
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Update error:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: `Purchase Order Item update error: ${error.message}`,
-    });
-  }
-});
-
-//delete po item
-v1Router.delete("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const poItemId = req.params.id;
-    if (!poItemId) {
-      return res.status(400).json({
-        success: false,
-        message: "PO Item ID is required",
-      });
-    }
-    const poItemData = await PurchaseOrderItem.findOne({
-      where: { po_item_id: poItemId },
-    });
-    if (!poItemData) {
-      return res.status(404).json({
-        success: false,
-        message: "PO Item not found",
-      });
-    }
-    await PurchaseOrderItem.update(
-      {
-        status: "inactive",
-        updated_at: new Date(),
-        updated_by: req.user.id,
-        deleted_at: new Date(),
-      },
-      {
-        where: { po_item_id: poItemId },
-        transaction,
+      console.log(" Delete po Id ", deletePOId)
+  
+      // Recreate new purchase order items
+      for (const item of items) {
+        await PurchaseOrderItem.create({
+          ...item,
+          po_id: poId,
+          company_id: req.user.company_id,
+          created_by: req.user.id,
+          updated_by: req.user.id
+        }, { transaction });
       }
-    );
-    await transaction.commit();
+  
+      await transaction.commit();
+  
+      return res.status(200).json({
+        success: true,
+        message: "Purchase Order and Items updated successfully",
+        data: po
+      });
+  
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Update Error:", error.message);
+      return res.status(500).json({
+        success: false,
+        message: `Update failed: ${error.message}`
+      });
+    }
+  });
+  
+
+// delete po
+v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
+  try {
+    const po = await PurchaseOrder.findOne({ where: { po_id: req.params.id } });
+    if (!po) return res.status(404).json({ success: false, message: "Not found" });
+
+    await po.update({ status: "inactive", updated_by: req.user.id });
+
     return res.status(200).json({
       success: true,
-      message: "PO Item deleted successfully",
-      data: [],
+      message: "Purchase Order deleted (soft delete)",
     });
   } catch (error) {
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success: false,
-      message: `PO Item delete error: ${error.message}`,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
-
-
-
-
-
-
 
 
 //connection port
