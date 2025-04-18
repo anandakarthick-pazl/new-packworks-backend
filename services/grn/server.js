@@ -89,7 +89,7 @@ v1Router.post("/grn",authenticateJWT,async(req,res)=>{
 });
 
 // edit GRN 
-v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/grn/id/:id", authenticateJWT, async (req, res) => {
   try {
     const grnId = req.params.id;
     if (!grnId) {
@@ -122,7 +122,7 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
 });
 
 // update grn 
-v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/grn/id/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grnId = req.params.id;
@@ -176,7 +176,7 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
 });
 
 // Delete grn 
-v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/grn/id/:id", authenticateJWT, async (req, res) => {
   try {
     const grnId = req.params.id;
     if (!grnId) {
