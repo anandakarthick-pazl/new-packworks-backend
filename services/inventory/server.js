@@ -282,7 +282,7 @@ v1Router.delete("/inventory/:id", authenticateJWT, async (req, res) => {
 //////////////////////////////////////////////////////    InventoryType    /////////////////////////////////////////////////////
 
 // Get InventoryType
-v1Router.get('/inventory-type',authenticateJWT,async(req,res)=>{
+v1Router.get('/inventory/type',authenticateJWT,async(req,res)=>{
   try{
     const inventoryTypeData = await InventoryType.findAll({where:{status:"active"}});
     return res.status(200).json({
@@ -300,7 +300,7 @@ v1Router.get('/inventory-type',authenticateJWT,async(req,res)=>{
 });
 
 // Create InventoryType
-v1Router.post('/inventory-type',authenticateJWT,async(req,res)=>{
+v1Router.post('/inventory/type',authenticateJWT,async(req,res)=>{
   const transaction =await sequelize.transaction();
   try{
     const { ...rest } = req.body;
