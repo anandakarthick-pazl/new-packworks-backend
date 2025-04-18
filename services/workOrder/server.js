@@ -64,16 +64,31 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 
 v1Router.get("/work-order", authenticateJWT, async (req, res) => {
   try {
-    const { page = 1, limit = 10, manufacture, sku_name } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      manufacture, 
+      sku_name,
+      status = "active" // Default to 'active' status
+    } = req.query;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const offset = (pageNum - 1) * limitNum;
 
     // Build where clause for filtering
-    const whereClause = {};
+    const whereClause = {
+      company_id: req.user.company_id // Add company filter for security
+    };
+    
+    // Status filtering - default to active, but allow override
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+    
     if (manufacture) {
-      // Use exact match for manufacture filter
       whereClause.manufacture = manufacture;
     }
     if (sku_name) {
@@ -111,9 +126,22 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
+    const { status = "active" } = req.query; // Add status parameter
 
-    // Fetch from database
-    const workOrder = await WorkOrder.findByPk(id);
+    // Fetch from database with company_id for security
+    const whereClause = { 
+      id: id,
+      company_id: req.user.company_id
+    };
+    
+    // Add status filter unless 'all' is specified
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+    
+    const workOrder = await WorkOrder.findOne({
+      where: whereClause
+    });
 
     if (!workOrder) {
       return res.status(404).json({ message: "Work order not found" });
@@ -211,14 +239,13 @@ v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET work orders by sales order ID
 v1Router.get(
-  "/sale-order/:salesOrderId/work-orders", // Fixed route path with leading slash
+  "/sale-order/:salesOrderId/work-orders",
   authenticateJWT,
   async (req, res) => {
     try {
       const { salesOrderId } = req.params;
-      const { status = "active" } = req.query;
+      const { status = "active" } = req.query; // Default to active status
       const companyId = req.user.company_id;
 
       // Build where clause
@@ -228,7 +255,7 @@ v1Router.get(
       };
 
       // Filter by status unless "all" is specified
-      if (status && status !== "all") {
+      if (status !== "all") {
         where.status = status;
       }
 
