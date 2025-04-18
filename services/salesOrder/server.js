@@ -274,7 +274,7 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
           attributes: ["id", "name", "email"],
           foreignKey: "created_by",
         },
-        { 
+        {
           model: User,
           as: "updater_sales",
           attributes: ["id", "name", "email"],
@@ -480,7 +480,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             planned_end_date: work.planned_end_date || null,
             outsource_name:
               work.manufacture === "outsource" ? work.outsource_name : null,
-            priority: work.priority || null, 
+            priority: work.priority || null,
             progress: work.progress || null,
             updated_by: req.user.id,
             updated_at: new Date(),
@@ -643,6 +643,68 @@ v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// Add this new route to the v1Router section in your file
+
+// PATCH update sales_status only
+v1Router.patch("/sale-order/:id/status", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { sales_status } = req.body;
+
+  // Validate input
+  if (!sales_status) {
+    return res.status(400).json({
+      message: "sales_status is required",
+    });
+  }
+
+  // Check if status is valid
+  const validStatuses = ["Pending", "In-progress", "Completed", "Rejected"];
+  if (!validStatuses.includes(sales_status)) {
+    return res.status(400).json({
+      message:
+        "Invalid sales_status. Must be one of: Pending, In-progress, Completed, Rejected",
+    });
+  }
+
+  try {
+    // Find the sales order
+    const salesOrder = await SalesOrder.findByPk(id);
+
+    if (!salesOrder) {
+      return res.status(404).json({ message: "Sales order not found" });
+    }
+
+    // Verify user has access to this sales order (from the same company)
+    if (salesOrder.company_id !== req.user.company_id) {
+      return res
+        .status(403)
+        .json({ message: "Access denied to this sales order" });
+    }
+
+    // Update only the sales_status and updated_by fields
+    await salesOrder.update({
+      sales_status: sales_status,
+      updated_by: req.user.id,
+      updated_at: new Date(),
+    });
+
+    res.json({
+      message: "Sales status updated successfully",
+      data: {
+        id: salesOrder.id,
+        sales_status: sales_status,
+        updated_at: salesOrder.updated_at,
+      },
+    });
+  } catch (error) {
+    logger.error("Error updating sales status:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
