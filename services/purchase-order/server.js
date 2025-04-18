@@ -81,7 +81,7 @@ v1Router.post("/purchase-order",authenticateJWT,async(req,res)=>{
 });
 
 //edit purchase order
-v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
   try {
     const purchaseOrderId = req.params.id;
 
@@ -120,7 +120,7 @@ v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
 
 
 //update purchase order
-v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const poId = req.params.id;
@@ -166,7 +166,7 @@ v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
 
 
 // Delete purchase order
-v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/purchase-order/id/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const poId = req.params.id;
@@ -211,7 +211,7 @@ v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
 //////////////////////////////////////////////////////// Purchase Order Items//////////////////////////////////////////////////////
 
 // get Purchase Order Items
-v1Router.get("/purchase-order-items",authenticateJWT,async(req,res)=>{
+v1Router.get("/purchase-order/items",authenticateJWT,async(req,res)=>{
   try{
     const {search="",page="1",limit="10"}=req.params;
     const pageNumber = Math.max(1,parseInt(page)||1);
@@ -245,7 +245,7 @@ v1Router.get("/purchase-order-items",authenticateJWT,async(req,res)=>{
 });
 
 // Create po item
-v1Router.post("/purchase-order-item", authenticateJWT, async (req, res) => {
+v1Router.post("/purchase-order/item", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction(); 
   try {
     const { ...rest } = req.body;
@@ -299,7 +299,7 @@ v1Router.post("/purchase-order-item", authenticateJWT, async (req, res) => {
 
 
 // edit po item
-v1Router.get("/purchase-order-item/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
   try {
     const poItemId = req.params.id;
     if (!poItemId) {
@@ -332,7 +332,7 @@ v1Router.get("/purchase-order-item/:id", authenticateJWT, async (req, res) => {
 });
 
 // update po item 
-v1Router.put("/purchase-order-item/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const poItemId = req.params.id;
@@ -402,7 +402,7 @@ v1Router.put("/purchase-order-item/:id", authenticateJWT, async (req, res) => {
 });
 
 //delete po item
-v1Router.delete("/purchase-order-item/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/purchase-order/item/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const poItemId = req.params.id;

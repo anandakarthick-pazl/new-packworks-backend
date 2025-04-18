@@ -89,7 +89,7 @@ v1Router.post("/grn",authenticateJWT,async(req,res)=>{
 });
 
 // edit GRN 
-v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/grn/id/:id", authenticateJWT, async (req, res) => {
   try {
     const grnId = req.params.id;
     if (!grnId) {
@@ -122,7 +122,7 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
 });
 
 // update grn 
-v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/grn/id/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grnId = req.params.id;
@@ -176,7 +176,7 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
 });
 
 // Delete grn 
-v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/grn/id/:id", authenticateJWT, async (req, res) => {
   try {
     const grnId = req.params.id;
     if (!grnId) {
@@ -219,7 +219,7 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
 /////////////////////////////////////////////////////   grn_items     ///////////////////////////////////////////////////////////
 
 // get grn_items 
-v1Router.get("/grn-items", authenticateJWT, async (req, res) => {
+v1Router.get("/grn/items", authenticateJWT, async (req, res) => {
   try {
     const { search = "", page = "1", limit = "10" } = req.query;
     const pageNumber = Math.max(1, parseInt(page) || 1);
@@ -254,7 +254,7 @@ v1Router.get("/grn-items", authenticateJWT, async (req, res) => {
 
 
 //create grn_items
-v1Router.post("/grn-items", authenticateJWT, async (req, res) => {
+v1Router.post("/grn/items", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { ...rest } = req.body;
@@ -309,7 +309,7 @@ v1Router.post("/grn-items", authenticateJWT, async (req, res) => {
 });
 
 // edit grn 
-v1Router.get("/grn-item/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/grn/item/:id", authenticateJWT, async (req, res) => {
   try {
     const grnItemId = parseInt(req.params.id);
     if (isNaN(grnItemId)) {
@@ -342,7 +342,7 @@ v1Router.get("/grn-item/:id", authenticateJWT, async (req, res) => {
 });
 
 // update grn 
-v1Router.put("/grn-item/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/grn/item/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grnItemId = parseInt(req.params.id);
@@ -413,7 +413,7 @@ v1Router.put("/grn-item/:id", authenticateJWT, async (req, res) => {
 });
 
 //delete grn item
-v1Router.delete("/grn-item/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/grn/item/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grnItemId = req.params.id;

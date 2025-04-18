@@ -162,28 +162,28 @@ module.exports = {
     },
     {
       name: "item",
-      script: "./services/taxes/server.js",
+      script: "./services/item/server.js",
       env: {
         PORT: 3022,
       },
     },
     {
       name: "purchase",
-      script: "./services/taxes/server.js",
+      script: "./services/purchase-order/server.js",
       env: {
         PORT: 3023,
       },
     },
     {
       name: "grn",
-      script: "./services/taxes/server.js",
+      script: "./services/grn/server.js",
       env: {
         PORT: 3024,
       },
     },
     {
       name: "inventory",
-      script: "./services/taxes/server.js",
+      script: "./services/inventory/server.js",
       env: {
         PORT: 3025,
       },
