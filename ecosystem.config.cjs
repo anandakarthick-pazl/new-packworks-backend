@@ -183,7 +183,7 @@ module.exports = {
     },
     {
       name: "inventory",
-      script: "./services/invrntory/server.js",
+      script: "./services/inventory/server.js",
       env: {
         PORT: 3025,
       },
