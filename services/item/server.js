@@ -76,7 +76,7 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
 
 
 //edit-item
-v1Router.get("/item/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
   try {
     const item_id = req.params.id;
     const itemData = await ItemMaster.findOne({ where: { item_id: item_id } });
@@ -95,7 +95,7 @@ v1Router.get("/item/:id", authenticateJWT, async (req, res) => {
 });
 
 // update items 
-v1Router.put("/item/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
   console.log(req.body);
   const transaction = await sequelize.transaction();
   try {
@@ -139,7 +139,7 @@ v1Router.put("/item/:id", authenticateJWT, async (req, res) => {
 });
 
 
-v1Router.delete("/item/delete/:id",authenticateJWT,async(req,res)=>{
+v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
   try{
     const itemId=req.params.id;
     if(!itemId){
