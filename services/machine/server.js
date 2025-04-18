@@ -30,42 +30,47 @@ v1Router.post("/assign", authenticateJWT, async (req, res) => {
     const { assignments } = req.body;
 
     // Validate request body
-    if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+    if (
+      !assignments ||
+      !Array.isArray(assignments) ||
+      assignments.length === 0
+    ) {
       return res.status(400).json({
         status: "error",
-        message: "Please provide an array of machine and process assignments"
+        message: "Please provide an array of machine and process assignments",
       });
     }
 
     // Validate each assignment has required fields
     const missingFields = assignments.filter(
-      item => !item.machine_id || !item.process_id
+      (item) => !item.machine_id || !item.process_id
     );
 
     if (missingFields.length > 0) {
       return res.status(400).json({
         status: "error",
-        message: "Each assignment must have machine_id and process_id"
+        message: "Each assignment must have machine_id and process_id",
       });
     }
 
     // Collect all machine and process IDs for validation
-    const machineIds = [...new Set(assignments.map(item => item.machine_id))];
-    const processIds = [...new Set(assignments.map(item => item.process_id))];
+    const machineIds = [...new Set(assignments.map((item) => item.machine_id))];
+    const processIds = [...new Set(assignments.map((item) => item.process_id))];
 
     // Validate all machines exist and belong to the company
     const machines = await Machine.findAll({
       where: {
         id: machineIds,
         company_id,
-        status: "active"
-      }
+        status: "active",
+      },
     });
 
     if (machines.length !== machineIds.length) {
       return res.status(404).json({
         status: "error",
-        message: "One or more machines not found or do not belong to your company"
+        message:
+          "One or more machines not found or do not belong to your company",
       });
     }
 
@@ -74,41 +79,46 @@ v1Router.post("/assign", authenticateJWT, async (req, res) => {
       where: {
         id: processIds,
         company_id,
-        status: "active"
-      }
+        status: "active",
+      },
     });
 
     if (processes.length !== processIds.length) {
       return res.status(404).json({
         status: "error",
-        message: "One or more processes not found or do not belong to your company"
+        message:
+          "One or more processes not found or do not belong to your company",
       });
     }
 
     // Create a map for easy lookup
-    const machineMap = new Map(machines.map(machine => [machine.id, machine]));
-    const processMap = new Map(processes.map(process => [process.id, process]));
+    const machineMap = new Map(
+      machines.map((machine) => [machine.id, machine])
+    );
+    const processMap = new Map(
+      processes.map((process) => [process.id, process])
+    );
 
     // Check for existing assignments to avoid duplicates
     const existingAssignments = await MachineFlow.findAll({
       where: {
         company_id,
         status: "active",
-        [Op.or]: assignments.map(item => ({
+        [Op.or]: assignments.map((item) => ({
           machine_id: item.machine_id,
-          process_id: item.process_id
-        }))
-      }
+          process_id: item.process_id,
+        })),
+      },
     });
 
     // Filter out any existing assignments
     const existingMap = new Map();
-    existingAssignments.forEach(assignment => {
+    existingAssignments.forEach((assignment) => {
       const key = `${assignment.machine_id}-${assignment.process_id}`;
       existingMap.set(key, true);
     });
 
-    const newAssignments = assignments.filter(item => {
+    const newAssignments = assignments.filter((item) => {
       const key = `${item.machine_id}-${item.process_id}`;
       return !existingMap.has(key);
     });
@@ -116,15 +126,15 @@ v1Router.post("/assign", authenticateJWT, async (req, res) => {
     if (newAssignments.length === 0) {
       return res.status(409).json({
         status: "error",
-        message: "All requested assignments already exist"
+        message: "All requested assignments already exist",
       });
     }
 
     // Create new machine flow assignments
-    const machineFlowData = newAssignments.map(item => {
+    const machineFlowData = newAssignments.map((item) => {
       const machine = machineMap.get(item.machine_id);
       const process = processMap.get(item.process_id);
-      
+
       return {
         company_id,
         machine_id: item.machine_id,
@@ -133,53 +143,57 @@ v1Router.post("/assign", authenticateJWT, async (req, res) => {
         process_name: process.process_name,
         status: "active",
         created_by: user_id,
-        updated_by: user_id
+        updated_by: user_id,
       };
     });
 
-    const createdAssignments = await MachineFlow.bulkCreate(machineFlowData, { transaction });
+    const createdAssignments = await MachineFlow.bulkCreate(machineFlowData, {
+      transaction,
+    });
 
     await transaction.commit();
 
     // Fetch complete data with associations
     const completeAssignments = await MachineFlow.findAll({
       where: {
-        id: createdAssignments.map(item => item.id)
+        id: createdAssignments.map((item) => item.id),
       },
       include: [
-        { model: Company, attributes: ['id', 'company_name'] },
-        { model: Machine, attributes: ['id', 'machine_name', 'machine_type'] },
-        { model: ProcessName, attributes: ['id', 'process_name'] },
-        { 
-          model: User, 
-          as: 'creator_machine_flow', 
-          attributes: ['id', 'name'] 
+        { model: Company, attributes: ["id", "company_name"] },
+        { model: Machine, attributes: ["id", "machine_name", "machine_type"] },
+        { model: ProcessName, attributes: ["id", "process_name"] },
+        {
+          model: User,
+          as: "creator_machine_flow",
+          attributes: ["id", "name"],
         },
-        { 
-          model: User, 
-          as: 'updater_machine_flow', 
-          attributes: ['id', 'name'] 
-        }
-      ]
+        {
+          model: User,
+          as: "updater_machine_flow",
+          attributes: ["id", "name"],
+        },
+      ],
     });
 
     return res.status(201).json({
       status: "success",
       message: "Machine-process assignments created successfully",
       data: completeAssignments,
-      skipped: assignments.length - newAssignments.length
+      skipped: assignments.length - newAssignments.length,
     });
   } catch (error) {
     // Rollback if transaction hasn't been committed
     if (!transaction.finished) {
       await transaction.rollback();
     }
-    
-    logger.error(`Error creating machine-process assignments: ${error.message}`);
+
+    logger.error(
+      `Error creating machine-process assignments: ${error.message}`
+    );
     return res.status(500).json({
       status: "error",
       message: "Failed to create machine-process assignments",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -190,123 +204,138 @@ v1Router.get("/assign", authenticateJWT, async (req, res) => {
     const machineFlows = await MachineFlow.findAll({
       where: {
         company_id,
-        status: "active"
+        status: "active",
       },
       include: [
-        { model: Machine, attributes: ['id', 'machine_name', 'machine_type'] },
-        { model: ProcessName, attributes: ['id', 'process_name'] }
+        { model: Machine, attributes: ["id", "machine_name", "machine_type"] },
+        { model: ProcessName, attributes: ["id", "process_name"] },
       ],
-      order: [['created_at', 'DESC']]
+      order: [["created_at", "DESC"]],
     });
 
     return res.status(200).json({
       status: "success",
       message: "Machine-process assignments retrieved successfully",
-      data: machineFlows
+      data: machineFlows,
     });
   } catch (error) {
-    logger.error(`Error retrieving machine-process assignments: ${error.message}`);
+    logger.error(
+      `Error retrieving machine-process assignments: ${error.message}`
+    );
     return res.status(500).json({
       status: "error",
       message: "Failed to retrieve machine-process assignments",
-      error: error.message
+      error: error.message,
     });
   }
 });
-v1Router.get("/assign/machine/:machineId", authenticateJWT, async (req, res) => {
-  try {
-    const company_id = req.user.company_id;
-    const machineId = req.params.machineId;
+v1Router.get(
+  "/assign/machine/:machineId",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const company_id = req.user.company_id;
+      const machineId = req.params.machineId;
 
-    // Validate machine exists and belongs to company
-    const machine = await Machine.findOne({
-      where: {
-        id: machineId,
-        company_id,
-        status: "active"
+      // Validate machine exists and belongs to company
+      const machine = await Machine.findOne({
+        where: {
+          id: machineId,
+          company_id,
+          status: "active",
+        },
+      });
+
+      if (!machine) {
+        return res.status(404).json({
+          status: "error",
+          message: "Machine not found or does not belong to your company",
+        });
       }
-    });
 
-    if (!machine) {
-      return res.status(404).json({
+      const processAssignments = await MachineFlow.findAll({
+        where: {
+          company_id,
+          machine_id: machineId,
+          status: "active",
+        },
+        include: [{ model: ProcessName, attributes: ["id", "process_name"] }],
+        order: [["created_at", "DESC"]],
+      });
+
+      return res.status(200).json({
+        status: "success",
+        message: "Process assignments for machine retrieved successfully",
+        data: processAssignments,
+      });
+    } catch (error) {
+      logger.error(
+        `Error retrieving process assignments for machine: ${error.message}`
+      );
+      return res.status(500).json({
         status: "error",
-        message: "Machine not found or does not belong to your company"
+        message: "Failed to retrieve process assignments for machine",
+        error: error.message,
       });
     }
-
-    const processAssignments = await MachineFlow.findAll({
-      where: {
-        company_id,
-        machine_id: machineId,
-        status: "active"
-      },
-      include: [
-        { model: ProcessName, attributes: ['id', 'process_name'] }
-      ],
-      order: [['created_at', 'DESC']]
-    });
-
-    return res.status(200).json({
-      status: "success",
-      message: "Process assignments for machine retrieved successfully",
-      data: processAssignments
-    });
-  } catch (error) {
-    logger.error(`Error retrieving process assignments for machine: ${error.message}`);
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve process assignments for machine",
-      error: error.message
-    });
   }
-});
-v1Router.get("/assign/process/:processId", authenticateJWT, async (req, res) => {
-  try {
-    const company_id = req.user.company_id;
-    const processId = req.params.processId;
+);
+v1Router.get(
+  "/assign/process/:processId",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const company_id = req.user.company_id;
+      const processId = req.params.processId;
 
-    // Validate process exists and belongs to company
-    const process = await ProcessName.findOne({
-      where: {
-        id: processId,
-        company_id,
-        status: "active"
+      // Validate process exists and belongs to company
+      const process = await ProcessName.findOne({
+        where: {
+          id: processId,
+          company_id,
+          status: "active",
+        },
+      });
+
+      if (!process) {
+        return res.status(404).json({
+          status: "error",
+          message: "Process not found or does not belong to your company",
+        });
       }
-    });
 
-    if (!process) {
-      return res.status(404).json({
+      const machineAssignments = await MachineFlow.findAll({
+        where: {
+          company_id,
+          process_id: processId,
+          status: "active",
+        },
+        include: [
+          {
+            model: Machine,
+            attributes: ["id", "machine_name", "machine_type"],
+          },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      return res.status(200).json({
+        status: "success",
+        message: "Machine assignments for process retrieved successfully",
+        data: machineAssignments,
+      });
+    } catch (error) {
+      logger.error(
+        `Error retrieving machine assignments for process: ${error.message}`
+      );
+      return res.status(500).json({
         status: "error",
-        message: "Process not found or does not belong to your company"
+        message: "Failed to retrieve machine assignments for process",
+        error: error.message,
       });
     }
-
-    const machineAssignments = await MachineFlow.findAll({
-      where: {
-        company_id,
-        process_id: processId,
-        status: "active"
-      },
-      include: [
-        { model: Machine, attributes: ['id', 'machine_name', 'machine_type'] }
-      ],
-      order: [['created_at', 'DESC']]
-    });
-
-    return res.status(200).json({
-      status: "success",
-      message: "Machine assignments for process retrieved successfully",
-      data: machineAssignments
-    });
-  } catch (error) {
-    logger.error(`Error retrieving machine assignments for process: ${error.message}`);
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve machine assignments for process",
-      error: error.message
-    });
   }
-});
+);
 v1Router.delete("/assign/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -319,14 +348,15 @@ v1Router.delete("/assign/:id", authenticateJWT, async (req, res) => {
       where: {
         id: flowId,
         company_id,
-        status: "active"
-      }
+        status: "active",
+      },
     });
 
     if (!flow) {
       return res.status(404).json({
         status: "error",
-        message: "Machine-process assignment not found or does not belong to your company"
+        message:
+          "Machine-process assignment not found or does not belong to your company",
       });
     }
 
@@ -334,13 +364,13 @@ v1Router.delete("/assign/:id", authenticateJWT, async (req, res) => {
     await MachineFlow.update(
       {
         status: "inactive",
-        updated_by: user_id
+        updated_by: user_id,
       },
       {
         where: {
-          id: flowId
+          id: flowId,
         },
-        transaction
+        transaction,
       }
     );
 
@@ -348,19 +378,19 @@ v1Router.delete("/assign/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: "Machine-process assignment removed successfully"
+      message: "Machine-process assignment removed successfully",
     });
   } catch (error) {
     // Rollback if transaction hasn't been committed
     if (!transaction.finished) {
       await transaction.rollback();
     }
-    
+
     logger.error(`Error removing machine-process assignment: ${error.message}`);
     return res.status(500).json({
       status: "error",
       message: "Failed to remove machine-process assignment",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -1823,7 +1853,6 @@ v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-// Create a new process value
 v1Router.post("/process-values", authenticateJWT, async (req, res) => {
   let transaction;
   try {
@@ -1856,6 +1885,24 @@ v1Router.post("/process-values", authenticateJWT, async (req, res) => {
       return res.status(404).json({
         status: "error",
         message: "Process not found or access denied",
+      });
+    }
+
+    // Check if a process value already exists for this process_name_id
+    const existingProcessValue = await MachineProcessValue.findOne({
+      where: {
+        process_name_id,
+        company_id,
+      },
+      transaction,
+    });
+
+    if (existingProcessValue) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: "error",
+        message:
+          "A value already exists for this process. Please update the existing value instead.",
       });
     }
 
