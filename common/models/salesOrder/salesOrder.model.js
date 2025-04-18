@@ -58,7 +58,7 @@ const SalesOrder = sequelize.define(
       allowNull: false,
     },
     sales_status:{
-      type: DataTypes.ENUM("Approved", "Pending", "Rejected"),
+      type: DataTypes.ENUM('Pending','In-progress','Completed','Rejected'),
       allowNull: false,
       defaultValue: "Pending",
     },
