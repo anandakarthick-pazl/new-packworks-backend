@@ -34,6 +34,14 @@ const Die = sequelize.define('Die',{
     type: DataTypes.STRING,
     allowNull: false,
   },
+  board_width: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  board_length: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   ups: {
     type: DataTypes.STRING,
     allowNull: false,
