@@ -160,7 +160,14 @@ module.exports = {
         PORT: 3021,
       },
     },
-
+    {
+      name: "attendance-service",
+      script: "./services/attendance/server.js",
+      env: {
+        PORT: 3022,
+      },
+    },
+    
 
   ],
 };
