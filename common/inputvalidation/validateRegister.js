@@ -8,8 +8,8 @@ export const validateRegister = (req, res, next) => {
         email: Joi.string().email().required(),
         password: Joi.string().min(6).max(50).required(),
         mobile: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(),
-        image: Joi.string().max(191).optional().allow(null),
-        skills: Joi.string().max(255).optional().allow(null),
+        // image: Joi.string().max(191).optional().allow(null),
+        // skills: Joi.string().max(255).optional().allow(null),
 
         // Employee-related fields
         employee_id: Joi.string().max(50).optional().allow(null),
@@ -32,7 +32,7 @@ export const validateRegister = (req, res, next) => {
         notice_period_end_date: Joi.date().optional().allow(null).default(() => new Date()),
         notice_period_start_date: Joi.date().optional().allow(null).default(() => new Date()),
         probation_end_date: Joi.date().optional().allow(null).default(() => new Date()),
-        about_me: Joi.string().optional().allow(null),
+        // about_me: Joi.string().optional().allow(null),
         reporting_to: Joi.number().integer().optional().allow(null),
         employment_type: Joi.string().valid("Full-time", "Part-time", "Internship", "Contract").optional().allow(null),
         marital_status: Joi.string().valid("single", "married", "divorced", "widowed").optional().allow(null),

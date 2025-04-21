@@ -5,6 +5,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import SkuVersion from "../skuModel/skuVersion.js";
+import Sku from "../skuModel/sku.model.js";
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -47,6 +48,14 @@ const WorkOrder = sequelize.define(
     manufacture: {
       type: DataTypes.ENUM("inhouse", "outsource", "purchase"),
       allowNull: false,
+    },
+    sku_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: Sku,
+        key: "id",
+      },
     },
     sku_name: {
       type: DataTypes.STRING,
@@ -152,7 +161,10 @@ WorkOrder.belongsTo(SkuVersion, {
 SkuVersion.hasMany(WorkOrder, {
   foreignKey: "sku_version",
   as: "workOrders",
-});       
+}); 
+
+Sku.hasMany(WorkOrder, { foreignKey: "sku_id" });
+WorkOrder.belongsTo(Sku, { foreignKey: "sku_id" });
 
 Company.hasMany(WorkOrder, { foreignKey: "company_id" });
 WorkOrder.belongsTo(Company, { foreignKey: "company_id" });
