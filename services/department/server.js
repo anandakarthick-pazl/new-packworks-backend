@@ -27,6 +27,73 @@ const v1Router = Router();
 
 // GET single work order by ID
 
+/**
+ * @swagger
+ * /departments:
+ *   post:
+ *     summary: Create a new department
+ *     description: Adds a new department to the system. Optionally, a parent department can be specified.
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - department_name
+ *               - added_by
+ *               - last_updated_by
+ *             properties:
+ *               company_id:
+ *                 type: integer
+ *                 example: 101
+ *               department_name:
+ *                 type: string
+ *                 example: "IT Department"
+ *               parent_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 2
+ *               added_by:
+ *                 type: integer
+ *                 example: 1
+ *               last_updated_by:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       201:
+ *         description: Department created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Department created successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Department'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error details
+ */
 
 v1Router.post("/departments", authenticateJWT, async (req, res) => {
   try {
@@ -52,6 +119,46 @@ v1Router.post("/departments", authenticateJWT, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /departments:
+ *   get:
+ *     summary: Get all departments
+ *     description: Retrieve a list of all departments.
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of departments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Department'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error details
+ */
+
 v1Router.get("/departments", authenticateJWT, async (req, res) => {
   try {
     const departments = await Department.findAll();
@@ -64,6 +171,64 @@ v1Router.get("/departments", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /departments/{id}:
+ *   get:
+ *     summary: Get a department by ID
+ *     description: Retrieve a single department using its unique ID.
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the department to retrieve
+ *     responses:
+ *       200:
+ *         description: Department retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Department'
+ *       404:
+ *         description: Department not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Department not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error message
+ */
 
 v1Router.get("/departments/:id", authenticateJWT, async (req, res) => {
   try {
@@ -87,6 +252,84 @@ v1Router.get("/departments/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /departments/{id}:
+ *   put:
+ *     summary: Update a department by ID
+ *     description: Update the details of a department using its ID.
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the department to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               department_name:
+ *                 type: string
+ *                 example: Production Department
+ *               parent_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 2
+ *               last_updated_by:
+ *                 type: integer
+ *                 example: 5
+ *     responses:
+ *       200:
+ *         description: Department updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Department updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Department'
+ *       404:
+ *         description: Department not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Department not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error message
+ */
 
 v1Router.put("/departments/:id", authenticateJWT, async (req, res) => {
   try {
@@ -119,6 +362,65 @@ v1Router.put("/departments/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /departments/{id}:
+ *   delete:
+ *     summary: Delete a department by ID
+ *     description: Permanently delete a department from the system using its ID.
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the department to delete
+ *     responses:
+ *       200:
+ *         description: Department deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Department deleted successfully
+ *       404:
+ *         description: Department not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Department not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Error message
+ */
 
 v1Router.delete("/departments/:id", authenticateJWT, async (req, res) => {
   try {

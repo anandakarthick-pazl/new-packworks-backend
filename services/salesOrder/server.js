@@ -21,6 +21,7 @@ const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
 // POST create new sales order - with SalesSkuDetails table
+
 v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
 
@@ -40,13 +41,17 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
     // Create Sales Order - get company_id and user info from JWT token
     const newSalesOrder = await SalesOrder.create(
       {
-        company_id: req.user.company_id, // Get from token
+        company_id: req.user.company_id,
+        sales_ui_id: salesDetails.sales_ui_id || null,
         client_id: salesDetails.client_id,
         estimated: salesDetails.estimated,
         client: salesDetails.client,
         credit_period: salesDetails.credit_period,
         freight_paid: salesDetails.freight_paid,
         confirmation: salesDetails.confirmation,
+        confirmation_email: salesDetails.confirmation_email || null,
+        confirmation_name: salesDetails.confirmation_name || null,
+        confirmation_mobile: salesDetails.confirmation_mobile || null,
         sales_status: salesDetails.sales_status,
         total_amount: salesDetails.total_amount,
         sgst: salesDetails.sgst,
@@ -98,6 +103,8 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       planned_start_date: work.planned_start_date || null,
       planned_end_date: work.planned_end_date || null,
       outsource_name: work.outsource_name || null,
+      priority: work.priority || null,
+      progress: work.progress || null,
       created_by: req.user.id,
       updated_by: req.user.id,
       status: "active",
@@ -146,7 +153,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
 
     // Build base filter conditions for SalesOrder
     const where = {
-      status: status, // Only fetch records with specified status (default is active)
+      status: status,
       company_id: req.user.company_id, // Filter by the company ID from JWT token
     };
 
@@ -175,12 +182,12 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
         separate: true, // Use separate query to ensure SKU details are properly fetched
       },
       {
-        model: db.User,
+        model: User,
         as: "creator_sales",
         attributes: ["id", "name", "email"],
       },
       {
-        model: db.User,
+        model: User,
         as: "updater_sales",
         attributes: ["id", "name", "email"],
       },
@@ -242,6 +249,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   }
 });
 // GET single sales order by ID (including associated records)
+
 v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
@@ -261,13 +269,13 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
           required: false,
         },
         {
-          model: db.User,
+          model: User,
           as: "creator_sales",
           attributes: ["id", "name", "email"],
           foreignKey: "created_by",
         },
         {
-          model: db.User,
+          model: User,
           as: "updater_sales",
           attributes: ["id", "name", "email"],
           foreignKey: "updated_by",
@@ -299,6 +307,7 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // PUT update existing sales order - modified to update existing records
+
 v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { salesDetails, skuDetails, workDetails } = req.body;
@@ -336,11 +345,15 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
     await salesOrder.update(
       {
         client_id: salesDetails.client_id,
+        sales_ui_id: salesDetails.sales_ui_id || null, // Update if provided
         estimated: salesDetails.estimated,
         client: salesDetails.client,
         credit_period: salesDetails.credit_period,
         freight_paid: salesDetails.freight_paid,
         confirmation: salesDetails.confirmation,
+        confirmation_email: salesDetails.confirmation_email || null,
+        confirmation_name: salesDetails.confirmation_name || null,
+        confirmation_mobile: salesDetails.confirmation_mobile || null,
         sales_status: salesDetails.sales_status,
         total_amount: salesDetails.total_amount,
         sgst: salesDetails.sgst,
@@ -467,6 +480,8 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             planned_end_date: work.planned_end_date || null,
             outsource_name:
               work.manufacture === "outsource" ? work.outsource_name : null,
+            priority: work.priority || null,
+            progress: work.progress || null,
             updated_by: req.user.id,
             updated_at: new Date(),
           },
@@ -492,6 +507,8 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             planned_end_date: work.planned_end_date || null,
             outsource_name:
               work.manufacture === "outsource" ? work.outsource_name : null,
+            priority: work.priority || null,
+            progress: work.progress || null,
             created_by: req.user.id,
             updated_by: req.user.id,
             status: "active",
@@ -547,6 +564,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
 });
 
 // DELETE sales order - changed to soft delete including associated records
+
 v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const transaction = await sequelize.transaction();
@@ -625,6 +643,68 @@ v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// Add this new route to the v1Router section in your file
+
+// PATCH update sales_status only
+v1Router.patch("/sale-order/:id/status", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { sales_status } = req.body;
+
+  // Validate input
+  if (!sales_status) {
+    return res.status(400).json({
+      message: "sales_status is required",
+    });
+  }
+
+  // Check if status is valid
+  const validStatuses = ["Pending", "In-progress", "Completed", "Rejected"];
+  if (!validStatuses.includes(sales_status)) {
+    return res.status(400).json({
+      message:
+        "Invalid sales_status. Must be one of: Pending, In-progress, Completed, Rejected",
+    });
+  }
+
+  try {
+    // Find the sales order
+    const salesOrder = await SalesOrder.findByPk(id);
+
+    if (!salesOrder) {
+      return res.status(404).json({ message: "Sales order not found" });
+    }
+
+    // Verify user has access to this sales order (from the same company)
+    if (salesOrder.company_id !== req.user.company_id) {
+      return res
+        .status(403)
+        .json({ message: "Access denied to this sales order" });
+    }
+
+    // Update only the sales_status and updated_by fields
+    await salesOrder.update({
+      sales_status: sales_status,
+      updated_by: req.user.id,
+      updated_at: new Date(),
+    });
+
+    res.json({
+      message: "Sales status updated successfully",
+      data: {
+        id: salesOrder.id,
+        sales_status: sales_status,
+        updated_at: salesOrder.updated_at,
+      },
+    });
+  } catch (error) {
+    logger.error("Error updating sales status:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 

@@ -26,6 +26,88 @@ const v1Router = Router();
 
 // GET single work order by ID
 
+/**
+ * @swagger
+ * /rbac:
+ *   get:
+ *     summary: Get Role-Based Access Control (RBAC) modules and permissions
+ *     description: Fetches modules and permissions for the authenticated user based on their role (superadmin or regular user).
+ *     tags:
+ *       - RBAC
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully fetched RBAC data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: RABC fetched successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       module_group:
+ *                         type: string
+ *                         example: "Administration"
+ *                       module_id:
+ *                         type: integer
+ *                         example: 1
+ *                       module_name:
+ *                         type: string
+ *                         example: "User Management"
+ *                       modules_description:
+ *                         type: string
+ *                         example: "Manage system users and roles"
+ *                       permissions:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             permissions_id:
+ *                               type: integer
+ *                               example: 101
+ *                             permissions_name:
+ *                               type: string
+ *                               example: "create_user"
+ *                             permissions_display_name:
+ *                               type: string
+ *                               example: "Create User"
+ *       404:
+ *         description: No modules found or user not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Module group is not available
+ *       500:
+ *         description: Internal server error while fetching RBAC
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal Server Error
+ *                 error:
+ *                   type: string
+ *                   example: Error details
+ */
 
 v1Router.get("/rbac", authenticateJWT, async (req, res) => {
   try {

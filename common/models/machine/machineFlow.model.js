@@ -1,12 +1,12 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
-import MachineProcessName from "./processName.model.js";
-import User from "../user.model.js";
 import Company from "../company.model.js";
+import User from "../user.model.js";
+import Machine from "./machine.model.js"; // Adjust the path as needed
 import ProcessName from "./processName.model.js";
 
-const MachineProcessField = sequelize.define(
-  "MachineProcessField",
+const MachineFlow = sequelize.define(
+  "MachineFlow",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -21,8 +21,22 @@ const MachineProcessField = sequelize.define(
         key: "id",
       },
       onUpdate: "CASCADE",
+      onDelete: "CASCADE",
     },
-    process_name_id: {
+    machine_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Machine,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    machine_name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    process_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
@@ -31,16 +45,8 @@ const MachineProcessField = sequelize.define(
       },
       onUpdate: "CASCADE",
     },
-    label: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
-    field_type: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
-    required: {
-      type: DataTypes.TINYINT(1),
+    process_name: {
+      type: DataTypes.STRING,
       allowNull: false,
     },
     status: {
@@ -50,10 +56,12 @@ const MachineProcessField = sequelize.define(
     },
     created_at: {
       type: DataTypes.DATE,
+      allowNull: false,
       defaultValue: DataTypes.NOW,
     },
     updated_at: {
       type: DataTypes.DATE,
+      allowNull: false,
       defaultValue: DataTypes.NOW,
       onUpdate: DataTypes.NOW,
     },
@@ -75,24 +83,46 @@ const MachineProcessField = sequelize.define(
     },
   },
   {
-    tableName: "machine_process_fields",
+    tableName: "machine_flow",
     timestamps: false,
   }
 );
 
-Company.hasMany(MachineProcessField, { foreignKey: "company_id" });
-MachineProcessField.belongsTo(Company, { foreignKey: "company_id" });
-
-MachineProcessField.belongsTo(MachineProcessName, {
-  foreignKey: "process_name_id",
+// Associations
+Company.hasMany(MachineFlow, {
+  foreignKey: "company_id",
 });
-MachineProcessName.hasMany(MachineProcessField, {
-  foreignKey: "process_name_id",
+MachineFlow.belongsTo(Company, {
+  foreignKey: "company_id",
 });
 
-User.hasMany(MachineProcessField, { foreignKey: "created_by" });
-User.hasMany(MachineProcessField, { foreignKey: "updated_by" });
-MachineProcessField.belongsTo(User, { foreignKey: "created_by" , as: "creator" });
-MachineProcessField.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+Machine.hasMany(MachineFlow, {
+  foreignKey: "machine_id",
+});
+MachineFlow.belongsTo(Machine, {
+  foreignKey: "machine_id",
+});
 
-export default MachineProcessField;
+ProcessName.hasMany(MachineFlow, {
+  foreignKey: "process_id",
+});
+MachineFlow.belongsTo(ProcessName, {
+  foreignKey: "process_id",
+});
+
+User.hasMany(MachineFlow, {
+  foreignKey: "created_by",
+});
+User.hasMany(MachineFlow, {
+  foreignKey: "updated_by",
+});
+MachineFlow.belongsTo(User, {
+  foreignKey: "created_by",
+  as: "creator_machine_flow",
+});
+MachineFlow.belongsTo(User, {
+  foreignKey: "updated_by",
+  as: "updater_machine_flow",
+});
+
+export default MachineFlow;

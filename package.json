@@ -22,13 +22,15 @@
     "company-address": "nodemon services/company-address/server.js",
     "fil-view": "nodemon services/upload-view/server.js",
     "billing": "nodemon services/billing/server.js",
-    "package" : "nodemon services/package/server.js",
-    "swagger" : "nodemon config/swagger.js",
-    "taxes" : "nodemon services/taxes/server.js",
+    "package": "nodemon services/package/server.js",
+    "swagger": "nodemon config/swagger.js",
+    "taxes": "nodemon services/taxes/server.js",
     "faqs": "nodemon services/faqs/server.js",
-    "faq_categories":"nodemon services/faq-categories/server.js"
-
-
+    "faq_categories": "nodemon services/faq-categories/server.js",
+    "item" : "nodemon services/item/server.js",
+    "purchase" : "nodemon services/purchase-order/server.js",
+    "grn" : "nodemon services/grn/server.js",
+    "inventory" : "nodemon services/inventory/server.js"
   },
   "keywords": [],
   "author": "",

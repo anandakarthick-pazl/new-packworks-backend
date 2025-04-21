@@ -40,7 +40,7 @@ const Sku = sequelize.define(
     height: { type: DataTypes.FLOAT, allowNull: true },
     unit: { type: DataTypes.STRING, allowNull: true },
     joints: { type: DataTypes.INTEGER, allowNull: true },
-    ups: { type: DataTypes.INTEGER, allowNull: true },
+    ups: { type: DataTypes.INTEGER, allowNull: true }, 
     select_dies: { type: DataTypes.STRING, allowNull: true },
     inner_outer_dimension: {
       type: DataTypes.ENUM("Inner", "Outer"),
@@ -63,6 +63,13 @@ const Sku = sequelize.define(
     board_size_cm2: { type: DataTypes.STRING, allowNull: true },
     deckle_size: { type: DataTypes.FLOAT, allowNull: true },
     minimum_order_level: { type: DataTypes.INTEGER, allowNull: true },
+
+    estimate_composite_item: { type: DataTypes.STRING, allowNull: true },
+    description: { type: DataTypes.STRING, allowNull: true },
+    default_sku_details: { type: DataTypes.STRING, allowNull: true },
+    tags: { type: DataTypes.JSON, allowNull: true },
+
+    
     sku_type: { type: DataTypes.STRING, allowNull: true },
     sku_values: {
       type: Sequelize.JSON,

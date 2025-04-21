@@ -10,7 +10,7 @@ import Sku from "./skuModel/sku.model.js";
 import SalesOrder from "./salesOrder/salesOrder.model.js";
 import WorkOrder from "./salesOrder/workOrder.model.js";
 import Machine from "./machine/machine.model.js";
-import MachineProcessName from "./machine/processName.model.js";
+import ProcessName from "./machine/processName.model.js";
 import MachineProcessField from "./machine/processField.model.js";
 import DropdownName from "./commonModel/dropdown.model.js";
 import DropdownValue from "./commonModel/dropdownValues.model.js";
@@ -22,8 +22,17 @@ import Flute from "../models/flute.model.js";
 import Module from "../models/module.model.js";
 import SkuVersion from "./skuModel/skuVersion.js";
 import SalesSkuDetails from "./salesOrder/salesSku.model.js";
+import Taxes from "./taxes.model.js";
+import Die from "./die.model.js";
+import MachineFlow from "./machine/machineFlow.model.js";
+import ItemMaster from "./item.model.js";
+import PurchaseOrder from "../models/po/purchase_order.model.js";
+import PurchaseOrderItem from "./po/purchase_order_item.model.js";
+import GRN from "./grn/grn.model.js";
+import GRNItem from "./grn/grn_item.model.js";
+import Inventory from "./inventory/inventory.model.js";
+import InventoryType from "./inventory/inventory_type.model.js";
 
-import Taxes from "../models/taxes.model.js";
 const db = {
   sequelize,
   User,
@@ -41,7 +50,8 @@ const db = {
   DropdownName,
   DropdownValue,
   Machine,
-  MachineProcessName,
+  MachineFlow,
+  ProcessName,
   MachineProcessValue,
   MachineProcessField,
   Package,
@@ -49,7 +59,15 @@ const db = {
   ModuleSettings,
   Flute,
   Module,
-  Taxes
+  Taxes,
+  Die,
+  ItemMaster,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  GRN,
+  GRNItem,
+  Inventory,
+  InventoryType
 };
 
 export default db;

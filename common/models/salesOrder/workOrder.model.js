@@ -4,6 +4,8 @@ import SalesOrder from "./salesOrder.model.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
+import SkuVersion from "../skuModel/skuVersion.js";
+import Sku from "../skuModel/sku.model.js";
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -47,41 +49,53 @@ const WorkOrder = sequelize.define(
       type: DataTypes.ENUM("inhouse", "outsource", "purchase"),
       allowNull: false,
     },
+    sku_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: Sku,
+        key: "id",
+      },
+    },
     sku_name: {
       type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     sku_version: {
-      type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: SkuVersion,
+        key: "id",
+      },
     },
     qty: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     edd: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     description: {
       type: DataTypes.TEXT,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     acceptable_excess_units: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     planned_start_date: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     planned_end_date: {
       type: DataTypes.DATE,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     outsource_name: {
       type: DataTypes.STRING,
-      allowNull: true, // Optional field
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,
@@ -92,6 +106,16 @@ const WorkOrder = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+    },
+    priority: {
+      type: DataTypes.ENUM("High", "Medium", "Low"),
+      allowNull: false,
+      defaultValue:"low"
+    },
+    progress: {
+      type: DataTypes.ENUM("Pending","Product Planning", "Procurement Sourcing", "Production Planning", "Production", "Quality Control", "Packaging", "Shipping"),
+      allowNull: false,
+      defaultValue: "Pending",
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -129,6 +153,18 @@ WorkOrder.belongsTo(SalesOrder, {
   foreignKey: "sales_order_id",
   as: "salesOrder",
 });
+
+WorkOrder.belongsTo(SkuVersion, {
+  foreignKey: "sku_version",
+  as: "skuVersion",
+});
+SkuVersion.hasMany(WorkOrder, {
+  foreignKey: "sku_version",
+  as: "workOrders",
+}); 
+
+Sku.hasMany(WorkOrder, { foreignKey: "sku_id" });
+WorkOrder.belongsTo(Sku, { foreignKey: "sku_id" });
 
 Company.hasMany(WorkOrder, { foreignKey: "company_id" });
 WorkOrder.belongsTo(Company, { foreignKey: "company_id" });

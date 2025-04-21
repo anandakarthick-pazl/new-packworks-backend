@@ -131,6 +131,88 @@ const v1Router = Router();
 
 
 // GET single work order by ID
+/**
+ * @swagger
+ * /save-storage-settings:
+ *   post:
+ *     summary: Save storage settings (AWS S3 or local)
+ *     tags:
+ *       - File Storage
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - filesystem
+ *             properties:
+ *               filesystem:
+ *                 type: string
+ *                 enum: [aws_s3, local]
+ *                 example: aws_s3
+ *               aws_access_key:
+ *                 type: string
+ *                 example: YOUR_AWS_ACCESS_KEY
+ *               aws_secret_key:
+ *                 type: string
+ *                 example: YOUR_AWS_SECRET_KEY
+ *               aws_region:
+ *                 type: string
+ *                 example: us-east-1
+ *               aws_bucket_name:
+ *                 type: string
+ *                 example: your-bucket-name
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Storage settings saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: AWS credentials saved successfully!
+ *       400:
+ *         description: Invalid filesystem type
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid filesystem type
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Error saving storage settings
+ *                 error:
+ *                   type: string
+ *                   example: <detailed error message>
+ */
+
 v1Router.post("/save-storage-settings", authenticateJWT, upload.single("file"), async (req, res) => {
   try {
     const { filesystem, aws_access_key, aws_secret_key, aws_region, aws_bucket_name } = req.body;
@@ -184,6 +266,69 @@ v1Router.post("/save-storage-settings", authenticateJWT, upload.single("file"), 
   }
 });
 
+/**
+ * @swagger
+ * /upload:
+ *   post:
+ *     summary: Upload a file to either AWS S3 or local storage
+ *     tags:
+ *       - File Upload
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: File to upload
+ *     responses:
+ *       200:
+ *         description: File uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: File uploaded successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     file_id:
+ *                       type: integer
+ *                       example: 1
+ *                     filename:
+ *                       type: string
+ *                       example: example.jpg
+ *                     file_url:
+ *                       type: string
+ *                       example: https://your-bucket.s3.region.amazonaws.com/packworkz/uploads/example.jpg
+ *                     storage:
+ *                       type: string
+ *                       example: aws_s3
+ *       500:
+ *         description: Upload error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error message
+ */
 
 v1Router.post("/upload", authenticateJWT, checkFileCount, upload.single("file"), async (req, res) => {
   try {

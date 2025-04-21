@@ -1,3 +1,136 @@
+-- 15/04/2025
+CREATE TABLE machine_flow (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id INT UNSIGNED NOT NULL,
+    machine_id INT UNSIGNED NOT NULL,
+    machine_name VARCHAR(255) NOT NULL,
+    process_id INT UNSIGNED NOT NULL,
+    process_name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by INT UNSIGNED NOT NULL,
+    updated_by INT UNSIGNED NOT NULL
+ );
+--11/04/2025
+
+ALTER TABLE work_order
+ADD COLUMN `priority` ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'Low',
+ADD COLUMN `progress` ENUM('Pending','Product Planning', 'Procurement Sourcing', 'Production Planning', 'Production', 'Quality Control', 'Packaging', 'Shipping') NOT NULL DEFAULT 'Pending';
+
+-- 09/04/2025
+DROP TABLE machine_process_name;
+DROP TABLE machine_process_values;
+DROP TABLE machine_process_fields;
+
+CREATE TABLE process_name (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+CREATE TABLE machine_process_values (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name_id INT UNSIGNED NOT NULL,
+  process_value JSON NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+
+CREATE TABLE machine_process_fields (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id INT UNSIGNED NOT NULL,
+  process_name_id INT UNSIGNED NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  field_type VARCHAR(255) NOT NULL,
+  required TINYINT(1) NULL,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+
+ALTER TABLE sku
+ADD COLUMN estimate_composite_item VARCHAR(255),
+ADD COLUMN description VARCHAR(255),
+ADD COLUMN default_sku_details VARCHAR(255),
+ADD COLUMN tags VARCHAR(255);
+
+-- add above to db
+
+ALTER TABLE sales_order
+ADD COLUMN confirmation_email VARCHAR(255);
+
+ALTER TABLE sales_order
+ADD COLUMN confirmation_name VARCHAR(255);
+
+ALTER TABLE sales_order
+ADD COLUMN confirmation_mobile BIGINT;
+
+
+ALTER TABLE sales_order
+ADD COLUMN sales_ui_id VARCHAR(150) NULL;
+
+CREATE TABLE sku_invoice_history (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,  
+  company_id INT UNSIGNED NOT NULL,
+  client_id INT UNSIGNED NOT NULL,
+  sku_id INT UNSIGNED NOT NULL,
+  invoice_number VARCHAR(255) NOT NULL UNIQUE,
+  date DATE NOT NULL,
+  quantity INT NOT NULL,
+  rate_per_sku DECIMAL(10, 2) NOT NULL,
+  cost DECIMAL(10, 2) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  created_by INT UNSIGNED NOT NULL,
+  updated_by INT UNSIGNED NOT NULL
+);
+INSERT INTO sku_invoice_history (
+  company_id,
+  client_id,
+  sku_id,
+  invoice_number,
+  date,
+  quantity,
+  rate_per_sku,
+  cost,
+  created_at,
+  updated_at,
+  status,
+  created_by,
+  updated_by
+) VALUES (
+  8,                         -- company_id
+  1,                         -- client_id
+  1,                         -- sku_id
+  'INV-1001',                -- invoice_number
+  '2025-04-09',              -- date
+  100,                       -- quantity
+  25.50,                     -- rate_per_sku
+  2550.00,                   -- cost (quantity * rate)
+  NOW(),                     -- created_at
+  NOW(),                     -- updated_at
+  'active',                  -- status
+  3,                         -- created_by
+  3                          -- updated_by
+);
+
+
+
+
 -- 07/04/2025
 
 ALTER TABLE sales_order

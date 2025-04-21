@@ -163,11 +163,35 @@ module.exports = {
     {
       name: "attendance-service",
       script: "./services/attendance/server.js",
+      name: "item",
+      script: "./services/item/server.js",
       env: {
         PORT: 3022,
       },
     },
     
+    {
+      name: "purchase",
+      script: "./services/purchase-order/server.js",
+      env: {
+        PORT: 3023,
+      },
+    },
+    {
+      name: "grn",
+      script: "./services/grn/server.js",
+      env: {
+        PORT: 3024,
+      },
+    },
+    {
+      name: "inventory",
+      script: "./services/inventory/server.js",
+      env: {
+        PORT: 3025,
+      },
+    },
+
 
   ],
 };

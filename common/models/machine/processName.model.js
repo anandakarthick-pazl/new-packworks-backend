@@ -1,21 +1,21 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
-import Machine from "./machine.model.js";
 import User from "../user.model.js";
+import Company from "../company.model.js";
 
-const MachineProcessName = sequelize.define(
-  "MachineProcessName",
+const ProcessName = sequelize.define(
+  "ProcessName",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
-    machine_id: {
+    company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
-        model: Machine,
+        model: Company,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -34,8 +34,6 @@ const MachineProcessName = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW, 
-
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -60,21 +58,24 @@ const MachineProcessName = sequelize.define(
     },
   },
   {
-    tableName: "machine_process_name",
+    tableName: "process_name",
     timestamps: false,
+    underscored: true,
   }
 );
+// Associations
+Company.hasMany(ProcessName, { foreignKey: "company_id" });
+ProcessName.belongsTo(Company, { foreignKey: "company_id" });
 
-Machine.hasMany(MachineProcessName, {
-  foreignKey: "machine_id",
+User.hasMany(ProcessName, { foreignKey: "created_by" });
+User.hasMany(ProcessName, { foreignKey: "updated_by" });
+ProcessName.belongsTo(User, {
+  foreignKey: "created_by",
+  as: "process_creator",
 });
-MachineProcessName.belongsTo(Machine, {
-  foreignKey: "machine_id",
+ProcessName.belongsTo(User, {
+  foreignKey: "updated_by",
+  as: "process_updater",
 });
 
-User.hasMany(MachineProcessName, { foreignKey: "created_by" });
-User.hasMany(MachineProcessName, { foreignKey: "updated_by" });
-MachineProcessName.belongsTo(User, { foreignKey: "created_by" });
-MachineProcessName.belongsTo(User, { foreignKey: "updated_by" });
-
-export default MachineProcessName;
+export default ProcessName;
