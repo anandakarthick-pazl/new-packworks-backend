@@ -55,15 +55,10 @@ v1Router.post("/route", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET all routes with pagination and filtering
+// Modify the GET all routes endpoint
 v1Router.get("/route", authenticateJWT, async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search, // Replace route_name with a general search parameter
-      status = "active", // Default to 'active' status
-    } = req.query;
+    const { page = 1, limit = 10, search, status = "active" } = req.query;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -71,25 +66,17 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
 
     // Build where clause for filtering
     const whereClause = {
-      company_id: req.user.company_id, // Add company filter for security
+      company_id: req.user.company_id,
     };
 
     // Status filtering
-    if (status === "all") {
-      // Don't filter by status if 'all' is specified
-    } else {
+    if (status !== "all") {
       whereClause.status = status;
     }
 
     // Search functionality
     if (search) {
-      // whereClause.route_name = { [Op.like]: `%${search}%` };
-      // You can expand search to include other fields if needed
-      // For example:
-      whereClause[Op.or] = [
-        { route_name: { [Op.like]: `%${search}%` } },
-        // { description: { [Op.like]: `%${search}%` } },
-      ];
+      whereClause[Op.or] = [{ route_name: { [Op.like]: `%${search}%` } }];
     }
 
     // Fetch from database with pagination and filters
@@ -117,7 +104,7 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
         // Only proceed with fetching process names if we have process IDs
         let processDetails = [];
         if (Array.isArray(processIds) && processIds.length > 0) {
-          // Fetch process names for the process IDs
+          // Fetch all processes
           const processes = await ProcessName.findAll({
             where: {
               id: {
@@ -127,11 +114,19 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
             attributes: ["id", "process_name"],
           });
 
-          // Map processes to required format
-          processDetails = processes.map((process) => ({
-            id: process.id,
-            process_name: process.process_name,
-          }));
+          // Create a map of id -> process for quick lookup
+          const processMap = {};
+          processes.forEach((process) => {
+            processMap[process.id] = {
+              id: process.id,
+              process_name: process.process_name,
+            };
+          });
+
+          // Map processes in the ORIGINAL order from route_process
+          processDetails = processIds.map(
+            (id) => processMap[id] || { id, process_name: "Unknown" }
+          );
         }
 
         // Replace route_process string with the array of process objects
@@ -166,7 +161,7 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET single route by ID
+// GET single route by ID - Apply the same fix
 v1Router.get("/route/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
 
@@ -206,11 +201,19 @@ v1Router.get("/route/:id", authenticateJWT, async (req, res) => {
         attributes: ["id", "process_name"],
       });
 
-      // Map processes to required format
-      processDetails = processes.map((process) => ({
-        id: process.id,
-        process_name: process.process_name,
-      }));
+      // Create a map of id -> process for quick lookup
+      const processMap = {};
+      processes.forEach((process) => {
+        processMap[process.id] = {
+          id: process.id,
+          process_name: process.process_name,
+        };
+      });
+
+      // Map processes in the ORIGINAL order from route_process
+      processDetails = processIds.map(
+        (id) => processMap[id] || { id, process_name: "Unknown" }
+      );
     }
 
     // Replace route_process string with the array of process objects
@@ -232,7 +235,7 @@ v1Router.get("/route/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// PUT update existing route
+// Also fix the PUT route update to maintain consistency
 v1Router.put("/route/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const routeDetails = req.body;
@@ -264,7 +267,15 @@ v1Router.put("/route/:id", authenticateJWT, async (req, res) => {
 
     // Get updated route with process names
     const updatedRoute = route.get({ plain: true });
-    const processIds = updatedRoute.route_process;
+
+    // Parse route_process
+    let processIds;
+    try {
+      processIds = JSON.parse(updatedRoute.route_process);
+    } catch (err) {
+      logger.error("Error parsing route_process JSON:", err);
+      processIds = [];
+    }
 
     // Fetch process names for the process IDs
     const processes = await ProcessName.findAll({
@@ -276,11 +287,19 @@ v1Router.put("/route/:id", authenticateJWT, async (req, res) => {
       attributes: ["id", "process_name"],
     });
 
-    // Map processes to required format
-    updatedRoute.processes = processes.map((process) => ({
-      process_id: process.id,
-      process_name: process.process_name,
-    }));
+    // Create a map of id -> process for quick lookup
+    const processMap = {};
+    processes.forEach((process) => {
+      processMap[process.id] = {
+        process_id: process.id,
+        process_name: process.process_name,
+      };
+    });
+
+    // Map processes in the ORIGINAL order from route_process
+    updatedRoute.processes = processIds.map(
+      (id) => processMap[id] || { process_id: id, process_name: "Unknown" }
+    );
 
     res.json({
       message: "Route updated successfully",

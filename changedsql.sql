@@ -8,7 +8,7 @@ CREATE TABLE route (
     company_id INT UNSIGNED NOT NULL,
     route_name VARCHAR(255) NOT NULL,
     route_process JSON NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active';
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by INT UNSIGNED NOT NULL,
