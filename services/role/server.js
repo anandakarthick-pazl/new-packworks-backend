@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
+// import redisClient, { clearClientCache } from "../../common/helper/redis.js";
 import {
   publishToQueue,
   rabbitChannel,
@@ -14,7 +14,7 @@ import {
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
-import Role from "../../common/models/designation.model.js";
+import Role from "../../common/models/role.model.js";
 
 dotenv.config();
 
@@ -371,6 +371,32 @@ v1Router.put("/role/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.delete("/role/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const role = await Role.findOne({ where: { id } });
+
+    if (!role) {
+      return res.status(404).json({
+        success: false,
+        message: "Role not found",
+      });
+    }
+
+    await role.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: "Role deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting role:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 
 
 // ✅ Health Check Endpoint
@@ -378,7 +404,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
+    // redis: redisClient.status === "ready" ? "connected" : "disconnected",
     rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
@@ -386,7 +412,7 @@ app.get("/health", (req, res) => {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-  await redisClient.quit();
+  // await redisClient.quit();
   await closeRabbitMQConnection();
   process.exit(0);
 });
