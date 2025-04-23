@@ -237,6 +237,7 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "composite_type",
       "part_count",
       "part_value",
+      "route",
       "estimate_composite_item",
       "description",
       "default_sku_details",
@@ -338,6 +339,18 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
     if (updatedSku.part_value) {
       try {
         updatedSku.part_value = JSON.parse(updatedSku.part_value);
+      } catch (error) {
+        console.error("Error parsing part_value:", error.message);
+        await transaction.rollback();
+        return res.status(500).json({
+          message: "Error parsing part_value.",
+          error: error.message,
+        });
+      }
+    }
+    if (updatedSku.route) {
+      try {
+        updatedSku.route = JSON.parse(updatedSku.route);
       } catch (error) {
         console.error("Error parsing part_value:", error.message);
         await transaction.rollback();
@@ -526,6 +539,7 @@ v1Router.get(
         { header: "Description", key: "description", width: 20 },
         { header: "Default SKU Details", key: "default_sku_details", width: 20 },
         { header: "Tags", key: "tags", width: 20 },
+        {header:"route", key:"route", width:20},
         { header: "Joints", key: "joints", width: 10 },
         { header: "UPS", key: "ups", width: 10 },
         { header: "Select Dies", key: "select_dies", width: 10 },
@@ -581,6 +595,7 @@ v1Router.get(
           description: sku.description,
           default_sku_details: sku.default_sku_details,
           tags: sku.tags,
+          route: sku.route,
           joints: sku.joints,
           ups: sku.ups,
           select_dies: sku.select_dies,

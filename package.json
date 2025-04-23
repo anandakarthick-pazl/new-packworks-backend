@@ -30,7 +30,8 @@
     "item" : "nodemon services/item/server.js",
     "purchase" : "nodemon services/purchase-order/server.js",
     "grn" : "nodemon services/grn/server.js",
-    "inventory" : "nodemon services/inventory/server.js"
+    "inventory" : "nodemon services/inventory/server.js",
+    "route": "nodemon services/route/server.js"
   },
   "keywords": [],
   "author": "",

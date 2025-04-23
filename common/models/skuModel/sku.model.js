@@ -40,7 +40,7 @@ const Sku = sequelize.define(
     height: { type: DataTypes.FLOAT, allowNull: true },
     unit: { type: DataTypes.STRING, allowNull: true },
     joints: { type: DataTypes.INTEGER, allowNull: true },
-    ups: { type: DataTypes.INTEGER, allowNull: true }, 
+    ups: { type: DataTypes.INTEGER, allowNull: true },
     select_dies: { type: DataTypes.STRING, allowNull: true },
     inner_outer_dimension: {
       type: DataTypes.ENUM("Inner", "Outer"),
@@ -49,7 +49,7 @@ const Sku = sequelize.define(
     flap_width: { type: DataTypes.FLOAT, allowNull: true },
     flap_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     length_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
-    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true }, //add new
+    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     strict_adherence: {
       type: DataTypes.BOOLEAN,
       allowNull: true,
@@ -69,7 +69,6 @@ const Sku = sequelize.define(
     default_sku_details: { type: DataTypes.STRING, allowNull: true },
     tags: { type: DataTypes.JSON, allowNull: true },
 
-    
     sku_type: { type: DataTypes.STRING, allowNull: true },
     sku_values: {
       type: Sequelize.JSON,
@@ -79,19 +78,23 @@ const Sku = sequelize.define(
     sku_version_limit: {
       type: DataTypes.INTEGER,
       allowNull: true,
-    }, //add
+    },
     composite_type: {
       type: DataTypes.ENUM("Partition", "Panel"),
       allowNull: true,
-    }, //add new
+    },
     part_count: {
       type: DataTypes.INTEGER,
       allowNull: true,
-    }, // add new
+    },
     part_value: {
       type: Sequelize.JSON,
       allowNull: true,
-    }, //add new
+    },
+    route: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

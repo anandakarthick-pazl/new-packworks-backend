@@ -1474,141 +1474,16 @@ v1Router.post("/process-fields", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+// Update a process field (label and required status only)
 v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
-  let transaction;
-
-  try {
-    transaction = await sequelize.transaction();
-
-    const { id } = req.params;
-    const { process_name_id, label, field_type, required, status } = req.body;
-    const company_id = req.user.company_id;
-    const user_id = req.user.id;
-
-    // Find the process field and ensure it belongs to the user's company
-    const processField = await MachineProcessField.findOne({
-      where: {
-        id,
-        company_id,
-      },
-    });
-
-    if (!processField) {
-      await transaction.rollback();
-      return res.status(404).json({
-        status: "error",
-        message: "Process field not found or access denied",
-      });
-    }
-
-    // If process_name_id is changing, verify the new process exists
-    if (process_name_id && process_name_id !== processField.process_name_id) {
-      const process = await ProcessName.findOne({
-        where: {
-          id: process_name_id,
-          company_id,
-          status: "active",
-        },
-      });
-
-      if (!process) {
-        await transaction.rollback();
-        return res.status(404).json({
-          status: "error",
-          message: "New process not found or access denied",
-        });
-      }
-    }
-
-    // Check for duplicate label within the same process
-    if (
-      (label && label !== processField.label) ||
-      (process_name_id && process_name_id !== processField.process_name_id)
-    ) {
-      const existingField = await MachineProcessField.findOne({
-        where: {
-          company_id,
-          process_name_id: process_name_id || processField.process_name_id,
-          label: label || processField.label,
-          id: { [Op.ne]: id },
-          status: "active",
-        },
-      });
-
-      if (existingField) {
-        await transaction.rollback();
-        return res.status(409).json({
-          status: "error",
-          message: "Field label already exists for this process",
-        });
-      }
-    }
-
-    // Prepare the update data
-    const updateData = {
-      ...(process_name_id && { process_name_id }),
-      ...(label && { label }),
-      ...(field_type && { field_type }),
-      ...(required !== undefined && { required: required ? 1 : 0 }),
-      ...(status && { status }),
-      updated_by: user_id,
-    };
-
-    // Update the field
-    await processField.update(updateData, { transaction });
-    await transaction.commit();
-
-    // Fetch the updated field
-    const updatedField = await MachineProcessField.findByPk(id, {
-      include: [
-        { model: Company, attributes: ["id", "company_name"] },
-        { model: ProcessName, attributes: ["id", "process_name"] },
-        {
-          model: User,
-          as: "creator",
-          foreignKey: "created_by",
-          attributes: ["id", "name"],
-        },
-        {
-          model: User,
-          as: "updater",
-          foreignKey: "updated_by",
-          attributes: ["id", "name"],
-        },
-      ],
-    });
-
-    return res.status(200).json({
-      status: "success",
-      message: "Process field updated successfully",
-      data: updatedField,
-    });
-  } catch (error) {
-    if (transaction) {
-      try {
-        await transaction.rollback();
-      } catch (rollbackError) {
-        logger.error(`Rollback failed: ${rollbackError.message}`);
-      }
-    }
-
-    logger.error(`Error updating process field: ${error.message}`);
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to update process field",
-      error: error.message,
-    });
-  }
-});
-// Delete (soft delete) a process field
-v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
-
   try {
     const { id } = req.params;
+    const { label, required } = req.body;
     const company_id = req.user.company_id;
     const user_id = req.user.id;
-
+    
     // Check if the process field exists for the given company
     const processField = await MachineProcessField.findOne({
       where: {
@@ -1616,15 +1491,276 @@ v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
         company_id,
       },
     });
-
+    
     if (!processField) {
       return res.status(404).json({
         status: "error",
         message: "Process field not found or access denied",
       });
     }
+    
+    // Store the old label for reference
+    const oldLabel = processField.label;
+    const process_name_id = processField.process_name_id;
+    
+    console.log(`Updating field: ${oldLabel} to ${label}, process_name_id: ${process_name_id}`);
+    
+    // Update only the label and required fields
+    await processField.update(
+      {
+        label: label || processField.label,
+        required: required !== undefined ? required : processField.required,
+        updated_by: user_id,
+      },
+      { transaction }
+    );
+    
+    // If the label was changed, update all corresponding process values
+    if (label && label !== oldLabel) {
+      // Find process values related to this specific process_name_id
+      const processValues = await MachineProcessValue.findAll({
+        where: {
+          company_id,
+          process_name_id: process_name_id,
+          status: "active"
+        }
+      });
+      
+      console.log(`Found ${processValues.length} process values to update`);
+      
+      // Update each process value that contains this field name
+      for (const processValue of processValues) {
+        let valuesObj = processValue.process_value;
+        
+        console.log(`Original process value:`, valuesObj);
+        
+        // Parse if it's a string
+        if (typeof valuesObj === 'string') {
+          try {
+            valuesObj = JSON.parse(valuesObj);
+            console.log('Parsed JSON:', valuesObj);
+          } catch (e) {
+            console.log(`Error parsing JSON: ${e.message}`);
+            continue; // Skip if parsing fails
+          }
+        }
+        
+        if (valuesObj && typeof valuesObj === 'object') {
+          // Check if this process value contains the old field name
+          if (valuesObj.hasOwnProperty(oldLabel)) {
+            console.log(`Found old label ${oldLabel} in process value`);
+            
+            // Store the value associated with the old label
+            const fieldValue = valuesObj[oldLabel];
+            console.log(`Value for ${oldLabel}: ${fieldValue}`);
+            
+            // Create a new object with the updated key
+            const updatedValuesObj = {};
+            
+            // Copy all existing keys except the old label
+            for (const key in valuesObj) {
+              if (key !== oldLabel) {
+                updatedValuesObj[key] = valuesObj[key];
+              }
+            }
+            
+            // Add the new label with the same value
+            updatedValuesObj[label] = fieldValue;
+            
+            console.log(`Updated values object:`, updatedValuesObj);
+            
+            // Update the process value
+            await processValue.update(
+              {
+                process_value: updatedValuesObj,
+                updated_by: user_id
+              },
+              { transaction }
+            );
+            
+            console.log(`Updated process value with id ${processValue.id}`);
+          } else {
+            console.log(`Old label ${oldLabel} not found in process value`);
+          }
+        }
+      }
+    }
+    
+    await transaction.commit();
+    
+    return res.status(200).json({
+      status: "success",
+      message: "Process field updated successfully",
+      data: processField
+    });
+  } catch (error) {
+    await transaction.rollback();
+    logger.error(`Error updating process field: ${error.message}`);
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to update process field",
+      error: error.message,
+    });
+  }
+});
 
-    // Soft delete: explicitly update only the needed fields
+// v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
+//   let transaction;
+
+//   try {
+//     transaction = await sequelize.transaction();
+
+//     const { id } = req.params;
+//     const { process_name_id, label, field_type, required, status } = req.body;
+//     const company_id = req.user.company_id;
+//     const user_id = req.user.id;
+
+//     // Find the process field and ensure it belongs to the user's company
+//     const processField = await MachineProcessField.findOne({
+//       where: {
+//         id,
+//         company_id,
+//       },
+//     });
+
+//     if (!processField) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process field not found or access denied",
+//       });
+//     }
+
+//     // If process_name_id is changing, verify the new process exists
+//     if (process_name_id && process_name_id !== processField.process_name_id) {
+//       const process = await ProcessName.findOne({
+//         where: {
+//           id: process_name_id,
+//           company_id,
+//           status: "active",
+//         },
+//       });
+
+//       if (!process) {
+//         await transaction.rollback();
+//         return res.status(404).json({
+//           status: "error",
+//           message: "New process not found or access denied",
+//         });
+//       }
+//     }
+
+//     // Check for duplicate label within the same process
+//     if (
+//       (label && label !== processField.label) ||
+//       (process_name_id && process_name_id !== processField.process_name_id)
+//     ) {
+//       const existingField = await MachineProcessField.findOne({
+//         where: {
+//           company_id,
+//           process_name_id: process_name_id || processField.process_name_id,
+//           label: label || processField.label,
+//           id: { [Op.ne]: id },
+//           status: "active",
+//         },
+//       });
+
+//       if (existingField) {
+//         await transaction.rollback();
+//         return res.status(409).json({
+//           status: "error",
+//           message: "Field label already exists for this process",
+//         });
+//       }
+//     }
+
+//     // Prepare the update data
+//     const updateData = {
+//       ...(process_name_id && { process_name_id }),
+//       ...(label && { label }),
+//       ...(field_type && { field_type }),
+//       ...(required !== undefined && { required: required ? 1 : 0 }),
+//       ...(status && { status }),
+//       updated_by: user_id,
+//     };
+
+//     // Update the field
+//     await processField.update(updateData, { transaction });
+//     await transaction.commit();
+
+//     // Fetch the updated field
+//     const updatedField = await MachineProcessField.findByPk(id, {
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: ProcessName, attributes: ["id", "process_name"] },
+//         {
+//           model: User,
+//           as: "creator",
+//           foreignKey: "created_by",
+//           attributes: ["id", "name"],
+//         },
+//         {
+//           model: User,
+//           as: "updater",
+//           foreignKey: "updated_by",
+//           attributes: ["id", "name"],
+//         },
+//       ],
+//     });
+
+//     return res.status(200).json({
+//       status: "success",
+//       message: "Process field updated successfully",
+//       data: updatedField,
+//     });
+//   } catch (error) {
+//     if (transaction) {
+//       try {
+//         await transaction.rollback();
+//       } catch (rollbackError) {
+//         logger.error(`Rollback failed: ${rollbackError.message}`);
+//       }
+//     }
+
+//     logger.error(`Error updating process field: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to update process field",
+//       error: error.message,
+//     });
+//   }
+// });
+
+
+// Delete (soft delete) a process field
+v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+    
+    // Check if the process field exists for the given company
+    const processField = await MachineProcessField.findOne({
+      where: {
+        id,
+        company_id,
+      },
+    });
+    
+    if (!processField) {
+      return res.status(404).json({
+        status: "error",
+        message: "Process field not found or access denied",
+      });
+    }
+    
+    // Get the field name from the process field and the process_name_id
+    const fieldName = processField.label;
+    const process_name_id = processField.process_name_id;
+    
+    // Soft delete the process field
     await processField.update(
       {
         status: "inactive",
@@ -1632,12 +1768,52 @@ v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
       },
       { transaction }
     );
-
+    
+    // Find process values related to this specific process_name_id
+    const processValues = await MachineProcessValue.findAll({
+      where: {
+        company_id,
+        process_name_id: process_name_id,
+        status: "active"
+      }
+    });
+    
+    // Update each process value that contains this field name
+    for (const processValue of processValues) {
+      let valuesObj = processValue.process_value;
+      
+      // Parse if it's a string
+      if (typeof valuesObj === 'string') {
+        try {
+          valuesObj = JSON.parse(valuesObj);
+        } catch (e) {
+          continue; // Skip if parsing fails
+        }
+      }
+      
+      if (valuesObj && typeof valuesObj === 'object') {
+        // Check if this process value contains the deleted field name
+        if (valuesObj.hasOwnProperty(fieldName)) {
+          // Remove the field from the JSON object
+          delete valuesObj[fieldName];
+          
+          // Update the process value
+          await processValue.update(
+            {
+              process_value: valuesObj,
+              updated_by: user_id
+            },
+            { transaction }
+          );
+        }
+      }
+    }
+    
     await transaction.commit();
-
+    
     return res.status(200).json({
       status: "success",
-      message: "Process field marked as inactive successfully",
+      message: "Process field and associated values marked as inactive successfully",
     });
   } catch (error) {
     await transaction.rollback();
@@ -1649,6 +1825,56 @@ v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+// // Delete (soft delete) a process field
+// v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+
+//   try {
+//     const { id } = req.params;
+//     const company_id = req.user.company_id;
+//     const user_id = req.user.id;
+
+//     // Check if the process field exists for the given company
+//     const processField = await MachineProcessField.findOne({
+//       where: {
+//         id,
+//         company_id,
+//       },
+//     });
+
+//     if (!processField) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process field not found or access denied",
+//       });
+//     }
+
+//     // Soft delete: explicitly update only the needed fields
+//     await processField.update(
+//       {
+//         status: "inactive",
+//         updated_by: user_id,
+//       },
+//       { transaction }
+//     );
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       status: "success",
+//       message: "Process field marked as inactive successfully",
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     logger.error(`Error soft-deleting process field: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to delete process field",
+//       error: error.message,
+//     });
+//   }
+// });
 // Get all fields for a specific process
 v1Router.get(
   "/process/:process_id/fields",
