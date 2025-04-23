@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
+// import redisClient, { clearClientCache } from "../../common/helper/redis.js";
 import {
   publishToQueue,
   rabbitChannel,
@@ -14,7 +14,7 @@ import {
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
-import Role from "../../common/models/designation.model.js";
+import Role from "../../common/models/role.model.js";
 
 dotenv.config();
 
@@ -378,7 +378,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
+    // redis: redisClient.status === "ready" ? "connected" : "disconnected",
     rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
@@ -386,7 +386,7 @@ app.get("/health", (req, res) => {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-  await redisClient.quit();
+  // await redisClient.quit();
   await closeRabbitMQConnection();
   process.exit(0);
 });
