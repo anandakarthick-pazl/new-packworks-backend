@@ -57,6 +57,14 @@ const ItemMaster = sequelize.define('ItemMaster', {
       reorder_level: {
         type: DataTypes.DECIMAL(15, 2)
       },
+      cgst: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      sgst: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
       standard_cost: {
         type: DataTypes.DECIMAL(15, 2)
       },
