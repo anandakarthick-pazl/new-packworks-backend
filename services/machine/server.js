@@ -1111,6 +1111,7 @@ v1Router.put("/process/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -1130,27 +1131,39 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Check if this process is used in MachineProcessValue
-    const processInUse = await MachineProcessValue.findOne({
-      where: {
-        process_name_id: id,
+    // Instead of checking if process is in use and returning error,
+    // we'll soft delete related records in MachineProcessValue
+    await MachineProcessValue.update(
+      {
+        status: "inactive",
+        updated_at: new Date(),
+        updated_by: req.user.id
       },
-    });
+      { 
+        where: { process_name_id: id },
+        transaction
+      }
+    );
 
-    if (processInUse) {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Cannot delete process as it is associated with machine process values",
-      });
-    }
+    // Also soft delete related records in MachineProcessField
+    await MachineProcessField.update(
+      {
+        status: "inactive",
+        updated_at: new Date(),
+        updated_by: req.user.id
+      },
+      { 
+        where: { process_name_id: id },
+        transaction
+      }
+    );
 
-    // Soft delete: explicitly update only the needed fields
+    // Soft delete the process itself
     await process.update(
       {
         status: "inactive",
-        updated_at: req.user.id,
-        updated_by: req.user.id,
+        updated_at: new Date(), // Fixed this from req.user.id to new Date()
+        updated_by: req.user.id
       },
       { transaction }
     );
@@ -1159,7 +1172,7 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: "Process marked as inactive successfully",
+      message: "Process and related data marked as inactive successfully"
     });
   } catch (error) {
     await transaction.rollback();
@@ -1171,6 +1184,67 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+// v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+
+//   try {
+//     const { id } = req.params;
+//     const company_id = req.user.company_id;
+
+//     // Check if the process exists for the given company
+//     const process = await ProcessName.findOne({
+//       where: { id, company_id },
+//     });
+
+//     if (!process) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process not found or access denied",
+//       });
+//     }
+
+//     // Check if this process is used in MachineProcessValue
+//     const processInUse = await MachineProcessValue.findOne({
+//       where: {
+//         process_name_id: id,
+//       },
+//     });
+
+//     if (processInUse) {
+//       return res.status(400).json({
+//         status: "error",
+//         message:
+//           "Cannot delete process as it is associated with machine process values",
+//       });
+//     }
+
+//     // Soft delete: explicitly update only the needed fields
+//     await process.update(
+//       {
+//         status: "inactive",
+//         updated_at: req.user.id,
+//         updated_by: req.user.id,
+//       },
+//       { transaction }
+//     );
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       status: "success",
+//       message: "Process marked as inactive successfully",
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     logger.error(`Error soft-deleting process: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to delete process",
+//       error: error.message,
+//     });
+//   }
+// });
 // Get all values for a specific process
 v1Router.get(
   "/process/:process_id/values",
