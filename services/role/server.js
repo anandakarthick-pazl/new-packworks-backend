@@ -371,6 +371,32 @@ v1Router.put("/role/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.delete("/role/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const role = await Role.findOne({ where: { id } });
+
+    if (!role) {
+      return res.status(404).json({
+        success: false,
+        message: "Role not found",
+      });
+    }
+
+    await role.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: "Role deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting role:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 
 
 // ✅ Health Check Endpoint
