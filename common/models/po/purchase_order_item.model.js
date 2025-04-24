@@ -60,6 +60,22 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
   unit_price: {
     type: DataTypes.DECIMAL(15, 2),
   },
+  cgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  cgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
+  sgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  sgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
   amount: {
     type: DataTypes.DECIMAL(15, 2),
   },
