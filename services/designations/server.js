@@ -393,7 +393,7 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
     const { id } = req.params;
     const { name, parent_id, last_updated_by } = req.body;
 
-    const Designation = await Designation.findOne({ where: { id } });
+    const Designation = await DesignationModel.findOne({ where: { id } });
 
     if (!Designation) {
       return res.status(404).json({
