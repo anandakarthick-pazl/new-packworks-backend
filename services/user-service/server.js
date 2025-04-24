@@ -261,169 +261,28 @@ v1Router.post(
   }
 );
 
-v1Router.patch(
-  "/employees/:id/status",
-  authenticateJWT,
-  async (req, res) => {
-    console.log("Updating user status");
-    const transaction = await sequelize.transaction();
-    const userId = req.user.id; // Logged-in user ID
-    const targetUserId = req.params.id; // User whose status we're updating
-
-    try {
-      logger.info(`🔵 Updating status for user ID ${targetUserId} : ${JSON.stringify(req.body)}`);
-
-      const { status } = req.body;
-
-      // Validate status value
-      if (status !== 'active' && status !== 'inactive') {
-        await transaction.rollback();
-        return res
-          .status(400)
-          .json({ status: false, message: "Status must be either 'active' or 'inactive'" });
-      }
-
-      // Check if user exists
-      const user = await User.findOne({
-        where: { 
-          id: targetUserId,
-          company_id: req.user.company_id 
-        },
-        transaction
-      });
-
-      if (!user) {
-        logger.info(`❌ User with ID ${targetUserId} not found`);
-        await transaction.rollback();
-        return res
-          .status(404)
-          .json({ status: false, message: "User not found" });
-      }
-
-      // Check if user has permission to update status
-      // Assuming admin role has ID 1, modify according to your role system
-      const userRole = await UserRole.findOne({
-        where: { user_id: userId },
-        transaction
-      });
-
-      if (!userRole || userRole.role_id !== 1) {
-        const isManager = await Employee.findOne({
-          where: { 
-            user_id: targetUserId,
-            reporting_to: userId
-          },
-          transaction
-        });
-
-        if (!isManager) {
-          logger.info(`❌ User ${userId} does not have permission to update status of user ${targetUserId}`);
-          await transaction.rollback();
-          return res
-            .status(403)
-            .json({ status: false, message: "You don't have permission to update this user's status" });
-        }
-      }
-
-      // Update the user status
-      await User.update(
-        { 
-          status: status === 'active' ? true : false,
-          updated_at: new Date(),
-          updated_by: userId
-        },
-        { 
-          where: { id: targetUserId },
-          transaction 
-        }
-      );
-
-      logger.info(`✅ User status updated to ${status}`);
-
-      // If status is inactive, also update related records
-      if (status === 'inactive') {
-        // Update employee record
-        await Employee.update(
-          { 
-            last_date: new Date(),
-            updated_at: new Date(),
-            updated_by: userId
-          },
-          { 
-            where: { user_id: targetUserId },
-            transaction 
-          }
-        );
-        
-        logger.info(`✅ Employee last_date updated for user ${targetUserId}`);
-      }
-
-      // Commit transaction
-      await transaction.commit();
-      logger.info(`✅ User status updated successfully to ${status}`);
-
-      // Send notification email
-      const userEmail = user.email;
-      const userName = user.name;
-      const statusMessage = status === 'active' ? 'activated' : 'deactivated';
-
-      const emailPayload = {
-        to: userEmail,
-        subject: `Your Account Has Been ${statusMessage}`,
-        body: `
-          <h2>Hello ${userName},</h2>
-          <p>Your account has been ${statusMessage} by ${req.user.name}.</p>
-          <p>If you believe this was done in error, please contact your administrator.</p>
-        `,
-      };
-
-      logger.info("📩 Email Payload: " + JSON.stringify(emailPayload));
-
-      // Publish Email Task to RabbitMQ
-      const connection = await amqp.connect(RABBITMQ_URL);
-      const channel = await connection.createChannel();
-      await channel.assertQueue(QUEUE_NAME, { durable: true });
-
-      channel.sendToQueue(
-        QUEUE_NAME,
-        Buffer.from(JSON.stringify(emailPayload)),
-        { persistent: true }
-      );
-
-      logger.info(`📩 Email task queued for ${userEmail}`);
-      await channel.close();
-      await connection.close();
-
-      return res.status(200).json({
-        status: true,
-        message: `User status updated to ${status} successfully`,
-        data: {
-          id: targetUserId,
-          status: status
-        }
-      });
-    } catch (error) {
-      await transaction.rollback();
-      logger.error(`❌ User Status Update Error: ${error.message}`);
-
-      return res.status(500).json({
-        status: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
-    }
-  }
-);
-
-v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
-  console.log("Delete user details...");
+v1Router.patch("/employees/:userId/status", authenticateJWT, async (req, res) => {
+  console.log("Update employee status...");
   const transaction = await sequelize.transaction();
   try {
     const { userId } = req.params;
+    const { status } = req.body;
+    
+    // Validate status
+    if (!status || !["active", "inactive"].includes(status)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Invalid status. Must be 'active' or 'inactive'",
+        data: [],
+      });
+    }
+    
     const employee = await Employee.findOne({
       where: { id: userId },
       transaction,
     });
+    
     if (!employee) {
       logger.info("⚠️ Employee details not found.");
       await transaction.rollback();
@@ -433,21 +292,28 @@ v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
         data: [],
       });
     }
+    
     const user = await User.findOne({
       where: { id: employee.user_id, company_id: req.user.company_id },
       transaction,
     });
+    
     if (user) {
       await user.update({
-        status: "inactive",
+        status: status,
         updated_by: req.user.id,
         updated_at: new Date(),
-      });
+      }, { transaction });
+      
       await transaction.commit();
       return res.status(200).json({
         status: true,
-        message: "User deleted successfully",
-        data: [],
+        message: `User status updated to '${status}' successfully`,
+        data: {
+          id: user.id,
+          status: user.status,
+          updated_at: user.updated_at
+        },
       });
     } else {
       await transaction.rollback();
@@ -478,10 +344,77 @@ v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
       data: [],
     };
 
-    logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
+    logger.error(`User status update failed: ${JSON.stringify(errorMessage)}`);
     return res.status(500).json(errorMessage);
   }
 });
+// v1Router.delete("/employees/:userId", authenticateJWT, async (req, res) => {
+//   console.log("Delete user details...");
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const { userId } = req.params;
+//     const employee = await Employee.findOne({
+//       where: { id: userId },
+//       transaction,
+//     });
+//     if (!employee) {
+//       logger.info("⚠️ Employee details not found.");
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         status: false,
+//         message: "Employee details not found",
+//         data: [],
+//       });
+//     }
+//     const user = await User.findOne({
+//       where: { id: employee.user_id, company_id: req.user.company_id },
+//       transaction,
+//     });
+//     if (user) {
+//       await user.update({
+//         status: "inactive",
+//         updated_by: req.user.id,
+//         updated_at: new Date(),
+//       });
+//       await transaction.commit();
+//       return res.status(200).json({
+//         status: true,
+//         message: "User deleted successfully",
+//         data: [],
+//       });
+//     } else {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         status: false,
+//         message: "User not found",
+//         data: [],
+//       });
+//     }
+//   } catch (error) {
+//     await transaction.rollback();
+
+//     const stackLines = error.stack.split("\n");
+//     const callerLine = stackLines[1];
+//     const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
+//     let fileName = "";
+//     let lineNumber = "";
+
+//     if (match) {
+//       fileName = match[1];
+//       lineNumber = match[2];
+//     }
+//     const errorMessage = {
+//       status: false,
+//       message: error.message,
+//       file: fileName,
+//       line: lineNumber,
+//       data: [],
+//     };
+
+//     logger.error(`User update failed: ${JSON.stringify(errorMessage)}`);
+//     return res.status(500).json(errorMessage);
+//   }
+// });
 
 v1Router.put("/employees/:userId", authenticateJWT, async (req, res) => {
   console.log("Updating user details...");
