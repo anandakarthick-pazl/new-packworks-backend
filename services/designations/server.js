@@ -24,7 +24,6 @@ app.use(cors());
 
 const v1Router = Router();
 
-
 // GET single work order by ID
 
 /**
@@ -393,6 +392,7 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
     const { id } = req.params;
     const { name, parent_id, last_updated_by } = req.body;
 
+    // Find the existing designation
     const Designation = await DesignationModel.findOne({ where: { id } });
 
     if (!Designation) {
@@ -402,17 +402,28 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    await DesignationModel.update({
-      name,
-      parent_id,
-      last_updated_by,
-      updated_at: new Date(),
+    // Update the designation with provided data
+    await DesignationModel.update(
+      {
+        name,
+        parent_id,
+        last_updated_by,
+        updated_at: new Date(),
+      },
+      {
+        where: { id },
+      }
+    );
+
+    // Refetch the updated record
+    const updatedDesignation = await DesignationModel.findOne({
+      where: { id },
     });
 
     return res.status(200).json({
       success: true,
       message: "Designation updated successfully",
-      data: Designation,
+      data: updatedDesignation,
     });
   } catch (error) {
     console.error("Error updating Designation:", error);
