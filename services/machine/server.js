@@ -395,6 +395,164 @@ v1Router.delete("/assign/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.put("/assign/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const company_id = req.user.company_id;
+    const user_id = req.user.id;
+    const flowId = req.params.id;
+    const { machine_id, process_id } = req.body;
+
+    // Validate request body
+    if (!machine_id && !process_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Please provide at least machine_id or process_id to update",
+      });
+    }
+
+    // Check if the flow exists and belongs to the company
+    const flow = await MachineFlow.findOne({
+      where: {
+        id: flowId,
+        company_id,
+        status: "active",
+      },
+    });
+
+    if (!flow) {
+      return res.status(404).json({
+        status: "error",
+        message:
+          "Machine-process assignment not found or does not belong to your company",
+      });
+    }
+
+    // If updating machine_id, validate machine exists and belongs to company
+    let machine;
+    if (machine_id) {
+      machine = await Machine.findOne({
+        where: {
+          id: machine_id,
+          company_id,
+          status: "active",
+        },
+      });
+
+      if (!machine) {
+        return res.status(404).json({
+          status: "error",
+          message: "Machine not found or does not belong to your company",
+        });
+      }
+    }
+
+    // If updating process_id, validate process exists and belongs to company
+    let process;
+    if (process_id) {
+      process = await ProcessName.findOne({
+        where: {
+          id: process_id,
+          company_id,
+          status: "active",
+        },
+      });
+
+      if (!process) {
+        return res.status(404).json({
+          status: "error",
+          message: "Process not found or does not belong to your company",
+        });
+      }
+    }
+
+    // Check if the updated assignment would create a duplicate
+    const duplicateCheck = await MachineFlow.findOne({
+      where: {
+        company_id,
+        machine_id: machine_id || flow.machine_id,
+        process_id: process_id || flow.process_id,
+        status: "active",
+        id: { [Op.ne]: flowId }, // Exclude current record
+      },
+    });
+
+    if (duplicateCheck) {
+      return res.status(409).json({
+        status: "error",
+        message: "This machine-process assignment already exists",
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      updated_by: user_id,
+    };
+
+    if (machine_id) {
+      updateData.machine_id = machine_id;
+      updateData.machine_name = machine.machine_name;
+    }
+
+    if (process_id) {
+      updateData.process_id = process_id;
+      updateData.process_name = process.process_name;
+    }
+
+    // Update the machine flow assignment
+    await MachineFlow.update(updateData, {
+      where: {
+        id: flowId,
+      },
+      transaction,
+    });
+
+    await transaction.commit();
+
+    // Fetch updated assignment with associations
+    const updatedAssignment = await MachineFlow.findOne({
+      where: {
+        id: flowId,
+      },
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        { model: Machine, attributes: ["id", "machine_name", "machine_type"] },
+        { model: ProcessName, attributes: ["id", "process_name"] },
+        {
+          model: User,
+          as: "creator_machine_flow",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "updater_machine_flow",
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Machine-process assignment updated successfully",
+      data: updatedAssignment,
+    });
+  } catch (error) {
+    // Rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
+    logger.error(
+      `Error updating machine-process assignment: ${error.message}`
+    );
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to update machine-process assignment",
+      error: error.message,
+    });
+  }
+});
+
 // Create a new machine
 v1Router.post("/master/create", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
