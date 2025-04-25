@@ -110,7 +110,7 @@ const v1Router = Router();
 
 v1Router.post("/designations", authenticateJWT, async (req, res) => {
   try {
-    const { name, parent_id=0, added_by, last_updated_by } = req.body;
+    const { name, parent_id=null, added_by, last_updated_by } = req.body;
 
     const newDesignation = await DesignationModel.create({
       name,

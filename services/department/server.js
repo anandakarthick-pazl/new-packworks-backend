@@ -97,7 +97,7 @@ const v1Router = Router();
 
 v1Router.post("/departments", authenticateJWT, async (req, res) => {
   try {
-    const { company_id, department_name, parent_id=0, added_by, last_updated_by } = req.body;
+    const { company_id, department_name, parent_id=null, added_by, last_updated_by } = req.body;
 
     const newDepartment = await Department.create({
       department_name,
