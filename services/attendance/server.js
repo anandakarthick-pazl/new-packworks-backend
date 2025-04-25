@@ -412,7 +412,7 @@ process.on("SIGINT", async () => {
 // Use Version 1 Router
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = 3022;
+const PORT = 3026;
 app.listen(PORT, () => {
   console.log(`attendance Service running on port ${PORT}`);
 });
