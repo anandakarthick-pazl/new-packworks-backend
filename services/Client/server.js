@@ -194,7 +194,7 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
     await t.rollback();
     res
       .status(500)
-      .json({ message: "Error adding client", error: "Email already exists" });
+      .json({ message: "Error adding client", error: error.message });
   }
 });
 
