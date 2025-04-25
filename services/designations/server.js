@@ -110,7 +110,15 @@ const v1Router = Router();
 
 v1Router.post("/designations", authenticateJWT, async (req, res) => {
   try {
-    const { name, parent_id, added_by, last_updated_by } = req.body;
+    let { name, parent_id, added_by, last_updated_by } = req.body;
+
+    // Convert parent_id to integer or null
+    parent_id = parent_id ? parseInt(parent_id) : null;
+
+    // Optional: Validate parent_id is a number or null
+    if (parent_id !== null && isNaN(parent_id)) {
+      return res.status(400).json({ success: false, error: "Invalid parent_id" });
+    }
 
     const newDesignation = await DesignationModel.create({
       name,
@@ -131,6 +139,7 @@ v1Router.post("/designations", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 /**
  * @swagger

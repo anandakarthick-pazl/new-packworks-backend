@@ -24,7 +24,6 @@ app.use(cors());
 
 const v1Router = Router();
 
-
 // GET single work order by ID
 
 /**
@@ -99,7 +98,9 @@ const v1Router = Router();
 
 v1Router.post("/role", authenticateJWT, async (req, res) => {
   try {
-    const { name, display_name, description, status, created_by, updated_by } = req.body;
+    const { name, display_name, description, status, created_by, updated_by } =
+      req.body;
+    const company_id = req.user.company_id;
 
     const newRole = await Role.create({
       name,
@@ -108,7 +109,8 @@ v1Router.post("/role", authenticateJWT, async (req, res) => {
       status,
       created_by,
       updated_by,
-      created_at: new Date(),
+      company_id,
+      created_at: req.user.id,
       updated_at: new Date(),
     });
 
@@ -164,7 +166,12 @@ v1Router.post("/role", authenticateJWT, async (req, res) => {
 
 v1Router.get("/role", authenticateJWT, async (req, res) => {
   try {
-    const roles = await Role.findAll();
+    const roles = await Role.findAll({
+      where: {
+        name: { [Op.ne]: "superadmin" }, // exclude SuperAdmin
+      },
+    });
+
     return res.status(200).json({
       success: true,
       data: roles,
@@ -395,9 +402,6 @@ v1Router.delete("/role/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
-
-
-
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {

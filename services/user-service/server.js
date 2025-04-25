@@ -36,7 +36,7 @@ const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
 v1Router.post(
   "/register",
-  validateRegister,
+  
   authenticateJWT,
   async (req, res) => {
     console.log("Registering user");
