@@ -12,6 +12,8 @@ const GRNItem = db.GRNItem;
 const PurchaseOrder = db.PurchaseOrder;
 const ItemMaster = db.ItemMaster;
 const PurchaseOrderItem = db.PurchaseOrderItem;
+const Inventory = db.Inventory;
+
 
 dotenv.config();
 const app = express();
@@ -22,18 +24,82 @@ const v1Router = Router();
 
 
 // create grn and grn items
+// v1Router.post("/grn", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const { items, ...grnData } = req.body;
+
+//     grnData.created_by = req.user.id;
+//     grnData.updated_by = req.user.id;
+//     grnData.company_id = req.user.company_id;
+
+//     const poId = grnData.po_id;
+//     const validatePo = await PurchaseOrder.findOne({
+//       where: { po_id: poId, status: "active" },
+//       transaction
+//     });
+
+//     if (!validatePo) {
+//       throw new Error("Invalid or inactive Purchase Order.");
+//     }
+
+//     const newGRN = await GRN.create(grnData, { transaction });
+
+//     for (const item of items) {
+//       item.created_by = req.user.id;
+//       item.updated_by = req.user.id;
+//       item.company_id = req.user.company_id;
+//       item.grn_id = newGRN.grn_id;
+
+//       const poItem = await PurchaseOrderItem.findOne({
+//         where: { po_item_id: item.po_item_id },
+//         transaction
+//       });
+//       if (!poItem) throw new Error(`PO Item ${item.po_item_id} not found`);
+
+//       const itemMaster = await ItemMaster.findOne({
+//         where: { item_id: item.item_id },
+//         transaction
+//       });
+//       if (!itemMaster) throw new Error(`Item ${item.item_id} not found`);
+
+//       await GRNItem.create(item, { transaction });
+//     }
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "GRN and items created successfully",
+//       data: newGRN
+//     });
+
+//   } catch (error) {
+//     await transaction.rollback();
+//     console.error("GRN creation error:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: `GRN creation failed: ${error.message}`
+//     });
+//   }
+// });
+
+
 v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { items, ...grnData } = req.body;
+    const { po_id } = grnData;
 
+
+    // Add user info
     grnData.created_by = req.user.id;
     grnData.updated_by = req.user.id;
     grnData.company_id = req.user.company_id;
 
-    const poId = grnData.po_id;
+    // Validate PO
     const validatePo = await PurchaseOrder.findOne({
-      where: { po_id: poId, status: "active" },
+      where: { po_id: grnData.po_id, status: "active" },
       transaction
     });
 
@@ -41,34 +107,118 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       throw new Error("Invalid or inactive Purchase Order.");
     }
 
+    // Create GRN
     const newGRN = await GRN.create(grnData, { transaction });
 
+    console.log("New GRN created with items:");
+
+    // Loop through items
     for (const item of items) {
-      item.created_by = req.user.id;
-      item.updated_by = req.user.id;
-      item.company_id = req.user.company_id;
-      item.grn_id = newGRN.grn_id;
+      const {
+        po_item_id,
+        item_id,
+        item_code,
+        grn_item_name,
+        description,
+        quantity_ordered,
+        quantity_received,
+        accepted_quantity,
+        rejected_quantity,
+        notes,
+        work_order_no,
+        batch_no,
+        location
+      } = item;
 
+      // Validate PO item
       const poItem = await PurchaseOrderItem.findOne({
-        where: { po_item_id: item.po_item_id },
+        where: { po_item_id },
         transaction
       });
-      if (!poItem) throw new Error(`PO Item ${item.po_item_id} not found`);
+      if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
 
+      // Validate Item Master
       const itemMaster = await ItemMaster.findOne({
-        where: { item_id: item.item_id },
+        where: { item_id },
         transaction
       });
-      if (!itemMaster) throw new Error(`Item ${item.item_id} not found`);
+      if (!itemMaster) throw new Error(`Item ${item_id} not found`);
 
-      await GRNItem.create(item, { transaction });
+      // Create GRN Item
+      const newGRNItem = await GRNItem.create({
+        grn_id: newGRN.grn_id,
+        po_item_id,
+        item_id,
+        item_code,
+        grn_item_name,
+        description,
+        quantity_ordered,
+        quantity_received,
+        accepted_quantity,
+        rejected_quantity,
+        notes,
+        work_order_no,
+        batch_no,
+        location,
+        created_by: req.user.id,
+        updated_by: req.user.id,
+        company_id: req.user.company_id
+      }, { transaction });
+
+      // Update Inventory with accepted_quantity only
+      const existingInventory = await Inventory.findOne({
+        where: {
+          item_id,
+          // batch_no: batch_no || null,
+          location: location || null,
+          company_id: req.user.company_id,
+          status: 'active'
+        },
+        transaction
+      });
+
+      console.log("Existing Inventory:", existingInventory);
+      
+
+      if (existingInventory) {
+        console.log("existing inventory:", existingInventory.quantity_available);
+        console.log("accepted quantity:", accepted_quantity);
+        
+        
+        const currentQty = parseFloat(existingInventory.quantity_available) || 0;
+        const acceptedQty = parseFloat(accepted_quantity) || 0;
+        existingInventory.quantity_available = currentQty + acceptedQty;
+        
+        console.log("newGRNItem inventory:", newGRNItem.quantity_available);
+
+        existingInventory.updated_by = req.user.id;
+        await existingInventory.save({ transaction });
+      } else {
+        await Inventory.create({
+          company_id: req.user.company_id,
+          item_id,
+          item_code,
+          grn_id: newGRN.grn_id,
+          grn_item_id: newGRNItem.grn_item_id,
+          po_id,
+          inventory_type: 'default',
+          work_order_no,
+          description,
+          quantity_available: accepted_quantity,
+          batch_no,
+          location,
+          status: 'active',
+          created_by: req.user.id,
+          updated_by: req.user.id
+        }, { transaction });
+      }
     }
 
     await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: "GRN and items created successfully",
+      message: "GRN and inventory updated successfully",
       data: newGRN
     });
 

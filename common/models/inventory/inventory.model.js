@@ -58,6 +58,9 @@ const Inventory = sequelize.define("Inventory", {
   work_order_no: {
     type: DataTypes.STRING(255),
   },
+  po_id: {
+    type: DataTypes.INTEGER(12),
+  },
   description: {
     type: DataTypes.TEXT,
   },
