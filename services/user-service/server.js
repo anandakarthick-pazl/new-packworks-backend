@@ -33,10 +33,8 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL;
 const QUEUE_NAME = process.env.USER_QUEUE_NAME;
 
 // Register API with Transaction
-
 v1Router.post(
-  "/register",
-  
+  "/register",  
   authenticateJWT,
   async (req, res) => {
     console.log("Registering user");
@@ -134,7 +132,7 @@ v1Router.post(
 
       logger.info("✅ newUser: " + JSON.stringify(newUser));
 
-      // Step 6: Insert into Employee table
+      // Step 6: Extract employee data from request body
       const {
         employee_id,
         address,
@@ -159,40 +157,59 @@ v1Router.post(
         skills,
       } = req.body;
 
-      // ✅ Ensure `joining_date` is set properly
-      const employee = await Employee.create(
-        {
-          user_id: newUser.id,
-          company_id: req.user.company_id,
-          employee_id,
-          address,
-          hourly_rate,
-          slack_username,
-          department_id,
-          designation_id,
-          joining_date: joining_date || new Date(), // ✅ Fix: Set default date if missing
-          last_date,
-          added_by,
-          last_updated_by,
-          attendance_reminder,
-          date_of_birth,
-          contract_end_date,
-          internship_end_date,
-          employment_type,
-          marriage_anniversary_date,
-          marital_status,
-          notice_period_end_date,
-          notice_period_start_date,
-          probation_end_date,
-          company_address_id,
-          overtime_hourly_rate,
-          created_at: new Date(),
-          created_by: userId,
-          updated_at: new Date(),
-          skills,
-        },
-        { transaction }
-      );
+      // Create a base employee data object with non-date fields
+      const employeeData = {
+        user_id: newUser.id,
+        company_id: req.user.company_id,
+        employee_id,
+        address,
+        hourly_rate,
+        slack_username,
+        department_id,
+        designation_id,
+        joining_date: joining_date ? new Date(joining_date) : new Date(), // Default to current date
+        added_by,
+        last_updated_by,
+        attendance_reminder,
+        employment_type,
+        marital_status,
+        company_address_id,
+        overtime_hourly_rate,
+        created_at: new Date(),
+        created_by: userId,
+        updated_at: new Date(),
+        skills,
+      };
+
+      // Validate and add date fields only if they contain valid dates
+      const dateFields = [
+        { field: 'last_date', value: last_date },
+        { field: 'date_of_birth', value: date_of_birth },
+        { field: 'contract_end_date', value: contract_end_date },
+        { field: 'internship_end_date', value: internship_end_date },
+        { field: 'marriage_anniversary_date', value: marriage_anniversary_date },
+        { field: 'notice_period_end_date', value: notice_period_end_date },
+        { field: 'notice_period_start_date', value: notice_period_start_date },
+        { field: 'probation_end_date', value: probation_end_date },
+      ];
+
+      dateFields.forEach(({ field, value }) => {
+        if (value) {
+          try {
+            const parsedDate = new Date(value);
+            if (!isNaN(parsedDate.getTime())) {
+              employeeData[field] = parsedDate;
+            } else {
+              logger.warn(`Skipping invalid date for ${field}: ${value}`);
+            }
+          } catch (e) {
+            logger.warn(`Error parsing date for ${field}: ${e.message}`);
+          }
+        }
+      });
+
+      // Create the employee with validated data
+      const employee = await Employee.create(employeeData, { transaction });
 
       logger.info("✅ newEmployee: " + JSON.stringify(employee));
 
@@ -260,6 +277,231 @@ v1Router.post(
     }
   }
 );
+// v1Router.post(
+//   "/register",  
+//   authenticateJWT,
+//   async (req, res) => {
+//     console.log("Registering user");
+//     const transaction = await sequelize.transaction();
+//     const userId = req.user.id; // Logged-in user ID
+
+//     try {
+//       logger.info("🔵 Registering a new user : " + JSON.stringify(req.body));
+
+//       const {
+//         name,
+//         email,
+//         password,
+//         mobile,
+//         role_id,
+//         department_id,
+//         designation_id,
+//         reporting_to,
+//         image,
+//         country_phonecode,
+//         country_id,
+//       } = req.body;
+
+//       // Step 1: Validate department_id, designation_id, and role_id
+//       const department = await Department.findByPk(department_id);
+//       if (!department) {
+//         await transaction.rollback();
+//         return res
+//           .status(400)
+//           .json({ status: false, message: "Invalid department_id" });
+//       }
+
+//       const designation = await Designation.findByPk(designation_id);
+//       if (!designation) {
+//         await transaction.rollback();
+//         return res
+//           .status(400)
+//           .json({ status: false, message: "Invalid designation_id" });
+//       }
+
+//       const role = await Role.findByPk(role_id);
+//       if (!role) {
+//         await transaction.rollback();
+//         return res
+//           .status(400)
+//           .json({ status: false, message: "Invalid role_id" });
+//       }
+//       const reportingTo = await User.findByPk(reporting_to);
+//       if (!reportingTo) {
+//         await transaction.rollback();
+//         return res
+//           .status(400)
+//           .json({ status: false, message: "Invalid Reporting To" });
+//       }
+
+//       // Step 2: Check if user already exists
+//       const existingUser = await User.findOne({
+//         where: { email, company_id: req.user.company_id },
+//         transaction,
+//       });
+
+//       if (existingUser) {
+//         logger.info("❌ Email already registered");
+//         await transaction.rollback();
+//         return res
+//           .status(400)
+//           .json({ status: false, message: "Email already registered" });
+//       }
+
+//       // Step 3: Hash password
+//       const hashedPassword = await bcrypt.hash(password, 10);
+
+//       // Step 4: Insert into UserAuth table
+//       const newUserAuth = await UserAuth.create(
+//         { email, password: hashedPassword },
+//         { transaction }
+//       );
+
+//       logger.info("✅ newUserAuth: " + JSON.stringify(newUserAuth));
+
+//       // Step 5: Insert into User table
+//       const newUser = await User.create(
+//         {
+//           name,
+//           user_auth_id: newUserAuth.id,
+//           email,
+//           mobile,
+//           company_id: req.user.company_id,
+//           image,
+//           country_phonecode,
+//           country_id,
+//         },
+//         { transaction }
+//       );
+
+//       logger.info("✅ newUser: " + JSON.stringify(newUser));
+
+//       // Step 6: Insert into Employee table
+//       const {
+//         employee_id,
+//         address,
+//         hourly_rate,
+//         slack_username,
+//         joining_date,
+//         last_date,
+//         added_by,
+//         last_updated_by,
+//         attendance_reminder,
+//         date_of_birth,
+//         contract_end_date,
+//         internship_end_date,
+//         employment_type,
+//         marriage_anniversary_date,
+//         marital_status,
+//         notice_period_end_date,
+//         notice_period_start_date,
+//         probation_end_date,
+//         company_address_id,
+//         overtime_hourly_rate,
+//         skills,
+//       } = req.body;
+
+//       // ✅ Ensure `joining_date` is set properly
+//       const employee = await Employee.create(
+//         {
+//           user_id: newUser.id,
+//           company_id: req.user.company_id,
+//           employee_id,
+//           address,
+//           hourly_rate,
+//           slack_username,
+//           department_id,
+//           designation_id,
+//           joining_date: joining_date || new Date(), // ✅ Fix: Set default date if missing
+//           last_date,
+//           added_by,
+//           last_updated_by,
+//           attendance_reminder,
+//           date_of_birth,
+//           contract_end_date,
+//           internship_end_date,
+//           employment_type,
+//           marriage_anniversary_date,
+//           marital_status,
+//           notice_period_end_date,
+//           notice_period_start_date,
+//           probation_end_date,
+//           company_address_id,
+//           overtime_hourly_rate,
+//           created_at: new Date(),
+//           created_by: userId,
+//           updated_at: new Date(),
+//           skills,
+//         },
+//         { transaction }
+//       );
+
+//       logger.info("✅ newEmployee: " + JSON.stringify(employee));
+
+//       // Step 7: Assign Role to User
+//       const [userRole, created] = await UserRole.findOrCreate({
+//         where: { user_id: newUser.id },
+//         defaults: { role_id, created_by: userId },
+//         transaction,
+//       });
+
+//       if (!created) {
+//         await userRole.update({ role_id, updated_by: userId }, { transaction });
+//       }
+
+//       logger.info("✅ User role assigned");
+
+//       // Step 8: Commit transaction
+//       await transaction.commit();
+//       logger.info("✅ User Registered Successfully");
+
+//       // Step 9: Prepare Email Message
+//       const emailPayload = {
+//         to: email,
+//         subject: "Welcome to Our Platform!",
+//         body: `
+//           <h2>Hello ${name},</h2>
+//           <p>Your account has been created successfully!</p>
+//           <p><strong>Email:</strong> ${email}</p>
+//           <p><strong>Password:</strong> ${password}</p>
+//           <p>Please login and change your password.</p>
+//         `,
+//       };
+
+//       logger.info("📩 Email Payload: " + JSON.stringify(emailPayload));
+
+//       // Step 10: Publish Email Task to RabbitMQ
+//       const connection = await amqp.connect(RABBITMQ_URL);
+//       const channel = await connection.createChannel();
+//       await channel.assertQueue(QUEUE_NAME, { durable: true });
+
+//       channel.sendToQueue(
+//         QUEUE_NAME,
+//         Buffer.from(JSON.stringify(emailPayload)),
+//         { persistent: true }
+//       );
+
+//       logger.info(`📩 Email task queued for ${email}`);
+//       await channel.close();
+//       await connection.close();
+
+//       return res.status(200).json({
+//         status: true,
+//         message: "User registered successfully",
+//         data: newUser,
+//       });
+//     } catch (error) {
+//       await transaction.rollback();
+//       logger.error(`❌ User Register Error: ${error.message}`);
+
+//       return res.status(500).json({
+//         status: false,
+//         message: "Internal Server Error",
+//         error: error.message,
+//       });
+//     }
+//   }
+// );
 
 v1Router.patch("/employees/:userId/status", authenticateJWT, async (req, res) => {
   console.log("Update employee status...");
