@@ -18,7 +18,8 @@ const Designation = sequelize.define('Designation', {
     },
     parent_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0,
     },
     added_by: {
       type: DataTypes.INTEGER.UNSIGNED,
