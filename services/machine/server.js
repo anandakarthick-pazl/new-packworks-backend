@@ -954,7 +954,22 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Soft delete: update status to inactive
+    // Soft delete related machine flows
+    await MachineFlow.update(
+      {
+        status: "inactive",
+        updated_by: user_id,
+      },
+      {
+        where: {
+          machine_id: id,
+          status: "active",
+        },
+        transaction
+      }
+    );
+
+    // Soft delete the machine
     await machine.update(
       {
         status: "inactive",
@@ -967,7 +982,7 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: "Machine deleted successfully",
+      message: "Machine and related flows deleted successfully",
     });
   } catch (error) {
     await transaction.rollback();
@@ -979,6 +994,55 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+// v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+
+//   try {
+//     const { id } = req.params;
+//     const company_id = req.user.company_id;
+//     const user_id = req.user.id;
+
+//     // Check if the machine exists for the given company
+//     const machine = await Machine.findOne({
+//       where: {
+//         id,
+//         company_id,
+//         status: "active",
+//       },
+//     });
+
+//     if (!machine) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Machine not found or access denied",
+//       });
+//     }
+
+//     // Soft delete: update status to inactive
+//     await machine.update(
+//       {
+//         status: "inactive",
+//         updated_by: user_id,
+//       },
+//       { transaction }
+//     );
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       status: "success",
+//       message: "Machine deleted successfully",
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     logger.error(`Error deleting machine: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to delete machine",
+//       error: error.message,
+//     });
+//   }
+// });
 // Update machine status (Active, Inactive, Under Maintenance)
 v1Router.patch("/master/:id/status", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
