@@ -89,6 +89,8 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { items, ...grnData } = req.body;
+    const { po_id } = grnData;
+
 
     // Add user info
     grnData.created_by = req.user.id;
@@ -187,7 +189,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         const acceptedQty = parseFloat(accepted_quantity) || 0;
         existingInventory.quantity_available = currentQty + acceptedQty;
         
-        console.log("Updating inventory:", existingInventory.quantity_available);
+        console.log("newGRNItem inventory:", newGRNItem.quantity_available);
 
         existingInventory.updated_by = req.user.id;
         await existingInventory.save({ transaction });
@@ -198,6 +200,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           item_code,
           grn_id: newGRN.grn_id,
           grn_item_id: newGRNItem.grn_item_id,
+          po_id,
           inventory_type: 'default',
           work_order_no,
           description,
