@@ -63,6 +63,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
       },
+      amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
       tax_amount: {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true,
