@@ -94,10 +94,17 @@ const v1Router = Router();
  *                   type: string
  *                   example: Error details
  */
-
 v1Router.post("/departments", authenticateJWT, async (req, res) => {
   try {
-    const { company_id, department_name, parent_id=null, added_by, last_updated_by } = req.body;
+    let { company_id, department_name, parent_id, added_by, last_updated_by } = req.body;
+
+    // Convert parent_id to integer or null
+    parent_id = parent_id ? parseInt(parent_id) : null;
+
+    // Optional: Validate parent_id is a number or null
+    if (parent_id !== null && isNaN(parent_id)) {
+      return res.status(400).json({ success: false, error: "Invalid parent_id" });
+    }
 
     const newDepartment = await Department.create({
       department_name,
@@ -118,6 +125,30 @@ v1Router.post("/departments", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// v1Router.post("/departments", authenticateJWT, async (req, res) => {
+//   try {
+//     const { company_id, department_name, parent_id=null, added_by, last_updated_by } = req.body;
+
+//     const newDepartment = await Department.create({
+//       department_name,
+//       parent_id,
+//       added_by,
+//       last_updated_by,
+//       created_at: new Date(),
+//       updated_at: new Date(),
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Department created successfully",
+//       data: newDepartment,
+//     });
+//   } catch (error) {
+//     console.error("Error creating department:", error);
+//     return res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 /**
  * @swagger
