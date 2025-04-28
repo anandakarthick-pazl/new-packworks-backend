@@ -33,6 +33,7 @@ import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
 import InventoryType from "./inventory/inventory_type.model.js";
 import Route from "./route/route.model.js";
+import InvoiceSetting from "./invoiceSetting.model.js";
 
 const db = {
   sequelize,
@@ -70,6 +71,7 @@ const db = {
   Inventory,
   InventoryType,
   Route,
+  InvoiceSetting
 };
 
 export default db;

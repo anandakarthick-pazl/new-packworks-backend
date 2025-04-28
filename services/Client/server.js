@@ -18,6 +18,8 @@ import { Readable } from "stream";
 // import { validateClient } from "../../common/inputvalidation/validationClient.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 
+import { generateId } from "../../common/inputvalidation/generateId.js";
+
 dotenv.config();
 
 const app = express();
@@ -32,120 +34,25 @@ const User = db.User;
 
 // 🔹 Create a Client (POST)
 
-/**
- * @swagger
- * /clients:
- *   post:
- *     summary: Create a new client with addresses
- *     description: Creates a client and their associated addresses.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - clientData
- *               - addresses
- *             properties:
- *               clientData:
- *                 type: object
- *                 properties:
- *                   name:
- *                     type: string
- *                     example: John Doe
- *                   email:
- *                     type: string
- *                     example: john@example.com
- *                   phone:
- *                     type: string
- *                     example: +91-9876543210
- *                   gstin:
- *                     type: string
- *                     example: 22AAAAA0000A1Z5
- *                   pan:
- *                     type: string
- *                     example: AAAAA0000A
- *                   company_name:
- *                     type: string
- *                     example: Acme Corporation
- *                   industry:
- *                     type: string
- *                     example: Manufacturing
- *                   notes:
- *                     type: string
- *                     example: Important client
- *               addresses:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     address_line1:
- *                       type: string
- *                       example: 123 Main Street
- *                     address_line2:
- *                       type: string
- *                       example: Suite 200
- *                     city:
- *                       type: string
- *                       example: Mumbai
- *                     state:
- *                       type: string
- *                       example: Maharashtra
- *                     country:
- *                       type: string
- *                       example: India
- *                     pincode:
- *                       type: string
- *                       example: 400001
- *                     address_type:
- *                       type: string
- *                       enum: [billing, shipping]
- *                       example: billing
- *     responses:
- *       201:
- *         description: Client and Addresses added successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Client and Addresses added successfully
- *                 client:
- *                   $ref: '#/components/schemas/Client'
- *                 addresses:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Address'
- *       500:
- *         description: Error adding client
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error adding client
- *                 error:
- *                   type: string
- *                   example: Email already exists
- */
-
 v1Router.post("/clients", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { clientData, addresses } = req.body;
 
+    // Extract entity_type from clientData instead of from req.body directly
+    const entity_type = clientData.entity_type;
+
+    const client_ui_id = await generateId(
+      req.user.company_id,
+      Client,
+      entity_type === "Client" ? "client" : entity_type === "Vendor" ? "vendor" : "other"
+    );
+
     // Add user tracking information internally
     const newClientData = {
       ...clientData,
+      // No need to override entity_type as it's already in clientData
+      client_ui_id: client_ui_id,
       company_id: req.user.company_id,
       created_by: req.user.id,
       updated_by: req.user.id,
@@ -153,7 +60,10 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
     };
 
     // 1. Create Client
-    const newClient = await Client.create(newClientData, { transaction: t, ...req.sequelizeOptions });
+    const newClient = await Client.create(newClientData, {
+      transaction: t,
+      ...req.sequelizeOptions,
+    });
 
     console.log("create Client", newClient.toJSON());
 
@@ -199,136 +109,6 @@ v1Router.post("/clients", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get All Clients (GET) with Addresses - Only active clients
-
-/**
- * @swagger
- * /clients:
- *   get:
- *     summary: Get paginated list of clients
- *     description: Fetches a paginated list of clients, with optional filters like search, entity type, and inactive status.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: page
- *         in: query
- *         description: Page number (default is 1)
- *         required: false
- *         schema:
- *           type: integer
- *           example: 1
- *       - name: limit
- *         in: query
- *         description: Number of records per page (default is 10)
- *         required: false
- *         schema:
- *           type: integer
- *           example: 10
- *       - name: search
- *         in: query
- *         description: Search string for company name, PAN, email, mobile, GST number, etc.
- *         required: false
- *         schema:
- *           type: string
- *           example: Acme
- *       - name: includeInactive
- *         in: query
- *         description: Include inactive clients (true or false)
- *         required: false
- *         schema:
- *           type: string
- *           enum: [true, false]
- *           example: false
- *       - name: entity_type
- *         in: query
- *         description: Filter by entity type (e.g., Client, Vendor)
- *         required: false
- *         schema:
- *           type: string
- *           example: Client
- *     responses:
- *       200:
- *         description: A paginated list of clients
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       client_id:
- *                         type: integer
- *                         example: 101
- *                       client_ui_id:
- *                         type: string
- *                         example: CLNT-101
- *                       company_name:
- *                         type: string
- *                         example: Acme Corp
- *                       entity_type:
- *                         type: string
- *                         example: Client
- *                       email:
- *                         type: string
- *                         example: client@example.com
- *                       mobile:
- *                         type: string
- *                         example: "+1234567890"
- *                       status:
- *                         type: string
- *                         example: active
- *                       addresses:
- *                         type: array
- *                         items:
- *                           type: object
- *                       creator:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *                           email:
- *                             type: string
- *                       updater:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *                           email:
- *                             type: string
- *                 totalPages:
- *                   type: integer
- *                   example: 5
- *                 currentPage:
- *                   type: integer
- *                   example: 1
- *                 totalRecords:
- *                   type: integer
- *                   example: 50
- *       500:
- *         description: Server error while fetching clients
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Internal server error
- */
 
 v1Router.get("/clients", authenticateJWT, async (req, res) => {
   try {
@@ -392,12 +172,6 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       status: true,
       data: clients.map((client) => ({
         ...client.toJSON(),
-        client_ui_id:
-          client.entity_type === "Client"
-            ? `CLNT-${client.client_id}`
-            : client.entity_type === "Vendor"
-            ? `VEND-${client.client_id}`
-            : client.client_id,
       })),
       totalPages: Math.ceil(count / limit),
       currentPage: page,
@@ -412,106 +186,6 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Get a Single Client by ID with Addresses (GET)
-/**
- * @swagger
- * /clients/{id}:
- *   get:
- *     summary: Get a specific client by ID
- *     description: Fetch a single client including address and creator/updater information by client ID.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         description: Unique ID of the client
- *         required: true
- *         schema:
- *           type: integer
- *           example: 101
- *     responses:
- *       200:
- *         description: Client details retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     client_id:
- *                       type: integer
- *                       example: 101
- *                     company_name:
- *                       type: string
- *                       example: Acme Corp
- *                     entity_type:
- *                       type: string
- *                       example: Client
- *                     email:
- *                       type: string
- *                       example: client@example.com
- *                     mobile:
- *                       type: string
- *                       example: "+1234567890"
- *                     status:
- *                       type: string
- *                       example: active
- *                     addresses:
- *                       type: array
- *                       items:
- *                         type: object
- *                     creator:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: integer
- *                         name:
- *                           type: string
- *                         email:
- *                           type: string
- *                     updater:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: integer
- *                         name:
- *                           type: string
- *                         email:
- *                           type: string
- *       404:
- *         description: Client not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Client not found
- *       500:
- *         description: Server error while fetching client
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Internal server error
- */
-
 v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   try {
     const clientId = req.params.id;
@@ -546,122 +220,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-
-/**
- * @swagger
- * /clients/{id}:
- *   put:
- *     summary: Update a client and its addresses
- *     description: Update client details and associated addresses. Only existing addresses with valid IDs can be updated.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the client to update
- *         schema:
- *           type: integer
- *           example: 101
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               clientData:
- *                 type: object
- *                 description: Data to update for the client
- *                 example:
- *                   company_name: Acme Corporation
- *                   email: acme@example.com
- *                   mobile: "+1234567890"
- *                   entity_type: Client
- *               addresses:
- *                 type: array
- *                 description: List of addresses to update (must include address IDs)
- *                 items:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                       example: 201
- *                     address_line1:
- *                       type: string
- *                       example: "123 Street"
- *                     city:
- *                       type: string
- *                       example: "New York"
- *                     state:
- *                       type: string
- *                       example: "NY"
- *                     zip:
- *                       type: string
- *                       example: "10001"
- *     responses:
- *       200:
- *         description: Client and addresses updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Client and addresses updated successfully
- *                 client:
- *                   $ref: '#/components/schemas/Client'
- *                 addresses:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Address'
- *       400:
- *         description: Address ID missing or invalid update request
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Address ID is missing. Only existing addresses can be updated.
- *       404:
- *         description: Client or address not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Client not found
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Internal server error
- */
 
 v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -746,65 +304,6 @@ v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
 });
 
 // 🔹 Soft Delete a Client (DELETE) - Changes status to inactive
-/**
- * @swagger
- * /clients/{id}:
- *   delete:
- *     summary: Soft delete a client
- *     description: Soft deletes a client and marks all related addresses as inactive.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID of the client to soft delete
- *         schema:
- *           type: integer
- *           example: 101
- *     responses:
- *       200:
- *         description: Client and related addresses marked as inactive
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Client and related addresses marked as inactive successfully
- *       404:
- *         description: Client not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Client not found
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Internal server error
- */
 
 v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -853,62 +352,6 @@ v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-
-/**
- * @swagger
- * /clients/download/excel:
- *   get:
- *     summary: Download clients and addresses as Excel
- *     description: Download a list of clients and their associated addresses as an Excel file based on optional filters like `search`, `entity_type`, and `includeInactive`.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: search
- *         in: query
- *         required: false
- *         description: Search term for company name, PAN, or display name
- *         schema:
- *           type: string
- *           example: Acme Corp
- *       - name: entity_type
- *         in: query
- *         required: false
- *         description: Filter by entity type
- *         schema:
- *           type: string
- *           example: company
- *       - name: includeInactive
- *         in: query
- *         required: false
- *         description: Include inactive clients if true
- *         schema:
- *           type: boolean
- *           example: true
- *     responses:
- *       200:
- *         description: Excel file containing client and address data
- *         content:
- *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
- *             schema:
- *               type: string
- *               format: binary
- *       500:
- *         description: Internal server error during Excel generation
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Excel Download Error
- */
 
 v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   try {
@@ -1161,79 +604,6 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-
-/**
- * @swagger
- * /clients/check-gst:
- *   post:
- *     summary: Check if a GST number already exists
- *     description: Verifies if a GST number already exists for the authenticated user's company. If not, it fetches the details from a third-party API.
- *     tags:
- *       - Clients
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - gst_number
- *             properties:
- *               gst_number:
- *                 type: string
- *                 example: 29ABCDE1234F2Z5
- *     responses:
- *       200:
- *         description: GST validation result
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: GST details fetched successfully
- *                 isExisting:
- *                   type: boolean
- *                   example: false
- *                 gstDetails:
- *                   type: object
- *                   description: GST details from third-party API
- *       400:
- *         description: Missing or invalid input
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Company ID and GST number are required
- *       500:
- *         description: Internal server error during GST validation
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error checking GST number
- *                 error:
- *                   type: string
- */
 
 v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
   try {
