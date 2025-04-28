@@ -14,6 +14,7 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
 import validateUniqueKey from "../../common/inputvalidation/validteUniquKey.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 dotenv.config();
 
@@ -31,34 +32,45 @@ const Client = db.Client;
 
 // 🔹 Create a SKU (POST)
 
-v1Router.post("/sku-details", authenticateJWT,validateUniqueKey(Sku, ['sku_name']), async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    // Add created_by and updated_by from the authenticated user
-    const skuData = {
-      ...req.body,
-      company_id: req.user.company_id,
-      created_by: req.user.id,
-      // updated_by: req.user.id,
-      status: "active",
-    };
+v1Router.post(
+  "/sku-details",
+  authenticateJWT,
+  validateUniqueKey(Sku, ["sku_name"]),
+  async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      // Add created_by and updated_by from the authenticated user
 
-    const newSku = await Sku.create(skuData, { transaction: t });
-    await t.commit();
-    await publishToQueue({
-      operation: "CREATE",
-      skuId: newSku.id,
-      timestamp: new Date(),
-      data: newSku,
-    });
-    res.status(201).json({ message: "SKU created successfully", sku: newSku });
-  } catch (error) {
-    await t.rollback();
-    res
-      .status(500)
-      .json({ message: "Error creating SKU", error: error.message });
+      const sku_ui_id = await generateId(req.user.company_id, Sku, "sku");
+
+      const skuData = {
+        ...req.body,
+        sku_ui_id: sku_ui_id,
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        // updated_by: req.user.id,
+        status: "active",
+      };
+
+      const newSku = await Sku.create(skuData, { transaction: t });
+      await t.commit();
+      await publishToQueue({
+        operation: "CREATE",
+        skuId: newSku.id,
+        timestamp: new Date(),
+        data: newSku,
+      });
+      res
+        .status(201)
+        .json({ message: "SKU created successfully", sku: newSku });
+    } catch (error) {
+      await t.rollback();
+      res
+        .status(500)
+        .json({ message: "Error creating SKU", error: error.message });
+    }
   }
-});
+);
 
 v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   try {
@@ -527,6 +539,7 @@ v1Router.get(
       // Define columns with comprehensive SKU details
       skuSheet.columns = [
         { header: "SKU ID", key: "id", width: 10 },
+        {header: "SKU UI ID", key: "sku_ui_id", width: 15 },
         { header: "SKU Name", key: "sku_name", width: 20 },
         { header: "Client", key: "client", width: 20 },
         { header: "SKU Type", key: "sku_type", width: 15 },
@@ -535,26 +548,46 @@ v1Router.get(
         { header: "Width (cm)", key: "width", width: 12 },
         { header: "Height (cm)", key: "height", width: 12 },
         { header: "Unit", key: "unit", width: 10 },
-        { header: "Estimate Composite Item", key: "estimate_composite_item", width: 20 },
+        {
+          header: "Estimate Composite Item",
+          key: "estimate_composite_item",
+          width: 20,
+        },
         { header: "Description", key: "description", width: 20 },
-        { header: "Default SKU Details", key: "default_sku_details", width: 20 },
+        {
+          header: "Default SKU Details",
+          key: "default_sku_details",
+          width: 20,
+        },
         { header: "Tags", key: "tags", width: 20 },
-        {header:"route", key:"route", width:20},
+        { header: "route", key: "route", width: 20 },
         { header: "Joints", key: "joints", width: 10 },
         { header: "UPS", key: "ups", width: 10 },
         { header: "Select Dies", key: "select_dies", width: 10 },
         { header: "Inner/Outer", key: "inner_outer_dimension", width: 15 },
         { header: "Flap Width", key: "flap_width", width: 12 },
         { header: "Flap Tolerance", key: "flap_tolerance", width: 15 },
-        { header: "Length Trimming Tolerance", key: "length_trimming_tolerance", width: 20 },
-        { header: "Width Trimming Tolerance", key: "width_trimming_tolerance", width: 20 },
+        {
+          header: "Length Trimming Tolerance",
+          key: "length_trimming_tolerance",
+          width: 20,
+        },
+        {
+          header: "Width Trimming Tolerance",
+          key: "width_trimming_tolerance",
+          width: 20,
+        },
         { header: "Strict Adherence", key: "strict_adherence", width: 15 },
         { header: "Customer Reference", key: "customer_reference", width: 20 },
         { header: "Reference Number", key: "reference_number", width: 20 },
         { header: "Internal ID", key: "internal_id", width: 15 },
         { header: "Board Size (cm²)", key: "board_size_cm2", width: 15 },
         { header: "Deckle Size", key: "deckle_size", width: 15 },
-        { header: "Minimum Order Level", key: "minimum_order_level", width: 20 },
+        {
+          header: "Minimum Order Level",
+          key: "minimum_order_level",
+          width: 20,
+        },
         { header: "Status", key: "status", width: 12 },
         { header: "Created By", key: "created_by_name", width: 20 },
         { header: "Created At", key: "created_at", width: 20 },
@@ -582,10 +615,11 @@ v1Router.get(
       skus.forEach((sku) => {
         skuSheet.addRow({
           id: sku.id,
+          sku_ui_id: sku.sku_ui_id,
           sku_name: sku.sku_name,
           client: sku.client,
           sku_type: sku.sku_type,
-          composite_type: sku.composite_type, 
+          composite_type: sku.composite_type,
           ply: sku.ply,
           length: sku.length,
           width: sku.width,
@@ -625,86 +659,103 @@ v1Router.get(
 
       // Create SKU Values sheet with flattened JSON structure
       const skuValuesSheet = workbook.addWorksheet("SKU Values");
-      
+
       // First, collect all possible keys from sku_values across all SKUs
       const skuValuesKeys = new Set();
       skuValuesKeys.add("SKU ID");
       skuValuesKeys.add("SKU Name");
-      
-      skus.forEach(sku => {
+
+      skus.forEach((sku) => {
         if (sku.sku_values) {
           try {
-            const valuesObj = typeof sku.sku_values === 'string' ? JSON.parse(sku.sku_values) : sku.sku_values;
+            const valuesObj =
+              typeof sku.sku_values === "string"
+                ? JSON.parse(sku.sku_values)
+                : sku.sku_values;
             // Get all keys recursively
-            const getAllKeys = (obj, prefix = '') => {
-              if (typeof obj !== 'object' || obj === null) return;
-              
-              Object.keys(obj).forEach(key => {
+            const getAllKeys = (obj, prefix = "") => {
+              if (typeof obj !== "object" || obj === null) return;
+
+              Object.keys(obj).forEach((key) => {
                 const fullKey = prefix ? `${prefix}.${key}` : key;
-                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                if (
+                  typeof obj[key] === "object" &&
+                  obj[key] !== null &&
+                  !Array.isArray(obj[key])
+                ) {
                   getAllKeys(obj[key], fullKey);
                 } else {
                   skuValuesKeys.add(fullKey);
                 }
               });
             };
-            
+
             getAllKeys(valuesObj);
           } catch (e) {
             console.error("Error parsing SKU values:", e);
           }
         }
       });
-      
+
       // Convert set to array and define columns
-      const skuValuesColumns = Array.from(skuValuesKeys).map(key => ({
+      const skuValuesColumns = Array.from(skuValuesKeys).map((key) => ({
         header: key,
         key: key,
-        width: 15
+        width: 15,
       }));
-      
+
       skuValuesSheet.columns = skuValuesColumns;
-      
+
       // Apply header style
       skuValuesSheet.getRow(1).eachCell((cell) => {
         cell.style = headerStyle;
       });
-      
+
       // Add flattened data rows
-      skus.forEach(sku => {
+      skus.forEach((sku) => {
         if (sku.sku_values) {
           try {
-            const valuesObj = typeof sku.sku_values === 'string' ? JSON.parse(sku.sku_values) : sku.sku_values;
+            const valuesObj =
+              typeof sku.sku_values === "string"
+                ? JSON.parse(sku.sku_values)
+                : sku.sku_values;
             const rowData = {
               "SKU ID": sku.id,
-              "SKU Name": sku.sku_name
-            };
-            
-            // Flatten the object
-            const flattenObject = (obj, prefix = '') => {
-              if (typeof obj !== 'object' || obj === null) return {};
+              "SKU Name": sku.sku_name,
               
+            };
+
+            // Flatten the object
+            const flattenObject = (obj, prefix = "") => {
+              if (typeof obj !== "object" || obj === null) return {};
+
               return Object.keys(obj).reduce((acc, key) => {
                 const fullKey = prefix ? `${prefix}.${key}` : key;
-                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                if (
+                  typeof obj[key] === "object" &&
+                  obj[key] !== null &&
+                  !Array.isArray(obj[key])
+                ) {
                   Object.assign(acc, flattenObject(obj[key], fullKey));
                 } else {
-                  acc[fullKey] = Array.isArray(obj[key]) ? obj[key].join(', ') : obj[key];
+                  acc[fullKey] = Array.isArray(obj[key])
+                    ? obj[key].join(", ")
+                    : obj[key];
                 }
                 return acc;
               }, {});
             };
-            
+
             const flatData = flattenObject(valuesObj);
             Object.assign(rowData, flatData);
-            
+
             skuValuesSheet.addRow(rowData);
           } catch (e) {
             console.error("Error adding SKU values row:", e);
             skuValuesSheet.addRow({
               "SKU ID": sku.id,
               "SKU Name": sku.sku_name,
-              "Error": "Error parsing JSON"
+              Error: "Error parsing JSON",
             });
           }
         }
@@ -712,25 +763,28 @@ v1Router.get(
 
       // Create Part Values sheet with flattened JSON structure
       const partValuesSheet = workbook.addWorksheet("Part Values");
-      
+
       // First, collect all possible keys from part_value across all SKUs
       const partValuesKeys = new Set();
       partValuesKeys.add("SKU ID");
       partValuesKeys.add("SKU Name");
       partValuesKeys.add("Part Number");
-      
-      skus.forEach(sku => {
+
+      skus.forEach((sku) => {
         if (sku.part_value) {
           try {
-            const partsObj = typeof sku.part_value === 'string' ? JSON.parse(sku.part_value) : sku.part_value;
-            
+            const partsObj =
+              typeof sku.part_value === "string"
+                ? JSON.parse(sku.part_value)
+                : sku.part_value;
+
             // For each part in the object
-            Object.keys(partsObj).forEach(partKey => {
+            Object.keys(partsObj).forEach((partKey) => {
               const part = partsObj[partKey];
-              
+
               // Get all keys for this part
-              if (typeof part === 'object' && part !== null) {
-                Object.keys(part).forEach(key => {
+              if (typeof part === "object" && part !== null) {
+                Object.keys(part).forEach((key) => {
                   partValuesKeys.add(key);
                 });
               }
@@ -740,43 +794,46 @@ v1Router.get(
           }
         }
       });
-      
+
       // Convert set to array and define columns
-      const partValuesColumns = Array.from(partValuesKeys).map(key => ({
+      const partValuesColumns = Array.from(partValuesKeys).map((key) => ({
         header: key,
         key: key,
-        width: 15
+        width: 15,
       }));
-      
+
       partValuesSheet.columns = partValuesColumns;
-      
+
       // Apply header style
       partValuesSheet.getRow(1).eachCell((cell) => {
         cell.style = headerStyle;
       });
-      
+
       // Add data rows - one row per part
-      skus.forEach(sku => {
+      skus.forEach((sku) => {
         if (sku.part_value) {
           try {
-            const partsObj = typeof sku.part_value === 'string' ? JSON.parse(sku.part_value) : sku.part_value;
-            
+            const partsObj =
+              typeof sku.part_value === "string"
+                ? JSON.parse(sku.part_value)
+                : sku.part_value;
+
             // For each part in the object, create a new row
             Object.keys(partsObj).forEach((partKey, index) => {
               const part = partsObj[partKey];
-              
-              if (typeof part === 'object' && part !== null) {
+
+              if (typeof part === "object" && part !== null) {
                 const rowData = {
                   "SKU ID": sku.id,
                   "SKU Name": sku.sku_name,
                   "Part Number": index + 1,
                 };
-                
+
                 // Add all properties of this part
-                Object.keys(part).forEach(key => {
+                Object.keys(part).forEach((key) => {
                   rowData[key] = part[key];
                 });
-                
+
                 partValuesSheet.addRow(rowData);
               }
             });
@@ -786,14 +843,14 @@ v1Router.get(
               "SKU ID": sku.id,
               "SKU Name": sku.sku_name,
               "Part Number": 1,
-              "Error": "Error parsing JSON"
+              Error: "Error parsing JSON",
             });
           }
         }
       });
 
       // Apply alternating row colors to all sheets
-      [skuSheet, skuValuesSheet, partValuesSheet].forEach(sheet => {
+      [skuSheet, skuValuesSheet, partValuesSheet].forEach((sheet) => {
         sheet.eachRow((row, rowNumber) => {
           if (rowNumber > 1) {
             const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
@@ -1005,8 +1062,8 @@ v1Router.get(
 //           sku_name: sku.sku_name,
 //           client: sku.client,
 //           sku_type: sku.sku_type,
-//           composite_type: sku.composite_type, 
-//           part_count: sku.part_count, 
+//           composite_type: sku.composite_type,
+//           part_count: sku.part_count,
 //           part_value: partValueDisplay,
 //           ply: sku.ply,
 //           length: sku.length,

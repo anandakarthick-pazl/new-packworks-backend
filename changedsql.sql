@@ -6,6 +6,13 @@ ADD COLUMN client_digit INT NOT NULL,
 ADD COLUMN vendor_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN vendor_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN vendor_digit INT NOT NULL;
+-- sku
+ALTER TABLE invoice_settings
+ADD COLUMN sku_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_digit INT NOT NULL;
+
+
 
 -- 22/04/2025
 

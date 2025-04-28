@@ -3,7 +3,7 @@ import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 
 const InvoiceSetting = sequelize.define(
-    "SKU",
+  "SKU",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -250,17 +250,29 @@ const InvoiceSetting = sequelize.define(
       allowNull: true,
     },
     vendor_prefix: {
-        type: DataTypes.STRING(191),
-        allowNull: true,
-      },
-      vendor_number_separator: {
-        type: DataTypes.STRING(191),
-        allowNull: true,
-      },
-      vendor_digit: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    vendor_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    vendor_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    sku_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sku_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sku_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",
