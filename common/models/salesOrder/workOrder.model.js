@@ -15,6 +15,10 @@ const WorkOrder = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    work_generate_id:{
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
     sales_order_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,

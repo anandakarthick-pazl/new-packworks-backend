@@ -273,6 +273,30 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    sale_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sale_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sale_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    work_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    work_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    work_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",

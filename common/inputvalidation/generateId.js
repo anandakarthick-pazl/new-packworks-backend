@@ -2,6 +2,7 @@ import db from "../models/index.js";
 const Company = db.Company;
 const InvoiceSetting = db.InvoiceSetting;
 const Client = db.Client;
+const SalesOrder = db.SalesOrder;
 const Sku = db.Sku;
 
 export async function generateId(companyId, model, prefixKey) {

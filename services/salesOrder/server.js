@@ -6,6 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 dotenv.config();
 
@@ -38,9 +39,12 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
+
+    const sales_generate_id = await generateId(req.user.company_id, SalesOrder, "sale");
     // Create Sales Order - get company_id and user info from JWT token
     const newSalesOrder = await SalesOrder.create(
       {
+        sales_generate_id: sales_generate_id,
         company_id: req.user.company_id,
         sales_ui_id: salesDetails.sales_ui_id || null,
         client_id: salesDetails.client_id,
