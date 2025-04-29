@@ -110,7 +110,7 @@ v1Router.post("/role", authenticateJWT, async (req, res) => {
       created_by,
       updated_by,
       company_id,
-      created_at: req.user.id,
+      created_at: new Date(),
       updated_at: new Date(),
     });
 
