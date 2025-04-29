@@ -7,6 +7,7 @@ import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 // Import the Redis and RabbitMQ configurations
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 dotenv.config();
 const app = express();
 app.use(json());
@@ -560,6 +561,8 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
     const company_id = req.user.company_id;
     const user_id = req.user.id;
 
+    const machine_generate_id = await generateId(req.user.company_id, Machine, "machine");
+
     // Validate required fields
     const requiredFields = [
       "machine_name",
@@ -597,6 +600,7 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
 
     // Set default values for specific fields
     const defaultValues = {
+      machine_generate_id,
       machine_status: "Active",
       connectivity_status: true,
       status: "active",
