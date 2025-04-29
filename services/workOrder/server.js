@@ -27,8 +27,11 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   }
 
   try {
+    
+    const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
     // Create Work Order
     const newWorkOrder = await WorkOrder.create({
+      work_generate_id: work_generate_id,
       company_id: req.user.company_id,
       client_id: workDetails.client_id,
       sales_order_id: workDetails.sales_order_id || null,

@@ -42,7 +42,6 @@ Client.init(
     entity_type: {
       type: DataTypes.ENUM("Client", "Vendor"),
       allowNull: false,
-      defaultValue: "Client",
     },
     customer_type: {
       type: DataTypes.ENUM("Business", "Individual"),

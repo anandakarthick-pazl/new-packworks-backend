@@ -35,6 +35,8 @@ import InventoryType from "./inventory/inventory_type.model.js";
 import Route from "./route/route.model.js";
 import PurchaseOrderReturn from './po_return/purchase_order_return.model.js';
 import PurchaseOrderReturnItem from './po_return/purchase_order_return_item.model.js';
+import InvoiceSetting from "./invoiceSetting.model.js";
+
 const db = {
   sequelize,
   User,
@@ -73,6 +75,7 @@ const db = {
   Route,
   PurchaseOrderReturn,
   PurchaseOrderReturnItem,
+  InvoiceSetting
 };
 
 export default db;

@@ -37,6 +37,10 @@ const SalesOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    sales_generate_id:{
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     estimated: {
       type: DataTypes.DATE,
       allowNull: false,

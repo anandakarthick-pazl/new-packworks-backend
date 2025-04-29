@@ -1,3 +1,47 @@
+--29/04/2025
+
+ALTER TABLE invoice_settings
+ADD COLUMN machine_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN machine_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN machine_digit INT NOT NULL;
+
+ALTER TABLE machines
+ADD COLUMN machine_generate_id VARCHAR(255) NULL;
+
+-- 28/04/2025
+ALTER TABLE invoice_settings
+ADD COLUMN client_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN client_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN client_digit INT NOT NULL,
+ADD COLUMN vendor_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN vendor_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN vendor_digit INT NOT NULL;
+
+-- sku
+ALTER TABLE invoice_settings
+ADD COLUMN sku_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_digit INT NOT NULL;
+
+-- sales_order
+ALTER TABLE invoice_settings
+ADD COLUMN sale_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sale_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sale_digit INT NOT NULL;
+
+ALTER TABLE sales_order
+ADD COLUMN sales_generate_id VARCHAR(255) NULL;
+
+-- work order
+ALTER TABLE invoice_settings
+ADD COLUMN work_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_digit INT NOT NULL;
+
+ALTER TABLE work_order
+ADD COLUMN work_generate_id VARCHAR(255) NULL;
+
+
 -- 22/04/2025
 
 ALTER TABLE sku
