@@ -3,6 +3,7 @@ const Company = db.Company;
 const InvoiceSetting = db.InvoiceSetting;
 const Client = db.Client;
 const SalesOrder = db.SalesOrder;
+const WorkOrder = db.WorkOrder;
 const Machine = db.Machine;
 const Sku = db.Sku;
 

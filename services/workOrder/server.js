@@ -6,6 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 dotenv.config();
 
