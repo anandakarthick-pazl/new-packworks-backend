@@ -600,7 +600,7 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
 
     // Set default values for specific fields
     const defaultValues = {
-      machine_generate_id,
+      machine_generate_id: machine_generate_id,
       machine_status: "Active",
       connectivity_status: true,
       status: "active",
