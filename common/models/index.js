@@ -33,7 +33,8 @@ import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
 import InventoryType from "./inventory/inventory_type.model.js";
 import Route from "./route/route.model.js";
-
+import PurchaseOrderReturn from './po_return/purchase_order_return.model.js';
+import PurchaseOrderReturnItem from './po_return/purchase_order_return_item.model.js';
 const db = {
   sequelize,
   User,
@@ -70,6 +71,8 @@ const db = {
   Inventory,
   InventoryType,
   Route,
+  PurchaseOrderReturn,
+  PurchaseOrderReturnItem,
 };
 
 export default db;
