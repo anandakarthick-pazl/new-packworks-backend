@@ -5,7 +5,7 @@ import User from "./user.model.js";
 
 
 const ItemMaster = sequelize.define('ItemMaster', {
-      item_id: {
+      id: {
         type: DataTypes.INTEGER.UNSIGNED,
         autoIncrement: true,
         primaryKey: true
