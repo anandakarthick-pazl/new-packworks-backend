@@ -656,23 +656,26 @@ v1Router.put(
 
       // Step 3: Check if email already exists for another employee
       const { email } = req.body;
-      if (email && email !== user.email) {
-        const existingUserWithEmail = await User.findOne({
-          where: {
-            email,
-            id: { [sequelize.Op.ne]: userId },
-            company_id: req.user.company_id
-          },
-          transaction,
-        });
-
-        if (existingUserWithEmail) {
-          logger.info("❌ Email already in use by another employee.");
-          await transaction.rollback();
-          return res.status(400).json({
-            status: false,
-            message: "Email already in use by another employee",
+      if (email) {
+        // Only check if email is being updated to a new value
+        if (email !== user.email) {
+          const existingUserWithEmail = await User.findOne({
+            where: {
+              email,
+              id: { [sequelize.Op.ne]: userId },
+              company_id: req.user.company_id
+            },
+            transaction,
           });
+
+          if (existingUserWithEmail) {
+            logger.info("❌ Email already in use by another employee.");
+            await transaction.rollback();
+            return res.status(400).json({
+              status: false,
+              message: "Email already in use by another employee",
+            });
+          }
         }
       }
 
@@ -705,12 +708,14 @@ v1Router.put(
       // Step 6: Update User details
       const userUpdateData = {
         name,
-        email,
         mobile,
         image,
         updated_at: new Date()
       };
 
+      // Add email to update data if provided
+      if (email) userUpdateData.email = email;
+      
       // Add optional fields if they exist
       if (country_phonecode) userUpdateData.country_phonecode = country_phonecode;
       if (country_id) userUpdateData.country_id = country_id;

@@ -110,7 +110,7 @@ v1Router.post("/role", authenticateJWT, async (req, res) => {
       created_by,
       updated_by,
       company_id,
-      created_at: req.user.id,
+      created_at: new Date(),
       updated_at: new Date(),
     });
 
@@ -124,45 +124,6 @@ v1Router.post("/role", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
-
-/**
- * @swagger
- * /role:
- *   get:
- *     summary: Get all roles
- *     tags:
- *       - Roles
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of roles fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Role'
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: Error fetching roles
- */
 
 v1Router.get("/role", authenticateJWT, async (req, res) => {
   try {
@@ -181,63 +142,6 @@ v1Router.get("/role", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
-
-/**
- * @swagger
- * /role/{id}:
- *   get:
- *     summary: Get a role by ID
- *     tags:
- *       - Roles
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID of the role to retrieve
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Role fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/Role'
- *       404:
- *         description: Role not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Role not found
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: Error fetching role
- */
 
 v1Router.get("/role/:id", authenticateJWT, async (req, res) => {
   try {
@@ -262,87 +166,6 @@ v1Router.get("/role/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /role/{id}:
- *   put:
- *     summary: Update an existing role by ID
- *     tags:
- *       - Roles
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID of the role to update
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: admin
- *               display_name:
- *                 type: string
- *                 example: Administrator
- *               description:
- *                 type: string
- *                 example: Full access to all modules
- *               status:
- *                 type: string
- *                 example: active
- *               updated_by:
- *                 type: integer
- *                 example: 2
- *     responses:
- *       200:
- *         description: Role updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Role updated successfully
- *                 data:
- *                   $ref: '#/components/schemas/Role'
- *       404:
- *         description: Role not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Role not found
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: Error updating role
- */
 
 v1Router.put("/role/:id", authenticateJWT, async (req, res) => {
   try {
