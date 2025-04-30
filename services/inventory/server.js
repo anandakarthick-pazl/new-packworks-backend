@@ -67,7 +67,7 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
     // Validate Item
     const itemId = req.body.item_id;
     const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
+      where: { id: itemId, status: "active" }
     });
     if (!validateItem) {
       return res.status(400).json({
@@ -75,11 +75,13 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
         message: `Invalid or inactive Item.`,
       });
     }
+    let inventory_type= validateItem.item_type;
+    rest.inventory_type = inventory_type;
 
     // Validate GRN
     const grnId = req.body.grn_id;
     const validateGrn = await GRN.findOne({
-      where: { grn_id: grnId, status: "active" }
+      where: { id: grnId, status: "active" }
     });
     if (!validateGrn) {
       return res.status(400).json({
@@ -91,7 +93,7 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
     // Validate GRN Item
     const grnItemId = req.body.grn_item_id;
     const validateGrnItem = await GRNItem.findOne({
-      where: { grn_item_id: grnItemId, status: "active" }
+      where: { id: grnItemId, status: "active" }
     });
     if (!validateGrnItem) {
       return res.status(400).json({
@@ -179,7 +181,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate Item
     const itemId = req.body.item_id;
     const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
+      where: { id: itemId, status: "active" }
     });
     if (!validateItem) {
       return res.status(400).json({
@@ -191,7 +193,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate GRN
     const grnId = req.body.grn_id;
     const validateGrn = await GRN.findOne({
-      where: { grn_id: grnId, status: "active" }
+      where: { id: grnId, status: "active" }
     });
     if (!validateGrn) {
       return res.status(400).json({
@@ -203,7 +205,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate GRN Item
     const grnItemId = req.body.grn_item_id;
     const validateGrnItem = await GRNItem.findOne({
-      where: { grn_item_id: grnItemId, status: "active" }
+      where: { id: grnItemId, status: "active" }
     });
     if (!validateGrnItem) {
       return res.status(400).json({

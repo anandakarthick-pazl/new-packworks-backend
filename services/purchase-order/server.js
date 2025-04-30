@@ -35,7 +35,7 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     const newPO = await PurchaseOrder.create(poData, { transaction });
     for (const item of items) {
       const isValid = await ItemMaster.findOne({
-        where: { item_id: item.item_id, status: "active" },
+        where: { id: item.item_id, status: "active" },
         transaction,
       });
 
@@ -43,7 +43,7 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 
       await PurchaseOrderItem.create({
         ...item,
-        po_id: newPO.po_id,
+        po_id: newPO.id,
         company_id: poData.company_id,
         created_by: poData.created_by,
         updated_by: poData.updated_by
@@ -107,7 +107,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
 v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
   try {
     const po = await PurchaseOrder.findOne({
-      where: { po_id: req.params.id, status: "active" },
+      where: { id: req.params.id, status: "active" },
       include: [{ model: PurchaseOrderItem }],
     });
 
@@ -126,13 +126,15 @@ v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
 
 //update po
 v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
+  console.log("Update PO Request Body:", req.params.id, req.body);
+  
     const transaction = await sequelize.transaction();
     try {
       const { items, ...poData } = req.body;
       const poId = req.params.id;
   
       const po = await PurchaseOrder.findOne({
-        where: { po_id: poId },
+        where: { id: poId },
         transaction
       });
   
@@ -188,7 +190,7 @@ v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
 // delete po
 v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
   try {
-    const po = await PurchaseOrder.findOne({ where: { po_id: req.params.id } });
+    const po = await PurchaseOrder.findOne({ where: { id: req.params.id } });
     if (!po) return res.status(404).json({ success: false, message: "Not found" });
 
     await po.update({ status: "inactive", updated_by: req.user.id });
@@ -216,9 +218,9 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
 
     // Fetch Purchase Order
     const purchaseOrder = await PurchaseOrder.findOne({
-      where: { po_id: po_id },
+      where: { id: po_id },
       attributes: [
-        "po_id",
+        "id",
         "po_code",
         "supplier_id",
         "supplier_name",
@@ -244,8 +246,8 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
 
     // Fetch GRN
     const grnDetails = await GRN.findOne({
-      where: { grn_id: grn_id },
-      attributes: ["grn_id"],
+      where: { id: grn_id },
+      attributes: ["id"],
     });
 
     if (!grnDetails) {
@@ -256,7 +258,7 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
     const purchaseOrderItemDetails = await PurchaseOrderItem.findAll({
       where: { po_id: po_id },
       attributes: [
-        "po_item_id",
+        "id",
         "po_id",
         "item_id",
         "item_code",
@@ -283,13 +285,13 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
     // Fetch GRN Items
     const grnItemDetails = await GRNItem.findAll({
       where: { grn_id: grn_id },
-      attributes: ["grn_item_id", "item_id"],
+      attributes: ["id", "item_id"],
     });
 
     // Fetch Inventory
     const inventoryDetails = await Inventory.findAll({
       where: {
-        po_id: po_id,
+        id: po_id,
         grn_id: grn_id,
       },
       attributes: ["id", "item_id"],
@@ -299,8 +301,8 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
     const itemIds = purchaseOrderItemDetails.map(item => item.item_id);
 
     const items = await Item.findAll({
-      where: { item_id: itemIds },
-      attributes: ["item_id", "item_name"],
+      where: { id: itemIds },
+      attributes: ["id", "item_name"],
     });
 
     // ===========================
@@ -309,7 +311,7 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
 
     const formattedPurchaseOrder = {
       ...purchaseOrder.toJSON(),
-      grn_id: grnDetails.grn_id
+      id: grnDetails.grn_id
     };
 
     const formattedPurchaseOrderItemDetails = purchaseOrderItemDetails.map(poItem => {
@@ -322,7 +324,7 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
       return {
         ...poItemJson,
         item_name: itemInfo ? itemInfo.item_name : null,    // Correct Item Name
-        grn_item_id: grnItem ? grnItem.grn_item_id : null,   // GRN Item ID
+        grn_item_id: grnItem ? grnItem.id : null,   // GRN Item ID
         inventory_id: inventoryItem ? inventoryItem.id : null,  // Inventory ID
       };
     });
@@ -363,13 +365,13 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
   try {
     // 1. Validate Purchase Order
-    const purchaseOrder = await PurchaseOrder.findOne({ where: { po_id: po_id } });
+    const purchaseOrder = await PurchaseOrder.findOne({ where: { id: po_id } });
     if (!purchaseOrder) {
       return res.status(404).json({ error: 'Purchase Order not found.' });
     }
 
     // 2. Validate GRN
-    const grn = await GRN.findOne({ where: { grn_id: grn_id } });
+    const grn = await GRN.findOne({ where: { id: grn_id } });
     if (!grn) {
       return res.status(404).json({ error: 'GRN not found.' });
     }
@@ -416,7 +418,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
       // Validate GRN Item
       const grnItem = await GRNItem.findOne({
-        where: { grn_item_id: grn_item_id, grn_id, item_id }
+        where: { id: grn_item_id, grn_id, item_id }
       });
       if (!grnItem) {
         return res.status(404).json({
@@ -477,19 +479,24 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 });
 
 
+
+
+
+
+
 // create po return with calculation
 v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res) => {
   const { po_id, grn_id, items, reason, payment_terms, notes } = req.body;
 
   try {
     // 1. Validate Purchase Order
-    const purchaseOrder = await PurchaseOrder.findOne({ where: { po_id: po_id } });
+    const purchaseOrder = await PurchaseOrder.findOne({ where: { id: po_id } });
     if (!purchaseOrder) {
       return res.status(404).json({ error: 'Purchase Order not found.' });
     }
 
     // 2. Validate GRN
-    const grn = await GRN.findOne({ where: { grn_id: grn_id } });
+    const grn = await GRN.findOne({ where: { id: grn_id } });
     if (!grn) {
       return res.status(404).json({ error: 'GRN not found.' });
     }
@@ -506,11 +513,30 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 
     // 4. Process each item
     for (let item of items) {
-      const { grn_item_id, item_id, return_qty, unit_price, cgst, sgst, reason, notes } = item;
+      const { grn_item_id, item_id, return_qty, unit_price, reason, notes } = item;
+
+      const itemData = await Item.findOne({
+        where:{id:item_id}
+      });
+
+      if (!itemData) {
+        await transaction.rollback();
+        return res.status(404).json({ error: `Item not found: ${item_id}` });
+      }
+
+      // let unit_price=itemData.standard_cost;
+      let cgst=itemData.cgst;
+      let sgst=itemData.sgst;
+
+      if (unit_price == null || cgst == null || sgst == null) {
+        await transaction.rollback();
+        return res.status(400).json({ error: `Missing unit price or tax values for item ${item_id}` });
+      }
+
 
       // Validate GRN Item
       const grnItem = await GRNItem.findOne({
-        where: { grn_item_id: grn_item_id, grn_id, item_id }
+        where: { id: grn_item_id, grn_id, item_id }
       });
       if (!grnItem) {
         return res.status(404).json({ error: `GRN item not found for item ID ${item_id}` });
@@ -600,7 +626,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
     console.error('Error creating PO return:', error);
     return res.status(500).json({ error: 'An error occurred while processing the return.' });
   }
-});
+}); 
 
 
 

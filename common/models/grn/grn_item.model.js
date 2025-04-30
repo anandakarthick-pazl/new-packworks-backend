@@ -7,7 +7,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 
 const GRNItem = sequelize.define("GRNItem", {
-  grn_item_id: {
+  id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
@@ -26,7 +26,7 @@ const GRNItem = sequelize.define("GRNItem", {
     allowNull: false,
     references: {
       model: GRN,
-      key: "grn_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE",
@@ -36,7 +36,7 @@ const GRNItem = sequelize.define("GRNItem", {
     allowNull: false,
     references: {
       model: PurchaseOrderItem,
-      key: "po_item_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE",
@@ -46,7 +46,7 @@ const GRNItem = sequelize.define("GRNItem", {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "item_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE",

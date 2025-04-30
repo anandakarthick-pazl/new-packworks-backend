@@ -18,7 +18,7 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
     allowNull: true,
     references: {
       model: GRN,    
-      key: "grn_id"      
+      key: "id"      
     },
     onUpdate: "CASCADE",
     onDelete: "SET NULL"
@@ -28,7 +28,7 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
     allowNull: true,
     references: {
       model: PurchaseOrder,
-      key: "po_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
