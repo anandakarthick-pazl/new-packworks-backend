@@ -19,6 +19,7 @@ import { Readable } from "stream";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import { validateClient } from "../../common/inputvalidation/validationClient.js";
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ const User = db.User;
 
 // 🔹 Create a Client (POST)
 
-v1Router.post("/clients", authenticateJWT, async (req, res) => {
+v1Router.post("/clients", authenticateJWT,validateClient, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { clientData, addresses } = req.body;
@@ -221,7 +222,7 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.put("/clients/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/clients/:id", authenticateJWT, validateClient,async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
