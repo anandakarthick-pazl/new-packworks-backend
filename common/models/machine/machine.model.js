@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import MachineFlow from "./machineFlow.model.js";
 
 const Machine = sequelize.define(
   "Machine",
@@ -11,7 +12,7 @@ const Machine = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    machine_generate_id:{
+    machine_generate_id: {
       type: DataTypes.STRING(200),
       allowNull: true,
     },
@@ -108,8 +109,7 @@ const Machine = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW, 
-
+      onUpdate: DataTypes.NOW,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -153,10 +153,32 @@ User.hasMany(Machine, {
   foreignKey: "updated_by",
 });
 Machine.belongsTo(User, {
-  foreignKey: "created_by", as:"creator_machine",
+  foreignKey: "created_by",
+  as: "creator_machine",
 });
 Machine.belongsTo(User, {
-  foreignKey: "updated_by", as:"updater_machine",
+  foreignKey: "updated_by",
+  as: "updater_machine",
+});
+
+// Add hook to Machine model for soft delete cascade
+Machine.addHook("afterUpdate", async (machine, options) => {
+  // Check if status was changed to inactive (soft delete)
+  if (machine.status === "inactive" && machine.changed("status")) {
+    await MachineFlow.update(
+      {
+        status: "inactive",
+        updated_by: machine.updated_by || null,
+      },
+      {
+        where: {
+          machine_id: machine.id,
+          status: "active",
+        },
+        transaction: options.transaction,
+      }
+    );
+  }
 });
 
 export default Machine;

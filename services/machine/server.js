@@ -979,7 +979,9 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
         status: "inactive",
         updated_by: user_id,
       },
-      { transaction }
+      { transaction ,
+        individualHooks: true // Ensure hooks are triggered
+      } 
     );
 
     await transaction.commit();
@@ -1391,8 +1393,7 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Instead of checking if process is in use and returning error,
-    // we'll soft delete related records in MachineProcessValue
+    // Soft delete related records in MachineProcessValue
     await MachineProcessValue.update(
       {
         status: "inactive",
@@ -1405,7 +1406,7 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       }
     );
 
-    // Also soft delete related records in MachineProcessField
+    // Soft delete related records in MachineProcessField
     await MachineProcessField.update(
       {
         status: "inactive",
@@ -1418,14 +1419,29 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       }
     );
 
+    // Soft delete related records in MachineFlow
+    await MachineFlow.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+      },
+      {
+        where: { process_id: id, status: "active" },
+        transaction,
+      }
+    );
+
     // Soft delete the process itself
     await process.update(
       {
         status: "inactive",
-        updated_at: new Date(), // Fixed this from req.user.id to new Date()
+        updated_at: new Date(),
         updated_by: req.user.id,
       },
-      { transaction }
+      { 
+        transaction,
+        individualHooks: true // If you're using hooks approach
+      }
     );
 
     await transaction.commit();
