@@ -1,3 +1,9 @@
+-- 02/05/2025
+ALTER TABLE invoice_settings
+ADD COLUMN employee_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN employee_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN employee_digit INT NOT NULL;
+
 --29/04/2025
 
 ALTER TABLE invoice_settings

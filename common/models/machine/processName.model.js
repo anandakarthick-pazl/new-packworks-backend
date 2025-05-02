@@ -2,7 +2,6 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
-import MachineFlow from "./machineFlow.model.js";
 
 const ProcessName = sequelize.define(
   "ProcessName",
@@ -77,26 +76,6 @@ ProcessName.belongsTo(User, {
 ProcessName.belongsTo(User, {
   foreignKey: "updated_by",
   as: "process_updater",
-});
-
-// Add hook to ProcessName model for soft delete cascade
-ProcessName.addHook('afterUpdate', async (process, options) => {
-  // Check if status was changed to inactive (soft delete)
-  if (process.status === 'inactive' && process.changed('status')) {
-    await MachineFlow.update(
-      { 
-        status: 'inactive',
-        updated_by: process.updated_by || null 
-      },
-      { 
-        where: { 
-          process_id: process.id,
-          status: 'active'
-        },
-        transaction: options.transaction
-      }
-    );
-  }
 });
 
 export default ProcessName;

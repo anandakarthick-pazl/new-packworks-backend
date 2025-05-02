@@ -543,9 +543,7 @@ v1Router.put("/assign/:id", authenticateJWT, async (req, res) => {
       await transaction.rollback();
     }
 
-    logger.error(
-      `Error updating machine-process assignment: ${error.message}`
-    );
+    logger.error(`Error updating machine-process assignment: ${error.message}`);
     return res.status(500).json({
       status: "error",
       message: "Failed to update machine-process assignment",
@@ -561,7 +559,11 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
     const company_id = req.user.company_id;
     const user_id = req.user.id;
 
-    const machine_generate_id = await generateId(req.user.company_id, Machine, "machine");
+    const machine_generate_id = await generateId(
+      req.user.company_id,
+      Machine,
+      "machine"
+    );
 
     // Validate required fields
     const requiredFields = [
@@ -969,7 +971,7 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
           machine_id: id,
           status: "active",
         },
-        transaction
+        transaction,
       }
     );
 
@@ -979,9 +981,7 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
         status: "inactive",
         updated_by: user_id,
       },
-      { transaction ,
-        individualHooks: true // Ensure hooks are triggered
-      } 
+      { transaction }
     );
 
     await transaction.commit();
@@ -1438,9 +1438,8 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
         updated_at: new Date(),
         updated_by: req.user.id,
       },
-      { 
+      {
         transaction,
-        individualHooks: true // If you're using hooks approach
       }
     );
 
