@@ -5,7 +5,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 
 const GRN = sequelize.define("GRN", {
-  grn_id: {
+  id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
@@ -15,7 +15,7 @@ const GRN = sequelize.define("GRN", {
     allowNull: false,
     references: {
       model: PurchaseOrder,
-      key: "po_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
   },

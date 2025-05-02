@@ -30,7 +30,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnitem', {
     allowNull: false,
     references: {
       model: GRNItem,
-      key: "grn_item_id"
+      key: "id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
@@ -41,7 +41,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnitem', {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "item_id"
+      key: "id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"

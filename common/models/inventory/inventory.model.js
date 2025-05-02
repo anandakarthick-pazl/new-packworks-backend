@@ -26,7 +26,7 @@ const Inventory = sequelize.define("Inventory", {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "item_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE",
@@ -38,7 +38,7 @@ const Inventory = sequelize.define("Inventory", {
     type: DataTypes.INTEGER.UNSIGNED, // adjust to STRING(20) if grn_id is varchar
     references: {
       model: GRN,
-      key: "grn_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "SET NULL",
@@ -47,7 +47,7 @@ const Inventory = sequelize.define("Inventory", {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
       model: GRNItem,
-      key: "grn_item_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
     onDelete: "SET NULL",

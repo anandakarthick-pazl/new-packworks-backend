@@ -99,7 +99,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
     // Validate PO
     const validatePo = await PurchaseOrder.findOne({
-      where: { po_id: grnData.po_id, status: "active" },
+      where: { id: grnData.po_id, status: "active" },
       transaction
     });
 
@@ -132,21 +132,21 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
       // Validate PO item
       const poItem = await PurchaseOrderItem.findOne({
-        where: { po_item_id },
+        where: { id:po_item_id },
         transaction
       });
       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
 
       // Validate Item Master
       const itemMaster = await ItemMaster.findOne({
-        where: { item_id },
+        where: { id:item_id },
         transaction
       });
       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
 
       // Create GRN Item
       const newGRNItem = await GRNItem.create({
-        grn_id: newGRN.grn_id,
+        grn_id: newGRN.id,
         po_item_id,
         item_id,
         item_code,
@@ -278,7 +278,7 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
   
       // Fetch GRN
       const grn = await GRN.findOne({
-        where: { grn_id: grnId },
+        where: { id: grnId },
         include: [
           {
             model: GRNItem,
@@ -318,7 +318,7 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
       const { items, ...grnData } = req.body;
       const grnId = req.params.id;
   
-      const grn = await GRN.findOne({ where: { grn_id: grnId }, transaction });
+      const grn = await GRN.findOne({ where: { id: grnId }, transaction });
   
       if (!grn) {
         return res.status(404).json({ success: false, message: "GRN not found" });
@@ -360,7 +360,7 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
     try {
       const grnId = req.params.id;
   
-      const grn = await GRN.findOne({ where: { grn_id: grnId }, transaction });
+      const grn = await GRN.findOne({ where: { id: grnId }, transaction });
   
       if (!grn) {
         return res.status(404).json({ success: false, message: "GRN not found" });
