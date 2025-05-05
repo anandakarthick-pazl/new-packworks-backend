@@ -40,10 +40,14 @@ v1Router.get("/inventory",authenticateJWT,async(req,res)=>{
           limit: limitNumber,
           offset: offset,
         });
+
+        const totalCount = await Inventory.count({ where: whereCondition });
+
         return res.status(200).json({
           success: true,
           message: "Inventory data fetched successfully",
           data: inventoryData,
+          totalCount: totalCount,
         });
   }catch(error){
     console.error(error.message);
