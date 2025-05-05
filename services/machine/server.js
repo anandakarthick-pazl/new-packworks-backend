@@ -543,9 +543,7 @@ v1Router.put("/assign/:id", authenticateJWT, async (req, res) => {
       await transaction.rollback();
     }
 
-    logger.error(
-      `Error updating machine-process assignment: ${error.message}`
-    );
+    logger.error(`Error updating machine-process assignment: ${error.message}`);
     return res.status(500).json({
       status: "error",
       message: "Failed to update machine-process assignment",
@@ -561,7 +559,11 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
     const company_id = req.user.company_id;
     const user_id = req.user.id;
 
-    const machine_generate_id = await generateId(req.user.company_id, Machine, "machine");
+    const machine_generate_id = await generateId(
+      req.user.company_id,
+      Machine,
+      "machine"
+    );
 
     // Validate required fields
     const requiredFields = [
@@ -969,7 +971,7 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
           machine_id: id,
           status: "active",
         },
-        transaction
+        transaction,
       }
     );
 
@@ -1391,8 +1393,7 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Instead of checking if process is in use and returning error,
-    // we'll soft delete related records in MachineProcessValue
+    // Soft delete related records in MachineProcessValue
     await MachineProcessValue.update(
       {
         status: "inactive",
@@ -1405,7 +1406,7 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       }
     );
 
-    // Also soft delete related records in MachineProcessField
+    // Soft delete related records in MachineProcessField
     await MachineProcessField.update(
       {
         status: "inactive",
@@ -1418,14 +1419,28 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
       }
     );
 
+    // Soft delete related records in MachineFlow
+    await MachineFlow.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+      },
+      {
+        where: { process_id: id, status: "active" },
+        transaction,
+      }
+    );
+
     // Soft delete the process itself
     await process.update(
       {
         status: "inactive",
-        updated_at: new Date(), // Fixed this from req.user.id to new Date()
+        updated_at: new Date(),
         updated_by: req.user.id,
       },
-      { transaction }
+      {
+        transaction,
+      }
     );
 
     await transaction.commit();
