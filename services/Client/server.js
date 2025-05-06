@@ -145,6 +145,8 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
         { email: { [Op.like]: `%${search}%` } },
         { mobile: { [Op.like]: `%${search}%` } },
         { gst_number: { [Op.like]: `%${search}%` } },
+        { client_ui_id: { [Op.like]: `%${search}%` } },
+        { client_ref_id: { [Op.like]: `%${search}%` } },
       ];
     }
 
