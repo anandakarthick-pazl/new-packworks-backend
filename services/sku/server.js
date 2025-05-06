@@ -114,6 +114,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
               { client: { [Op.like]: `%${search}%` } },
               { ply: { [Op.like]: `%${ply}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
+              { sku_ui_id: { [Op.like]: `%${search}%` } },
             ],
           },
         ],
@@ -539,7 +540,7 @@ v1Router.get(
       // Define columns with comprehensive SKU details
       skuSheet.columns = [
         { header: "SKU ID", key: "id", width: 10 },
-        {header: "SKU UI ID", key: "sku_ui_id", width: 15 },
+        { header: "SKU UI ID", key: "sku_ui_id", width: 15 },
         { header: "SKU Name", key: "sku_name", width: 20 },
         { header: "Client", key: "client", width: 20 },
         { header: "SKU Type", key: "sku_type", width: 15 },
@@ -722,7 +723,6 @@ v1Router.get(
             const rowData = {
               "SKU ID": sku.id,
               "SKU Name": sku.sku_name,
-              
             };
 
             // Flatten the object
