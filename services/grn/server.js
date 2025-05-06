@@ -356,7 +356,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
       limit: limitNumber,
       offset,
       include: [{ model: GRNItem }],
-      order: [['updatedAt', 'DESC']] // Order by most recently updated
+      order: [['updated_at', 'DESC']] 
     });
 
     const totalCount = await GRN.count({ where: whereCondition });
