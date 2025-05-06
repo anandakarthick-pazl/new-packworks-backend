@@ -53,7 +53,7 @@ export const validateClient = async (req, res, next) => {
       payment_terms: Joi.string().optional().allow(null, ""),
       enable_portal: Joi.boolean().optional(),
       portal_language: Joi.string().optional().allow(null, ""),
-      documents: Joi.object().optional().allow(null),
+      documents: Joi.json().optional().allow(null),
       website_url: Joi.string().uri().optional().allow(null, ""),
       department: Joi.string().optional().allow(null, ""),
       designation: Joi.string().optional().allow(null, ""),
