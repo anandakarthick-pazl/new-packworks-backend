@@ -35,7 +35,7 @@ const User = db.User;
 
 // 🔹 Create a Client (POST)
 
-v1Router.post("/clients", authenticateJWT,validateClient, async (req, res) => {
+v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { clientData, addresses } = req.body;
@@ -46,7 +46,11 @@ v1Router.post("/clients", authenticateJWT,validateClient, async (req, res) => {
     const client_ui_id = await generateId(
       req.user.company_id,
       Client,
-      entity_type === "Client" ? "client" : entity_type === "Vendor" ? "vendor" : "other"
+      entity_type === "Client"
+        ? "client"
+        : entity_type === "Vendor"
+        ? "vendor"
+        : "other"
     );
 
     // Add user tracking information internally
@@ -224,87 +228,92 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.put("/clients/:id", authenticateJWT, validateClient,async (req, res) => {
-  const t = await sequelize.transaction();
+v1Router.put(
+  "/clients/:id",
+  authenticateJWT,
+  validateClient,
+  async (req, res) => {
+    const t = await sequelize.transaction();
 
-  try {
-    const { clientData, addresses } = req.body;
-    const clientId = req.params.id;
+    try {
+      const { clientData, addresses } = req.body;
+      const clientId = req.params.id;
 
-    // Check if client exists
-    const client = await Client.findByPk(clientId, { transaction: t });
-    if (!client) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ status: false, message: "Client not found" });
-    }
-
-    // Prepare update data
-    const updatedClientData = {
-      ...clientData,
-      updated_by: req.user.id,
-      updated_at: new Date(),
-    };
-
-    // Update client data
-    await client.update(updatedClientData, {
-      transaction: t,
-      fields: Object.keys(updatedClientData),
-    });
-
-    let updatedAddresses = [];
-
-    // Handle Addresses (Only Update, No Creation)
-    if (addresses && addresses.length > 0) {
-      for (const address of addresses) {
-        if (!address.id) {
-          await t.rollback();
-          return res.status(400).json({
-            status: false,
-            message:
-              "Address ID is missing. Only existing addresses can be updated.",
-          });
-        }
-
-        const existingAddress = await Address.findOne({
-          where: { id: address.id, client_id: clientId },
-          transaction: t,
-        });
-
-        if (!existingAddress) {
-          await t.rollback();
-          return res.status(404).json({
-            status: false,
-            message: `Address with ID ${address.id} not found or doesn't belong to the client.`,
-          });
-        }
-
-        const addressWithUser = {
-          ...address,
-          updated_by: req.user.id,
-          updated_at: new Date(),
-        };
-
-        await existingAddress.update(addressWithUser, { transaction: t });
-        updatedAddresses.push(existingAddress);
+      // Check if client exists
+      const client = await Client.findByPk(clientId, { transaction: t });
+      if (!client) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ status: false, message: "Client not found" });
       }
+
+      // Prepare update data
+      const updatedClientData = {
+        ...clientData,
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      };
+
+      // Update client data
+      await client.update(updatedClientData, {
+        transaction: t,
+        fields: Object.keys(updatedClientData),
+      });
+
+      let updatedAddresses = [];
+
+      // Handle Addresses (Only Update, No Creation)
+      if (addresses && addresses.length > 0) {
+        for (const address of addresses) {
+          if (!address.id) {
+            await t.rollback();
+            return res.status(400).json({
+              status: false,
+              message:
+                "Address ID is missing. Only existing addresses can be updated.",
+            });
+          }
+
+          const existingAddress = await Address.findOne({
+            where: { id: address.id, client_id: clientId },
+            transaction: t,
+          });
+
+          if (!existingAddress) {
+            await t.rollback();
+            return res.status(404).json({
+              status: false,
+              message: `Address with ID ${address.id} not found or doesn't belong to the client.`,
+            });
+          }
+
+          const addressWithUser = {
+            ...address,
+            updated_by: req.user.id,
+            updated_at: new Date(),
+          };
+
+          await existingAddress.update(addressWithUser, { transaction: t });
+          updatedAddresses.push(existingAddress);
+        }
+      }
+
+      await t.commit();
+
+      return res.status(200).json({
+        status: true,
+        message: "Client and addresses updated successfully",
+        client,
+        addresses: updatedAddresses,
+      });
+    } catch (error) {
+      await t.rollback();
+      console.error("Error updating client and addresses:", error);
+      return res.status(500).json({ status: false, message: error.message });
     }
-
-    await t.commit();
-
-    return res.status(200).json({
-      status: true,
-      message: "Client and addresses updated successfully",
-      client,
-      addresses: updatedAddresses,
-    });
-  } catch (error) {
-    await t.rollback();
-    console.error("Error updating client and addresses:", error);
-    return res.status(500).json({ status: false, message: error.message });
   }
-});
+);
 
 // 🔹 Soft Delete a Client (DELETE) - Changes status to inactive
 
@@ -633,9 +642,15 @@ v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
         isExisting: true,
       });
     }
-
+    const gstKey = process.env.GST_KEY;
+    if (!gstKey) {
+      return res.status(500).json({
+        success: false,
+        message: "GST key is not configured",
+      });
+    }
     // If GST not found in our database, fetch from third-party API
-    const thirdPartyUrl = `http://sheet.gstincheck.co.in/check/9ee24120971acd5c17dc6cad239d99fa/${gst_number}`;
+    const thirdPartyUrl = `http://sheet.gstincheck.co.in/check/${gstKey}/${gst_number}`;
     const thirdPartyResponse = await axios.get(thirdPartyUrl);
 
     return res.status(200).json({
