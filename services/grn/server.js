@@ -326,41 +326,59 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
 // get grn 
 v1Router.get("/grn", authenticateJWT, async (req, res) => {
-    try {
-      const { search = "", page = "1", limit = "10" } = req.query;
-      const pageNumber = Math.max(1, parseInt(page));
-      const limitNumber = Math.max(1, parseInt(limit));
-      const offset = (pageNumber - 1) * limitNumber;
-  
-      const whereCondition = {
-        status: "active",
-      };
-  
-      if (search.trim() !== "") {
-        whereCondition.grn_number = { [Op.like]: `%${search}%` };
-      }
-  
-      const grns = await GRN.findAll({
-        where: whereCondition,
-        limit: limitNumber,
-        offset,
-        include: [{ model: GRNItem }]
-      });
-  
-      const totalCount = await GRN.count({ where: whereCondition });
-  
-      return res.status(200).json({
-        success: true,
-        message: "GRNs fetched successfully",
-        data: grns,
-        totalCount
-      });
-  
-    } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
-  });
+  try {
+    const { search = "", page = "1", limit = "10" } = req.query;
+    const pageNumber = Math.max(1, parseInt(page));
+    const limitNumber = Math.max(1, parseInt(limit));
+    const offset = (pageNumber - 1) * limitNumber;
 
+    const whereCondition = {
+      status: "active",
+    };
+
+    // Enhanced search functionality across all relevant fields
+    if (search.trim() !== "") {
+      whereCondition[Op.or] = [
+        { grn_number: { [Op.like]: `%${search}%` } },
+        { delivery_note_no: { [Op.like]: `%${search}%` } },
+        { invoice_no: { [Op.like]: `%${search}%` } },
+        { received_by: { [Op.like]: `%${search}%` } }
+      ];
+      
+      // If search could be a number (for po_id)
+      if (!isNaN(search)) {
+        whereCondition[Op.or].push({ po_id: parseInt(search) });
+      }
+    }
+
+    const grns = await GRN.findAll({
+      where: whereCondition,
+      limit: limitNumber,
+      offset,
+      include: [{ model: GRNItem }],
+      order: [['updatedAt', 'DESC']] // Order by most recently updated
+    });
+
+    const totalCount = await GRN.count({ where: whereCondition });
+
+    return res.status(200).json({
+      success: true,
+      message: "GRNs fetched successfully",
+      data: grns,
+      totalCount,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages: Math.ceil(totalCount / limitNumber),
+        pageSize: limitNumber,
+        totalRecords: totalCount
+      }
+    });
+
+  } catch (error) {
+    console.error("Error fetching GRNs:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 //  get one grn 
 v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
