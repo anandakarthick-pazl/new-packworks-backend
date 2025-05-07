@@ -642,7 +642,7 @@ v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
         isExisting: true,
       });
     }
-    const gstKey = process.env.GST_KEY;
+    const gstKey = 'cfa094f23e71ae949b48752692059f56';
     if (!gstKey) {
       return res.status(500).json({
         success: false,
