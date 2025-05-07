@@ -86,6 +86,47 @@ v1Router.post(
 );
 
 
+// GET dropdown names with search options
+
+v1Router.get(
+  "/dropdown-name",
+  authenticateJWT,
+  extractUserDetails,
+  async (req, res) => {
+    try {
+      const {
+        dropdown_name,
+        client_id,
+        status = "active", // Default to showing only active records
+      } = req.query;
+
+      // Build filter conditions
+      const where = { company_id: req.userCompanyId };
+      if (dropdown_name)
+        where.dropdown_name = { [Op.like]: `%${dropdown_name}%` };
+      if (client_id) where.client_id = client_id;
+
+      // Filter by status - allow "all" to return both active and inactive records
+      if (status && status !== "all") {
+        where.status = status;
+      }
+
+      // Fetch data from database
+      const dropdownNames = await DropdownName.findAll({
+        where,
+        order: [["created_at", "DESC"]],
+      });
+
+      res.json(dropdownNames);
+    } catch (error) {
+      logger.error("Error fetching dropdown names:", error);
+      res
+        .status(500)
+        .json({ message: "Internal Server Error", error: error.message });
+    }
+  }
+);
+
 // PUT update existing dropdown name
 v1Router.put(
   "/dropdown-name/:id",
@@ -112,9 +153,9 @@ v1Router.put(
         client_id: dropdownDetails.client_id || dropdownName.client_id,
         dropdown_name:
           dropdownDetails.dropdown_name || dropdownName.dropdown_name,
-        status: dropdownDetails.status || dropdownName.status,
+        // status: dropdownDetails.status || dropdownName.status,
         updated_by: req.userId,
-        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
+        updated_at: new Date(),
       });
 
       res.json({
@@ -156,7 +197,7 @@ v1Router.delete(
 
       res.json({
         message: "Dropdown Name successfully marked as inactive",
-        data: dropdownName.get({ plain: true }),
+        // data: dropdownName,
       });
     } catch (error) {
       logger.error("Error soft deleting dropdown name:", error);
@@ -266,7 +307,7 @@ v1Router.put(
           valueDetails.dropdown_value || dropdownValue.dropdown_value,
         status: valueDetails.status || dropdownValue.status,
         updated_by: req.userId,
-        updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
+        updated_at: new Date(),
       });
 
       res.json({
@@ -308,7 +349,7 @@ v1Router.delete(
 
       res.json({
         message: "Dropdown Value successfully marked as inactive",
-        data: dropdownValue.get({ plain: true }),
+        // data: dropdownValue.get({ plain: true }),
       });
     } catch (error) {
       logger.error("Error soft deleting dropdown value:", error);
@@ -318,50 +359,6 @@ v1Router.delete(
     }
   }
 );
-
-
-
-// GET dropdown names with search options
-
-v1Router.get(
-  "/dropdown-name",
-  authenticateJWT,
-  extractUserDetails,
-  async (req, res) => {
-    try {
-      const {
-        dropdown_name,
-        client_id,
-        status = "active", // Default to showing only active records
-      } = req.query;
-
-      // Build filter conditions
-      const where = { company_id: req.userCompanyId };
-      if (dropdown_name)
-        where.dropdown_name = { [Op.like]: `%${dropdown_name}%` };
-      if (client_id) where.client_id = client_id;
-
-      // Filter by status - allow "all" to return both active and inactive records
-      if (status && status !== "all") {
-        where.status = status;
-      }
-
-      // Fetch data from database
-      const dropdownNames = await DropdownName.findAll({
-        where,
-        order: [["created_at", "DESC"]],
-      });
-
-      res.json(dropdownNames);
-    } catch (error) {
-      logger.error("Error fetching dropdown names:", error);
-      res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
-    }
-  }
-);
-
 
 // GET dropdown values with search options
 v1Router.get(
