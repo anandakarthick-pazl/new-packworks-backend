@@ -6,6 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 dotenv.config();
 
@@ -33,8 +34,11 @@ v1Router.post("/route", authenticateJWT, async (req, res) => {
   }
 
   try {
+
+    const route_generate_id = await generateId(req.user.company_id, Route, "route");
     // Create Route
     const newRoute = await Route.create({
+      route_generate_id: route_generate_id,
       company_id: req.user.company_id,
       route_name: routeDetails.route_name,
       route_process: routeDetails.route_process, // Array of process_ids [1,2,3]

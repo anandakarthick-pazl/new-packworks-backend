@@ -333,6 +333,18 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    route_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    route_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    route_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",

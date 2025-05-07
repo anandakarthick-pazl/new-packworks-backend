@@ -1,4 +1,12 @@
 ALTER TABLE invoice_settings
+ADD COLUMN route_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN route_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN route_digit INT NOT NULL;
+
+ALTER TABLE route
+ADD COLUMN route_generate_id VARCHAR(255) NULL;
+
+ALTER TABLE invoice_settings
 ADD COLUMN process_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN process_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN process_digit INT NOT NULL;

@@ -6,6 +6,7 @@ const SalesOrder = db.SalesOrder;
 const WorkOrder = db.WorkOrder;
 const Machine = db.Machine;
 const ProcessName = db.ProcessName;
+const Route = db.Route;
 const Sku = db.Sku;
 
 export async function generateId(companyId, model, prefixKey) {
