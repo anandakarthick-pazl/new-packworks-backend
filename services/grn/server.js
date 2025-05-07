@@ -339,7 +339,6 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     // Enhanced search functionality across all relevant fields
     if (search.trim() !== "") {
       whereCondition[Op.or] = [
-        { grn_number: { [Op.like]: `%${search}%` } },
         { delivery_note_no: { [Op.like]: `%${search}%` } },
         { invoice_no: { [Op.like]: `%${search}%` } },
         { received_by: { [Op.like]: `%${search}%` } }
