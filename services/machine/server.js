@@ -572,8 +572,8 @@ v1Router.post("/master/create", authenticateJWT, async (req, res) => {
       "model_number",
       "serial_number",
       "manufacturer",
-      "purchase_date",
-      "installation_date",
+      // "purchase_date",
+      // "installation_date",
       "location",
     ];
 
