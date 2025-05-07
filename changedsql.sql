@@ -1,3 +1,11 @@
+ALTER TABLE invoice_settings
+ADD COLUMN process_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN process_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN process_digit INT NOT NULL;
+
+ALTER TABLE process_name
+ADD COLUMN process_generate_id VARCHAR(255) NULL;
+
 -- 02/05/2025
 ALTER TABLE invoice_settings
 ADD COLUMN employee_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,

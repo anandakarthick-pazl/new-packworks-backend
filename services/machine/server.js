@@ -1237,6 +1237,8 @@ v1Router.post("/process", authenticateJWT, async (req, res) => {
     const { process_name, status = "active" } = req.body;
     const company_id = req.user.company_id;
     const user_id = req.user.id;
+    
+    const process_generate_id = await generateId(req.user.company_id, ProcessName, "process");
 
     if (!process_name) {
       return res.status(400).json({
@@ -1261,6 +1263,7 @@ v1Router.post("/process", authenticateJWT, async (req, res) => {
 
     const process = await ProcessName.create(
       {
+        process_generate_id: process_generate_id,
         company_id,
         process_name,
         status,
