@@ -53,6 +53,7 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
       status: workDetails.status || "active",
       created_by: req.user.id,
       updated_by: req.user.id,
+      work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
     res.status(201).json({
@@ -199,6 +200,7 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
       status: workDetails.status || workOrder.status,
       created_by: req.user.id,
       updated_by: req.user.id,
+      work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
     res.json({

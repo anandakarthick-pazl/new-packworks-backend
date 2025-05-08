@@ -1,4 +1,4 @@
-import { DataTypes } from "sequelize";
+import { DataTypes, Sequelize } from "sequelize";
 import sequelize from "../../database/database.js";
 import SalesOrder from "./salesOrder.model.js";
 import Company from "../company.model.js";
@@ -15,7 +15,7 @@ const WorkOrder = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    work_generate_id:{
+    work_generate_id: {
       type: DataTypes.STRING(191),
       allowNull: true,
     },
@@ -73,6 +73,10 @@ const WorkOrder = sequelize.define(
         key: "id",
       },
     },
+    work_order_sku_values: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
     qty: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -114,10 +118,19 @@ const WorkOrder = sequelize.define(
     priority: {
       type: DataTypes.ENUM("High", "Medium", "Low"),
       allowNull: false,
-      defaultValue:"low"
+      defaultValue: "low",
     },
     progress: {
-      type: DataTypes.ENUM("Pending","Product Planning", "Procurement Sourcing", "Production Planning", "Production", "Quality Control", "Packaging", "Shipping"),
+      type: DataTypes.ENUM(
+        "Pending",
+        "Product Planning",
+        "Procurement Sourcing",
+        "Production Planning",
+        "Production",
+        "Quality Control",
+        "Packaging",
+        "Shipping"
+      ),
       allowNull: false,
       defaultValue: "Pending",
     },
@@ -165,7 +178,7 @@ WorkOrder.belongsTo(SkuVersion, {
 SkuVersion.hasMany(WorkOrder, {
   foreignKey: "sku_version",
   as: "workOrders",
-}); 
+});
 
 Sku.hasMany(WorkOrder, { foreignKey: "sku_id" });
 WorkOrder.belongsTo(Sku, { foreignKey: "sku_id" });

@@ -113,6 +113,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       created_by: req.user.id,
       updated_by: req.user.id,
       status: "active",
+      work_order_sku_values: work.work_order_sku_values || null,
     }));
 
     const createdWorkOrders = await WorkOrder.bulkCreate(workOrders, {
@@ -490,6 +491,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             progress: work.progress || null,
             updated_by: req.user.id,
             updated_at: new Date(),
+            work_order_sku_values: work.work_order_sku_values || null,
           },
           { transaction }
         );
@@ -519,6 +521,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             created_by: req.user.id,
             updated_by: req.user.id,
             status: "active",
+            work_order_sku_values: work.work_order_sku_values || null,
           },
           { transaction }
         );

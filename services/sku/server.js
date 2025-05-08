@@ -29,6 +29,7 @@ const SkuVersion = db.SkuVersion;
 const User = db.User;
 const SkuType = db.SkuType;
 const Client = db.Client;
+const SkuOptions = db.SkuOptions;
 
 // 🔹 Create a SKU (POST)
 
@@ -215,7 +216,6 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   }
 });
 // 🔹 Get SKU by ID (GET)
-
 v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -480,7 +480,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
 v1Router.get(
   "/sku-details/download/excel",
   authenticateJWT,
-  async (req, res) => {
+  async (req, res) => {                                   
     try {
       const {
         search = "",
@@ -1679,8 +1679,124 @@ v1Router.delete(
   }
 );
 
-// sku-type apis
 
+v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    // Check if the referenced SKU exists
+    const existingSku = await Sku.findByPk(req.body.sku_id);
+    if (!existingSku) {
+      await t.rollback();
+      return res.status(404).json({ message: "Referenced SKU not found" });
+    }
+
+    // Check if sku_version_id exists if provided
+    if (req.body.sku_version_id) {
+      const existingVersion = await SkuVersion.findByPk(req.body.sku_version_id);
+      if (!existingVersion) {
+        await t.rollback();
+        return res.status(404).json({ message: "Referenced SKU Version not found" });
+      }
+    }
+
+    // Validate that field_options is provided
+    if (!req.body.field_options || !Array.isArray(req.body.field_options) || req.body.field_options.length === 0) {
+      await t.rollback();
+      return res.status(400).json({ message: "Field options are required" });
+    }
+
+    // Prepare the options for creation
+    const options = req.body.field_options.map(option => ({
+      sku_id: req.body.sku_id,
+      sku_version_id: req.body.sku_version_id || null,
+      field_path: option.field_path,
+      field_name: option.field_name,
+      field_value: option.field_value,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      status: "active"
+    }));
+
+    // Create all options
+    const newOptions = await SkuOptions.bulkCreate(options, { transaction: t });
+    await t.commit();
+
+    // Publish to queue if needed
+    await publishToQueue({
+      operation: "CREATE_OPTIONS",
+      skuId: req.body.sku_id,
+      skuVersionId: req.body.sku_version_id,
+      timestamp: new Date(),
+      data: newOptions,
+    });
+
+    res.status(201).json({
+      message: "SKU Options created successfully",
+      options: newOptions,
+    });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({
+      message: "Error creating SKU Options",
+      error: error.message,
+    });
+  }
+});
+
+// 3. Add a endpoint to retrieve options for a specific SKU:
+
+v1Router.get("/sku-details/:skuId/options", authenticateJWT, async (req, res) => {
+  try {
+    const { skuId } = req.params;
+    const { field_path, field_name } = req.query;
+    
+    // Build query filters
+    const filter = {
+      sku_id: skuId,
+      company_id: req.user.company_id,
+      status: "active"
+    };
+    
+    // Add optional filters if provided
+    if (field_path) filter.field_path = field_path;
+    if (field_name) filter.field_name = field_name;
+    
+    // Get all options for the SKU with optional filters
+    const options = await SkuOptions.findAll({
+      where: filter,
+      order: [['created_at', 'DESC']]
+    });
+    
+    // Group options by field_path for easier frontend handling
+    const groupedOptions = options.reduce((acc, option) => {
+      if (!acc[option.field_path]) {
+        acc[option.field_path] = [];
+      }
+      // Prevent duplicates
+      if (!acc[option.field_path].some(o => o.field_value === option.field_value)) {
+        acc[option.field_path].push({
+          id: option.id,
+          field_name: option.field_name,
+          field_value: option.field_value
+        });
+      }
+      return acc;
+    }, {});
+    
+    res.status(200).json({
+      message: "SKU Options retrieved successfully",
+      options: groupedOptions
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving SKU Options",
+      error: error.message
+    });
+  }
+});
+
+
+// sku-type apis
 v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   try {
     const { status = "active", company_id } = req.query;
@@ -1741,7 +1857,6 @@ v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
   }
 });
 // 🔹 Create SKU Type
-
 v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -1765,9 +1880,7 @@ v1Router.post("/sku-details/sku-type", authenticateJWT, async (req, res) => {
       .json({ message: "Error creating SKU Type", error: error.message });
   }
 });
-
 // 🔹 Update SKU Type
-
 v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -1814,7 +1927,6 @@ v1Router.put("/sku-details/sku-type/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Error updating SKU Type", error: error.message });
   }
 });
-
 v1Router.delete(
   "/sku-details/sku-type/:id",
   authenticateJWT,
@@ -1847,7 +1959,6 @@ v1Router.delete(
     }
   }
 );
-
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({

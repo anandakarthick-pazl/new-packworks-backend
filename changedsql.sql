@@ -1,6 +1,27 @@
 -- 08/05/2025
+ALTER TABLE work_order
+ADD COLUMN work_order_sku_values JSON NULL;
+
 ALTER TABLE sku
 ADD COLUMN gst_percentage DECIMAL(5,2) NULL;
+
+CREATE TABLE `sku_options` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NOT NULL,
+  `sku_id` INT UNSIGNED NOT NULL,
+  `sku_version_id` INT UNSIGNED DEFAULT NULL,
+  `field_path` VARCHAR(255) NOT NULL COMMENT 'Path to the field (e.g., "sku_values.0.gsm")',
+  `field_name` VARCHAR(100) NOT NULL COMMENT 'Name of the field (e.g., "gsm")',
+  `field_value` VARCHAR(255) NOT NULL COMMENT 'Value of the field (e.g., "210")',
+  `status` VARCHAR(50) NOT NULL DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 -- 
 ALTER TABLE invoice_settings
