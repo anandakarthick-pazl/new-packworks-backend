@@ -1,3 +1,8 @@
+-- 08/05/2025
+ALTER TABLE sku
+ADD COLUMN gst_percentage DECIMAL(5,2) NULL;
+
+-- 
 ALTER TABLE invoice_settings
 ADD COLUMN route_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN route_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,

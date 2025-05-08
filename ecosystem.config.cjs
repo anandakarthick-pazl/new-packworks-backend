@@ -201,5 +201,12 @@ module.exports = {
         PORT: 3027,
       },
     },
+    {
+      name: "production",
+      script: "./services/Production/server.js",
+      env: {
+        PORT: 3028,
+      },
+    },
   ],
 };

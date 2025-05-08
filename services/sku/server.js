@@ -255,6 +255,7 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "description",
       "default_sku_details",
       "tags",
+      "gst_percentage",
       // "status",
     ];
 
@@ -589,6 +590,7 @@ v1Router.get(
           key: "minimum_order_level",
           width: 20,
         },
+        { header: "GST Percentage", key: "gst_percentage", width: 15 },
         { header: "Status", key: "status", width: 12 },
         { header: "Created By", key: "created_by_name", width: 20 },
         { header: "Created At", key: "created_at", width: 20 },
@@ -641,6 +643,7 @@ v1Router.get(
           width_trimming_tolerance: sku.width_trimming_tolerance,
           strict_adherence: sku.strict_adherence ? "Yes" : "No",
           customer_reference: sku.customer_reference,
+          gst_percentage: sku.gst_percentage,
           reference_number: sku.reference_number,
           internal_id: sku.internal_id,
           board_size_cm2: sku.board_size_cm2,
