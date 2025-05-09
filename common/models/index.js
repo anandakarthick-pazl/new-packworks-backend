@@ -37,6 +37,7 @@ import PurchaseOrderReturn from './po_return/purchase_order_return.model.js';
 import PurchaseOrderReturnItem from './po_return/purchase_order_return_item.model.js';
 import InvoiceSetting from "./invoiceSetting.model.js";
 import SkuOptions from "./skuModel/skuOptions.model.js";
+import States from "./commonModel/states.model.js";
 
 const db = {
   sequelize,
@@ -77,7 +78,8 @@ const db = {
   Route,
   PurchaseOrderReturn,
   PurchaseOrderReturnItem,
-  InvoiceSetting
+  InvoiceSetting,
+  States,
 };
 
 export default db;

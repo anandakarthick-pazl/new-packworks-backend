@@ -18,14 +18,14 @@ const v1Router = Router();
 
 const DropdownName = db.DropdownName;
 const DropdownValue = db.DropdownValue;
-const Currency=db.Currency;
-const Flute=db.Flute;
-const ModuleSettings=db.ModuleSettings;
+const Currency = db.Currency;
+const Flute = db.Flute;
+const ModuleSettings = db.ModuleSettings;
 const Module = db.Module;
 const Company = db.Company;
-const Die=db.Die;
-
-
+const Die = db.Die;
+const States = db.States;
+const User = db.User;
 
 // Middleware to extract user details from token
 const extractUserDetails = (req, res, next) => {
@@ -40,7 +40,6 @@ const extractUserDetails = (req, res, next) => {
 
   next();
 };
-
 
 // POST create new dropdown name
 v1Router.post(
@@ -84,7 +83,6 @@ v1Router.post(
     }
   }
 );
-
 
 // GET dropdown names with search options
 
@@ -208,8 +206,6 @@ v1Router.delete(
   }
 );
 
-
-
 // POST create new dropdown value
 v1Router.post(
   "/dropdown-value",
@@ -323,7 +319,6 @@ v1Router.put(
   }
 );
 
-
 // DELETE dropdown value (soft delete)
 v1Router.delete(
   "/dropdown-value/:id",
@@ -409,7 +404,6 @@ v1Router.get(
   }
 );
 
-
 v1Router.get("/countries", authenticateJWT, async (req, res) => {
   try {
     const countries = await Country.findAll({
@@ -438,383 +432,395 @@ v1Router.get("/countries", authenticateJWT, async (req, res) => {
   }
 });
 
-
-
 // Get Currency
-v1Router.get("/currency",authenticateJWT, async (req, res) => {
+v1Router.get("/currency", authenticateJWT, async (req, res) => {
   try {
-  const currency = await Currency.findAll({where: { status: "active" },attributes:["id","company_id","currency_name","currency_symbol","currency_code","status"]});
-  return res.status(200).json({
+    const currency = await Currency.findAll({
+      where: { status: "active" },
+      attributes: [
+        "id",
+        "company_id",
+        "currency_name",
+        "currency_symbol",
+        "currency_code",
+        "status",
+      ],
+    });
+    return res.status(200).json({
       success: true,
-      message:"Currencies fetched Successfully",
+      message: "Currencies fetched Successfully",
       data: currency,
-  });
+    });
   } catch (error) {
-  console.error("Error fetching departments:", error);
-  return res.status(500).json({ success: false, error: error.message });
+    console.error("Error fetching departments:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
-
-
 
 // Get ModuleSettings
-v1Router.get("/module-setting",authenticateJWT, async (req, res) => {
+v1Router.get("/module-setting", authenticateJWT, async (req, res) => {
   try {
-  const settings = await ModuleSettings.findAll({where: { status: "active",type: "admin" },attributes:["id","company_id","module_name","status"],group: ["module_name"],order: [["id", "ASC"]],});
+    const settings = await ModuleSettings.findAll({
+      where: { status: "active", type: "admin" },
+      attributes: ["id", "company_id", "module_name", "status"],
+      group: ["module_name"],
+      order: [["id", "ASC"]],
+    });
 
-  return res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message:"Module Fetched Successfully",
+      message: "Module Fetched Successfully",
       data: settings,
-  });
+    });
   } catch (error) {
-  console.error("Error fetching Module Settings:", error);
-  return res.status(500).json({ success: false, error: error.message });
+    console.error("Error fetching Module Settings:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
-
 
 // Get Module
-v1Router.get("/module",authenticateJWT, async (req, res) => {
+v1Router.get("/module", authenticateJWT, async (req, res) => {
   try {
-  const module = await Module.findAll({where: { status: "active",is_superadmin: 0 ,module_name: { [Op.ne]: "dashboards" }},attributes:["id","module_name","description"]});
+    const module = await Module.findAll({
+      where: {
+        status: "active",
+        is_superadmin: 0,
+        module_name: { [Op.ne]: "dashboards" },
+      },
+      attributes: ["id", "module_name", "description"],
+    });
 
-  return res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message:"Module Fetched Successfully",
+      message: "Module Fetched Successfully",
       data: module,
-  });
+    });
   } catch (error) {
-  console.error("Error fetching Module:", error);
-  return res.status(500).json({ success: false, error: error.message });
+    console.error("Error fetching Module:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-
 // Get Flute
-  v1Router.get("/flute", authenticateJWT, async (req, res) => {
-    try {
-        const { search = "", page = "1", limit = "10" } = req.query;
-        const pageNumber = parseInt(page) || 1;
-        const limitNumber = parseInt(limit) || 10;
-        const offset = (pageNumber - 1) * limitNumber;
-        let whereCondition = { status: "active" };
-        if (search) {   
-          whereCondition = {
-            ...whereCondition,
-            name: { [Op.like]: `%${search}%` }, 
-          };
-        }
-        const totalflutes = await Flute.count({ where: whereCondition });
-        const flutes = await Flute.findAll({where: whereCondition, limit: limitNumber, offset });
-        const formattedFlutes = flutes.map(flt => ({
-          ...flt.toJSON(), 
-        }));
-        return res.status(200).json({
-          success: true,
-          message:"Flutes Fetched Successfully",
-          total: totalflutes, 
-          page, 
-          totalPages: Math.ceil(totalflutes / limit), 
-          data:formattedFlutes
-        }); 
-      } catch (error) {
-        console.error("Error fetching flutes:", error);
-        return res.status(500).json({ success: false, error: error.message });
-      }
+v1Router.get("/flute", authenticateJWT, async (req, res) => {
+  try {
+    const { search = "", page = "1", limit = "10" } = req.query;
+    const pageNumber = parseInt(page) || 1;
+    const limitNumber = parseInt(limit) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+    let whereCondition = { status: "active" };
+    if (search) {
+      whereCondition = {
+        ...whereCondition,
+        name: { [Op.like]: `%${search}%` },
+      };
+    }
+    const totalflutes = await Flute.count({ where: whereCondition });
+    const flutes = await Flute.findAll({
+      where: whereCondition,
+      limit: limitNumber,
+      offset,
     });
-
-
-
-
-
-  //create flute  
-  v1Router.post("/flute/create", authenticateJWT, async (req, res) => {
-    const transaction = await sequelize.transaction();
-    try {
-      const userId = req.user.id;
-      const { fluteData, ...rest } = req.body;
-  
-      rest.created_by = userId;
-      rest.updated_by = userId;
-      rest.created_at = new Date();
-      rest.updated_at = new Date();
-      rest.company_id = req.user.company_id;
-
-  
-      // Save flute data
-      const flute = await Flute.create(rest, { transaction });
-  
-      await transaction.commit();
-  
-      return res.status(201).json({
-        success: true,
-        message: "Flute created successfully",
-        data: flute.toJSON(),
-      });
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Error creating Flute:", error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-
-  // Get id based flute
-  v1Router.get("/flute/edit/:fluteId", authenticateJWT, async (req, res) => {
-    try {
-      const fluteId = parseInt(req.params.fluteId);
-  
-      if (isNaN(fluteId)) {
-        return res.status(400).json({ success: false, message: "Invalid flute ID" });
-      }
-  
-      const flute = await Flute.findOne({ where: { id: fluteId } });
-  
-      if (!flute) {
-        return res.status(404).json({ success: false, message: "Flute not found", data: {} });
-      }
-  
-      return res.status(200).json({
-        success: true,
-        data: {
-          ...flute.toJSON(),
-        }
-      });
-    } catch (error) {
-      console.error("Error fetching flute:", error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-
-  //update flute
-  v1Router.put("/flute/update/:id", authenticateJWT, async (req,res) => {
-    const transaction = await sequelize.transaction();
-    try{
-      const fulteId=req.params.id;
-      const userId=req.user.id;
-      const { ...rest} = req.body;
-
-    const existingFlute=await Flute.findByPk(fulteId,{transaction});
-    if(!existingFlute){
-        await transaction.rollback();
-        return res.status(404).json({ success: false, message: "Flute not found" });
-    }      
-
-      rest.updated_by=userId;
-
-      rest.created_at = existingFlute.created_at;  
-
-      rest.updated_at = new Date();
-
-      rest.company_id = req.user.company_id;
-
-      await Flute.update( rest,{ where: { id: fulteId }, transaction });
-
-      const updatedFlute = await Flute.findByPk(fulteId, { transaction });
-
-      await transaction.commit();
-
-      return res.status(200).json({
-        success: true,
-        message: "Flute updated successfully",
-        data: {
-          ...updatedFlute.toJSON(),
-        },
-      });
-
-    }catch(error){
-      await transaction.rollback();
-      console.error("Error updating Flute:", error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // Delete Flute
-    v1Router.delete("/flute/delete/:id", authenticateJWT, async (req,res) =>{
-          const transaction = await sequelize.transaction(); 
-          try{
-            const fluteId = req.params.id;
-            const userId = req.user.id;
-
-            const Flutes = await Flute.findOne({ where:{ id: fluteId } });
-            
-                  if (!Flutes) {
-                    return res.status(404).json({
-                      success: false,
-                      message: "Flutes not found",
-                    });
-                  }
-
-                  await Flute.update(
-                    {
-                    status: 'inactive',
-                    updated_at: new Date(),
-                    updated_by: userId
-                  },
-                  { where: { id: fluteId }, transaction }
-                );
-
-                  await transaction.commit();
-
-                  return res.status(200).json({
-                    status: true,
-                    message: "Flute deleted successfully",
-                    data: [],
-                  });      
-
-
-          }catch(error){
-            await transaction.rollback();
-            console.error("Error Deleted Packages:", error);
-            return res.status(500).json({ success: false, error: error.message });
-          }
+    const formattedFlutes = flutes.map((flt) => ({
+      ...flt.toJSON(),
+    }));
+    return res.status(200).json({
+      success: true,
+      message: "Flutes Fetched Successfully",
+      total: totalflutes,
+      page,
+      totalPages: Math.ceil(totalflutes / limit),
+      data: formattedFlutes,
     });
+  } catch (error) {
+    console.error("Error fetching flutes:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
+//create flute
+v1Router.post("/flute/create", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const userId = req.user.id;
+    const { fluteData, ...rest } = req.body;
 
-//get die
-    v1Router.get("/die",authenticateJWT,async(req,res)=>{
-      try{
-        const { search = "", page = "1", limit = "10" } = req.query;
-        const pageNumber = parseInt(page) || 1;
-          const limitNumber = parseInt(limit) || 10;
-          const offset = (pageNumber - 1) * limitNumber;
-          let whereCondition = { status: "active" };
-          if (search) {   
-            whereCondition = {
-              ...whereCondition,
-              name: { [Op.like]: `%${search}%` }, 
-            };
-          }
-          const totalDie = await Die.count({ where: whereCondition });
-          const die = await Die.findAll({where: whereCondition, limit: limitNumber, offset });
-          const dieFlutes = die.map(diemap => ({
-            ...diemap.toJSON(), 
-          }));
-        return res.status(200).json({
-          success: true,
-          message:"Die Fetched Successfully",
-          total: totalDie, 
-          page, 
-          totalPages: Math.ceil(totalDie / limit), 
-          data:dieFlutes
-        });
-      }catch(error){
-        console.error("server error : ",error);
-        
-      }
-    })
+    rest.created_by = userId;
+    rest.updated_by = userId;
+    rest.created_at = new Date();
+    rest.updated_at = new Date();
+    rest.company_id = req.user.company_id;
 
+    // Save flute data
+    const flute = await Flute.create(rest, { transaction });
 
-    v1Router.post("/die/create", authenticateJWT, async (req, res) => {
-      const transaction = await sequelize.transaction();
-      try {
-        const userId = req.user.id;
-        const { dieData, ...rest } = req.body;
-    
-        rest.created_by = userId;
-        rest.updated_by = userId;
-        rest.created_at = new Date();
-        rest.updated_at = new Date();
-        rest.company_id = req.user.company_id;
-  
-    
-        // Save die data
-        const die = await Die.create(rest, { transaction });
-    
-        await transaction.commit();
-    
-        return res.status(201).json({
-          success: true,
-          message: "Die created successfully",
-          data: die.toJSON(),
-        });
-      } catch (error) {
-        await transaction.rollback();
-        console.error("Error creating Die:", error);
-        return res.status(500).json({ success: false, error: error.message });
-      }
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Flute created successfully",
+      data: flute.toJSON(),
     });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error creating Flute:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
-//edit die 
-v1Router.get("/die/edit/:id",authenticateJWT,async (req,res)=>{
-  try{
-    const dieId = parseInt(req.params.id);
-    if(isNaN(dieId)){
-      return res.status(400).json({
-        success:false,
-        message:"Die id is required" 
-      });
+// Get id based flute
+v1Router.get("/flute/edit/:fluteId", authenticateJWT, async (req, res) => {
+  try {
+    const fluteId = parseInt(req.params.fluteId);
+
+    if (isNaN(fluteId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid flute ID" });
     }
 
-    const die = await Die.findOne({where:{id:dieId}});
+    const flute = await Flute.findOne({ where: { id: fluteId } });
 
-    if(!die){
-      return res.status(404).json({
-       success:false,
-        message:"Die not found"
-      })
+    if (!flute) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Flute not found", data: {} });
     }
 
     return res.status(200).json({
-      sucess:true,
-      data:{...die.toJSON()},
-      message: "Die Fetched Successfully"
-    })
-
-  }catch(error){
-    console.error("Die get a id based details error :",error.message);
-    return res.status(500).json({
-      success:false,
-      message:error.message
-    })
-    
+      success: true,
+      data: {
+        ...flute.toJSON(),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching flute:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
-})
+});
 
+//update flute
+v1Router.put("/flute/update/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const fulteId = req.params.id;
+    const userId = req.user.id;
+    const { ...rest } = req.body;
+
+    const existingFlute = await Flute.findByPk(fulteId, { transaction });
+    if (!existingFlute) {
+      await transaction.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "Flute not found" });
+    }
+
+    rest.updated_by = userId;
+
+    rest.created_at = existingFlute.created_at;
+
+    rest.updated_at = new Date();
+
+    rest.company_id = req.user.company_id;
+
+    await Flute.update(rest, { where: { id: fulteId }, transaction });
+
+    const updatedFlute = await Flute.findByPk(fulteId, { transaction });
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Flute updated successfully",
+      data: {
+        ...updatedFlute.toJSON(),
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error updating Flute:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete Flute
+v1Router.delete("/flute/delete/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const fluteId = req.params.id;
+    const userId = req.user.id;
+
+    const Flutes = await Flute.findOne({ where: { id: fluteId } });
+
+    if (!Flutes) {
+      return res.status(404).json({
+        success: false,
+        message: "Flutes not found",
+      });
+    }
+
+    await Flute.update(
+      {
+        status: "inactive",
+        updated_at: new Date(),
+        updated_by: userId,
+      },
+      { where: { id: fluteId }, transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      status: true,
+      message: "Flute deleted successfully",
+      data: [],
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error Deleted Packages:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+//get die
+v1Router.get("/die", authenticateJWT, async (req, res) => {
+  try {
+    const { search = "", page = "1", limit = "10" } = req.query;
+    const pageNumber = parseInt(page) || 1;
+    const limitNumber = parseInt(limit) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+    let whereCondition = { status: "active" };
+    if (search) {
+      whereCondition = {
+        ...whereCondition,
+        name: { [Op.like]: `%${search}%` },
+      };
+    }
+    const totalDie = await Die.count({ where: whereCondition });
+    const die = await Die.findAll({
+      where: whereCondition,
+      limit: limitNumber,
+      offset,
+    });
+    const dieFlutes = die.map((diemap) => ({
+      ...diemap.toJSON(),
+    }));
+    return res.status(200).json({
+      success: true,
+      message: "Die Fetched Successfully",
+      total: totalDie,
+      page,
+      totalPages: Math.ceil(totalDie / limit),
+      data: dieFlutes,
+    });
+  } catch (error) {
+    console.error("server error : ", error);
+  }
+});
+
+v1Router.post("/die/create", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const userId = req.user.id;
+    const { dieData, ...rest } = req.body;
+
+    rest.created_by = userId;
+    rest.updated_by = userId;
+    rest.created_at = new Date();
+    rest.updated_at = new Date();
+    rest.company_id = req.user.company_id;
+
+    // Save die data
+    const die = await Die.create(rest, { transaction });
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Die created successfully",
+      data: die.toJSON(),
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error creating Die:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+//edit die
+v1Router.get("/die/edit/:id", authenticateJWT, async (req, res) => {
+  try {
+    const dieId = parseInt(req.params.id);
+    if (isNaN(dieId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Die id is required",
+      });
+    }
+
+    const die = await Die.findOne({ where: { id: dieId } });
+
+    if (!die) {
+      return res.status(404).json({
+        success: false,
+        message: "Die not found",
+      });
+    }
+
+    return res.status(200).json({
+      sucess: true,
+      data: { ...die.toJSON() },
+      message: "Die Fetched Successfully",
+    });
+  } catch (error) {
+    console.error("Die get a id based details error :", error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 //update die
-  v1Router.put("/die/update/:id", authenticateJWT, async (req,res) => {
-    const transaction = await sequelize.transaction();
-    try{
-      const dieId=req.params.id;
-      const userId=req.user.id;
-      const { ...rest} = req.body;
+v1Router.put("/die/update/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const dieId = req.params.id;
+    const userId = req.user.id;
+    const { ...rest } = req.body;
 
-    const existingDie=await Die.findByPk(dieId,{transaction});
-    if(!existingDie){
-        await transaction.rollback();
-        return res.status(404).json({ success: false, message: "Die not found" });
-    }      
-
-      rest.updated_by=userId;
-
-      rest.updated_at = new Date();
-
-      rest.company_id = req.user.company_id;
-
-      await Die.update( rest,{ where: { id: dieId }, transaction });
-
-      const updatedDie = await Die.findByPk(dieId, { transaction });
-
-      await transaction.commit();
-
-      return res.status(200).json({
-        success: true,
-        message: "Die updated successfully",
-        data: {
-          ...updatedDie.toJSON(),
-        },
-      });
-
-    }catch(error){
+    const existingDie = await Die.findByPk(dieId, { transaction });
+    if (!existingDie) {
       await transaction.rollback();
-      console.error("Error updating Die:", error);
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(404).json({ success: false, message: "Die not found" });
     }
-  });   
-  
+
+    rest.updated_by = userId;
+
+    rest.updated_at = new Date();
+
+    rest.company_id = req.user.company_id;
+
+    await Die.update(rest, { where: { id: dieId }, transaction });
+
+    const updatedDie = await Die.findByPk(dieId, { transaction });
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Die updated successfully",
+      data: {
+        ...updatedDie.toJSON(),
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error updating Die:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 //delete die
 
 v1Router.delete("/die/delete/:id", authenticateJWT, async (req, res) => {
@@ -828,7 +834,7 @@ v1Router.delete("/die/delete/:id", authenticateJWT, async (req, res) => {
     if (!die) {
       return res.status(404).json({
         success: false,
-        message: "Die not found"
+        message: "Die not found",
       });
     }
 
@@ -836,7 +842,7 @@ v1Router.delete("/die/delete/:id", authenticateJWT, async (req, res) => {
       {
         updated_by: userId,
         updated_at: new Date(),
-        status: "inactive"
+        status: "inactive",
       },
       { where: { id: dieId }, transaction }
     );
@@ -846,18 +852,54 @@ v1Router.delete("/die/delete/:id", authenticateJWT, async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Die Deleted Successfully",
-      data: []
+      data: [],
     });
-
   } catch (error) {
     await transaction.rollback(); // Important: rollback on error
     console.error("Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Die delete error"
+      message: "Die delete error",
     });
   }
 });
+
+// states
+
+v1Router.get("/states", authenticateJWT, async (req, res) => {
+  try {
+    const states = await States.findAll({
+      include: [
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    res.status(200).json({
+      status: "success",
+      count: states.length,
+      data: states,
+    });
+  } catch (error) {
+    console.error("Error fetching states data:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
 // Basic Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
