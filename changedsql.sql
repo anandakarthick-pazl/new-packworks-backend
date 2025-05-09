@@ -1,5 +1,5 @@
 -- 09/04/2025
-CREATE TABLE `States` (
+CREATE TABLE `states` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `company_id` INT UNSIGNED NULL,
   `country_code` VARCHAR(3) NULL,
