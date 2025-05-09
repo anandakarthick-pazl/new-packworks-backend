@@ -1,4 +1,8 @@
 -- 09/04/2025
+
+ALTER TABLE companies
+ADD COLUMN company_state VARCHAR(191) NULL;
+
 CREATE TABLE `states` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `company_id` INT UNSIGNED NULL,

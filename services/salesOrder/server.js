@@ -224,7 +224,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       offset: parseInt(offset),
       include: includeConditions,
       order: [["created_at", "DESC"]],
-      distinct: true, // Important when including associations to get correct count
+      distinct: true, 
     });
 
     // Transform data
