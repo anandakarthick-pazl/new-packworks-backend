@@ -90,6 +90,10 @@ const SalesOrder = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
+    igst: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
     total_incl_gst: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: true,
