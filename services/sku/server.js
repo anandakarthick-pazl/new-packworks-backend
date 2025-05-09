@@ -116,6 +116,12 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
               { ply: { [Op.like]: `%${ply}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
               { sku_ui_id: { [Op.like]: `%${search}%` } },
+              {length: { [Op.like]: `%${search}%` } },
+              {width: { [Op.like]: `%${search}%` } },
+              {height: { [Op.like]: `%${search}%` } },
+              {length_board_size_cm2: { [Op.like]: `%${search}%` } },
+              {width_board_size_cm2: { [Op.like]: `%${search}%` } },
+              {board_size_cm2: { [Op.like]: `%${search}%` } },
             ],
           },
         ],
@@ -906,6 +912,63 @@ v1Router.get(
     }
   }
 );
+
+
+v1Router.get("/sku-details/client-sku/:client_id", authenticateJWT, async (req, res) => {
+  try {
+    const { client_id } = req.params;
+    const { sku_name } = req.query;
+
+    // Build the where condition with client_id
+    let whereCondition = {
+      client_id: client_id,
+      status: "active", // Default to active SKUs
+    };
+
+    // Add sku_name search if provided
+    if (sku_name) {
+      whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+    }
+
+    // Fetch all matching SKUs without pagination
+    const skus = await Sku.findAll({
+      where: whereCondition,
+      include: [
+        {
+          model: db.User,
+          as: "sku_creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: db.User,
+          as: "sku_updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    // Format the SKU data
+    const formattedSkus = skus.map((sku) => ({
+      ...sku.toJSON(),
+      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+      part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+      tags: sku.tags ? JSON.parse(sku.tags) : null,
+    }));
+
+    res.status(200).json({
+      data: formattedSkus,
+      count: formattedSkus.length
+    });
+  } catch (error) {
+    logger.error("Error fetching client SKUs:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 
 // v1Router.get(
 //   "/sku-details/download/excel",
