@@ -32,10 +32,7 @@ import GRN from "./grn/grn.model.js";
 import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
 import InventoryType from "./inventory/inventory_type.model.js";
-import PurchaseOrderReturn from "./po_return/purchase_order_return.model.js";
-import PurchaseOrderReturnItem from "./po_return/purchase_order_return_item.model.js";
-import StockAdjustment from "./sa/stock_adjustment.model.js";
-import StockAdjustmentItem from "./sa/stock_adjustment_item.model.js";
+
 const db = {
   sequelize,
   User,
@@ -70,11 +67,7 @@ const db = {
   GRN,
   GRNItem,
   Inventory,
-  InventoryType, 
-  PurchaseOrderReturn,
-  PurchaseOrderReturnItem,
-  StockAdjustment,
-  StockAdjustmentItem
+  InventoryType
 };
 
 export default db;

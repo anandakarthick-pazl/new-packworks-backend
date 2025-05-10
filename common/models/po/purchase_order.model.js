@@ -94,10 +94,6 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     PurchaseOrder.belongsTo(Company, { foreignKey: "company_id" });
     PurchaseOrder.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     PurchaseOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
-
-    
-
-
     
     export default PurchaseOrder;
   

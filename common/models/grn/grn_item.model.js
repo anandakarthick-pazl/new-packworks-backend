@@ -133,8 +133,4 @@ GRNItem.belongsTo(Company, { foreignKey: "company_id" });
 GRNItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRNItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-
-
-
-
 export default GRNItem;
