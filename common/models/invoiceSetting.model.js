@@ -345,6 +345,54 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    item_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    item_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    item_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    purchase_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    grn_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    grn_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    grn_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    inventory_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    inventory_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    inventory_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",

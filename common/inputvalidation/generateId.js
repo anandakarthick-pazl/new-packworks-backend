@@ -8,6 +8,10 @@ const Machine = db.Machine;
 const ProcessName = db.ProcessName;
 const Route = db.Route;
 const Sku = db.Sku;
+const ItemMaster = db.ItemMaster;
+const PurchaseOrder = db.PurchaseOrder;
+const GRN = db.GRN;
+const Inventory = db.Inventory;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
@@ -25,6 +29,8 @@ export async function generateId(companyId, model, prefixKey) {
     where: { company_id: companyId },
     order: [[primaryKey, "DESC"]],
   });
+
+  console.log(lastRecord, "lastRecord");
 
   // Use the appropriate primary key for incrementing
   const nextNumber = lastRecord ? lastRecord[primaryKey] + 1 : 1;

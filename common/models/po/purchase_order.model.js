@@ -10,6 +10,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         autoIncrement: true,
         primaryKey: true
       },
+      purchase_generate_id:{
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
       po_code: {
         type: DataTypes.STRING(100)
       },
