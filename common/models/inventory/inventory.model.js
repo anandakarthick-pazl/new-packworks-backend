@@ -12,6 +12,10 @@ const Inventory = sequelize.define("Inventory", {
     autoIncrement: true,
     primaryKey: true,
   },
+  inventory_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,

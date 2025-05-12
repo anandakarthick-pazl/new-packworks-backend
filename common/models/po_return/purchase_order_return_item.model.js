@@ -7,7 +7,7 @@ import GRN from "../grn/grn.model.js"; // If you have this model
 import GRNItem from "../grn/grn_item.model.js"; // If you have this model
 import ItemMaster from "../item.model.js";
 import PurchaseOrderReturn from "./purchase_order_return.model.js";
-const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnitem', {
+const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
@@ -30,7 +30,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnitem', {
     allowNull: false,
     references: {
       model: GRNItem,
-      key: "id"
+      key: "grn_item_id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
@@ -41,7 +41,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnitem', {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "id"
+      key: "item_id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
