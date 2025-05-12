@@ -7,6 +7,7 @@ import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import QRCode from "qrcode"; 
 
 dotenv.config();
 
@@ -14,12 +15,94 @@ const app = express();
 app.use(json());
 app.use(cors());
 
+// Create a public directory for storing QR code images if needed
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const qrCodeDir = path.join(__dirname, "../../public/qrcodes");
+
+// Ensure the directory exists
+if (!fs.existsSync(qrCodeDir)) {
+  fs.mkdirSync(qrCodeDir, { recursive: true });
+}
+
+// Serve the QR code images statically
+app.use("/qrcodes", express.static(qrCodeDir));
+
 const v1Router = Router();
 
 const WorkOrder = db.WorkOrder;
 
-// POST create new work order
+async function generateQRCode(workOrder) {
+  try {
+    // Create a nicely formatted plain text representation of the work order
+    const textContent = `
+Work Order: ${workOrder.work_generate_id}
+SKU: ${workOrder.sku_name || "N/A"}
+Quantity: ${workOrder.qty || "N/A"}
+Manufacture: ${workOrder.manufacture || "N/A"}
+Status: ${workOrder.status || "N/A"}
+${workOrder.description ? `Description: ${workOrder.description}` : ""}
+${
+  workOrder.edd
+    ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+    : ""
+}
+`.trim();
 
+    // Generate a unique filename
+    const qrFileName = `wo_${workOrder.work_generate_id.replace(
+      /[^a-zA-Z0-9]/g,
+      "_"
+    )}_${Date.now()}.png`;
+    const qrFilePath = path.join(qrCodeDir, qrFileName);
+
+    // Generate QR code with the plain text
+    await QRCode.toFile(qrFilePath, textContent, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 300,
+    });
+
+    // Return the URL to access the QR code
+    const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
+    return `${baseUrl}/qrcodes/${qrFileName}`;
+  } catch (error) {
+    logger.error("Error generating QR code:", error);
+    throw error;
+  }
+}
+// Alternative: Generate QR code as data URL (no file storage required)
+// async function generateQRCodeDataURL(workOrder) {
+//   try {
+//     // The data to encode in the QR code
+//     const qrData = JSON.stringify({
+//       work_id: workOrder.id,
+//       work_generate_id: workOrder.work_generate_id,
+//       sku_name: workOrder.sku_name,
+//       qty: workOrder.qty,
+//       manufacture: workOrder.manufacture,
+//       status: workOrder.status,
+//     });
+
+//     // Generate QR code as data URL
+//     const dataURL = await QRCode.toDataURL(qrData, {
+//       errorCorrectionLevel: "H",
+//       margin: 1,
+//       width: 300,
+//     });
+
+//     return dataURL;
+//   } catch (error) {
+//     logger.error("Error generating QR code data URL:", error);
+//     throw error;
+//   }
+// }
+
+// POST create new work order
 v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   const workDetails = req.body;
 
@@ -28,8 +111,12 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   }
 
   try {
-    
-    const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
+    const work_generate_id = await generateId(
+      req.user.company_id,
+      WorkOrder,
+      "work"
+    );
+
     // Create Work Order
     const newWorkOrder = await WorkOrder.create({
       work_generate_id: work_generate_id,
@@ -56,9 +143,26 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
       work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
+    // Generate QR code for this work order
+    // Option 1: Generate and store QR code as a file (with URL to access it)
+    const qrCodeUrl = await generateQRCode(newWorkOrder);
+
+    // Option 2: Generate QR code as data URL (no file storage)
+    // const qrCodeDataUrl = await generateQRCodeDataURL(newWorkOrder);
+
+    // Update work order with QR code URL
+    await newWorkOrder.update({
+      qr_code_url: qrCodeUrl,
+      // qr_code_data_url: qrCodeDataUrl, // Uncomment if using Option 2
+    });
+
     res.status(201).json({
       message: "Work Order created successfully",
-      data: newWorkOrder,
+      data: {
+        ...newWorkOrder.get({ plain: true }),
+        qr_code_url: qrCodeUrl,
+        // qr_code_data_url: qrCodeDataUrl, // Uncomment if using Option 2
+      },
     });
   } catch (error) {
     logger.error("Error creating work order:", error);
@@ -70,12 +174,13 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 
 v1Router.get("/work-order", authenticateJWT, async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      manufacture, 
+    const {
+      page = 1,
+      limit = 10,
+      manufacture,
       sku_name,
-      status = "active" // Default to 'active' status
+      status = "active", // Default to 'active' status
+      updateMissingQrCodes = "true", // New parameter to update missing QR codes
     } = req.query;
 
     const pageNum = parseInt(page, 10);
@@ -84,16 +189,16 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
 
     // Build where clause for filtering
     const whereClause = {
-      company_id: req.user.company_id // Add company filter for security
+      company_id: req.user.company_id, // Add company filter for security
     };
-    
+
     // Status filtering - default to active, but allow override
     if (status === "all") {
       // Don't filter by status if 'all' is specified
     } else {
       whereClause.status = status;
     }
-    
+
     if (manufacture) {
       whereClause.manufacture = manufacture;
     }
@@ -109,11 +214,35 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       order: [["updated_at", "DESC"]],
     });
 
+    // Process work orders - updating QR codes for those missing them
+    const workOrders = await Promise.all(
+      rows.map(async (workOrder) => {
+        const plainWorkOrder = workOrder.get({ plain: true });
+
+        // If QR code URL is missing and update flag is true, generate and update
+        if (updateMissingQrCodes === "true" && !plainWorkOrder.qr_code_url) {
+          try {
+            const qrCodeUrl = await generateQRCode(workOrder);
+            await workOrder.update({ qr_code_url: qrCodeUrl });
+            plainWorkOrder.qr_code_url = qrCodeUrl;
+          } catch (qrError) {
+            logger.error(
+              `Error generating QR code for work order ${plainWorkOrder.id}:`,
+              qrError
+            );
+            // Continue with the process even if QR generation fails for this item
+          }
+        }
+
+        return plainWorkOrder;
+      })
+    );
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(count / limitNum);
 
     res.json({
-      workOrders: rows,
+      workOrders,
       pagination: {
         total: count,
         page: pageNum,
@@ -128,29 +257,33 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
+// Update the other endpoints to return the QR code information
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status = "active" } = req.query; // Add status parameter
+    const { status = "active" } = req.query;
 
-    // Fetch from database with company_id for security
-    const whereClause = { 
+    const whereClause = {
       id: id,
-      company_id: req.user.company_id
+      company_id: req.user.company_id,
     };
-    
-    // Add status filter unless 'all' is specified
+
     if (status !== "all") {
       whereClause.status = status;
     }
-    
+
     const workOrder = await WorkOrder.findOne({
-      where: whereClause
+      where: whereClause,
     });
 
     if (!workOrder) {
       return res.status(404).json({ message: "Work order not found" });
+    }
+
+    // If QR code URL doesn't exist, generate it now
+    if (!workOrder.qr_code_url) {
+      const qrCodeUrl = await generateQRCode(workOrder);
+      await workOrder.update({ qr_code_url: qrCodeUrl });
     }
 
     const result = workOrder.get({ plain: true });
@@ -163,6 +296,50 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
+// Dedicated endpoint to generate QR code for existing work orders
+// v1Router.get("/work-order/:id/qrcode", authenticateJWT, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { format = "url" } = req.query;
+
+//     const workOrder = await WorkOrder.findOne({
+//       where: {
+//         id: id,
+//         company_id: req.user.company_id,
+//       },
+//     });
+
+//     if (!workOrder) {
+//       return res.status(404).json({ message: "Work order not found" });
+//     }
+
+//     let qrCode;
+
+//     if (format === "dataurl") {
+//       // Generate data URL QR code
+//       qrCode = await generateQRCodeDataURL(workOrder);
+//     } else {
+//       // Generate file-based QR code with URL
+//       if (!workOrder.qr_code_url) {
+//         qrCode = await generateQRCode(workOrder);
+//         await workOrder.update({ qr_code_url: qrCode });
+//       } else {
+//         qrCode = workOrder.qr_code_url;
+//       }
+//     }
+
+//     res.json({
+//       success: true,
+//       qrCode: qrCode,
+//     });
+//   } catch (error) {
+//     logger.error("Error generating QR code:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 // PUT update existing work order
 v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
@@ -181,6 +358,21 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: "Work order not found" });
     }
 
+    // Check if the user has permission to update this work order (same company)
+    if (workOrder.company_id !== req.user.company_id) {
+      return res.status(403).json({ 
+        message: "You don't have permission to update this work order" 
+      });
+    }
+
+    // Store original values for comparison to determine if we need a new QR code
+    const originalSku = workOrder.sku_name;
+    const originalQty = workOrder.qty;
+    const originalManufacture = workOrder.manufacture;
+    const originalStatus = workOrder.status;
+    const originalDescription = workOrder.description;
+    const originalEdd = workOrder.edd;
+
     // Update work order
     await workOrder.update({
       company_id: req.user.company_id,
@@ -198,14 +390,36 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
       planned_end_date: workDetails.planned_end_date || null,
       outsource_name: workDetails.outsource_name || null,
       status: workDetails.status || workOrder.status,
-      created_by: req.user.id,
       updated_by: req.user.id,
       work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
+    // Check if any QR code-relevant fields have changed
+    const needsNewQrCode = 
+      originalSku !== workDetails.sku_name ||
+      originalQty !== workDetails.qty ||
+      originalManufacture !== workDetails.manufacture ||
+      originalStatus !== (workDetails.status || workOrder.status) ||
+      originalDescription !== workDetails.description ||
+      originalEdd !== workDetails.edd;
+
+    // Generate new QR code if needed
+    if (needsNewQrCode || !workOrder.qr_code_url) {
+      try {
+        const qrCodeUrl = await generateQRCode(workOrder);
+        await workOrder.update({ qr_code_url: qrCodeUrl });
+      } catch (qrError) {
+        logger.error(`Error generating QR code for work order ${id}:`, qrError);
+        // Continue with response even if QR generation fails
+      }
+    }
+
+    // Reload the work order to get the latest data including the QR code URL
+    await workOrder.reload();
+
     res.json({
       message: "Work Order updated successfully",
-      data: workOrder,
+      data: workOrder.get({ plain: true }),
     });
   } catch (error) {
     logger.error("Error updating work order:", error);
@@ -286,86 +500,96 @@ v1Router.get(
 );
 
 // PUT update work order status (priority and progress only)
-v1Router.put("/work-order/status/:workOrderId", authenticateJWT, async (req, res) => {
-  try {
-    const { workOrderId } = req.params;
-    const { priority, progress } = req.body;
-    
-    // Get user details from authentication
-    const userId = req.user.id;
-    const companyId = req.user.company_id;
+v1Router.put(
+  "/work-order/status/:workOrderId",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { workOrderId } = req.params;
+      const { priority, progress } = req.body;
 
-    // Validate input
-    if (!priority && !progress) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one field (priority or progress) is required"
-      });
-    }
+      // Get user details from authentication
+      const userId = req.user.id;
+      const companyId = req.user.company_id;
 
-    // Validate priority value if provided
-    if (priority && !["High", "Medium", "Low"].includes(priority)) {
-      return res.status(400).json({
-        success: false,
-        message: "Priority must be High, Medium, or Low"
-      });
-    }
-
-    // Validate progress value if provided
-    const validProgressValues = [
-      "Pending", "Product Planning", "Procurement Sourcing",
-      "Production Planning", "Production", "Quality Control",
-      "Packaging", "Shipping"
-    ];
-    
-    if (progress && !validProgressValues.includes(progress)) {
-      return res.status(400).json({
-        success: false,
-        message: `Progress must be one of: ${validProgressValues.join(", ")}`
-      });
-    }
-
-    // Find the work order
-    const workOrder = await WorkOrder.findOne({
-      where: { 
-        id: workOrderId,
-        company_id: companyId
+      // Validate input
+      if (!priority && !progress) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one field (priority or progress) is required",
+        });
       }
-    });
-    
-    if (!workOrder) {
-      return res.status(404).json({
+
+      // Validate priority value if provided
+      if (priority && !["High", "Medium", "Low"].includes(priority)) {
+        return res.status(400).json({
+          success: false,
+          message: "Priority must be High, Medium, or Low",
+        });
+      }
+
+      // Validate progress value if provided
+      const validProgressValues = [
+        "Pending",
+        "Product Planning",
+        "Procurement Sourcing",
+        "Production Planning",
+        "Production",
+        "Quality Control",
+        "Packaging",
+        "Shipping",
+      ];
+
+      if (progress && !validProgressValues.includes(progress)) {
+        return res.status(400).json({
+          success: false,
+          message: `Progress must be one of: ${validProgressValues.join(", ")}`,
+        });
+      }
+
+      // Find the work order
+      const workOrder = await WorkOrder.findOne({
+        where: {
+          id: workOrderId,
+          company_id: companyId,
+        },
+      });
+
+      if (!workOrder) {
+        return res.status(404).json({
+          success: false,
+          message: "Work order not found or you don't have access to it",
+        });
+      }
+
+      // Create update object with only the provided fields
+      const updateData = {};
+      if (priority) updateData.priority = priority;
+      if (progress) updateData.progress = progress;
+
+      // Add audit fields
+      updateData.updated_by = userId;
+      updateData.updated_at = sequelize.literal("CURRENT_TIMESTAMP");
+
+      // Update the work order with new status information
+      await workOrder.update(updateData);
+
+      return res.status(200).json({
+        success: true,
+        message: "Work order status updated successfully",
+        data: workOrder.get({ plain: true }),
+      });
+    } catch (error) {
+      logger.error("Error updating work order status:", error);
+      return res.status(500).json({
         success: false,
-        message: "Work order not found or you don't have access to it"
+        message: "Internal server error",
+        error: error.message,
       });
     }
-
-    // Create update object with only the provided fields
-    const updateData = {};
-    if (priority) updateData.priority = priority;
-    if (progress) updateData.progress = progress;
-    
-    // Add audit fields
-    updateData.updated_by = userId;
-    updateData.updated_at = sequelize.literal("CURRENT_TIMESTAMP");
-
-    // Update the work order with new status information
-    await workOrder.update(updateData);
-
-    return res.status(200).json({
-      success: true,
-      message: "Work order status updated successfully",
-      data: workOrder.get({ plain: true })
-    });
-  } catch (error) {
-    logger.error("Error updating work order status:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
   }
-});
+);
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({

@@ -2,6 +2,8 @@
 ALTER TABLE sku
 ADD lwh VARCHAR(255) NULL;
 
+ALTER TABLE work_order
+ADD COLUMN qr_code_url TEXT NULL;
 
 -- 09/04/2025
 

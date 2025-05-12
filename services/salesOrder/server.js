@@ -7,12 +7,32 @@ import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import QRCode from "qrcode";
 
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
+
+
+
+// Create a public directory for storing QR code images if needed
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const qrCodeDir = path.join(__dirname, "../../public/qrcodes");
+
+// Ensure the directory exists
+if (!fs.existsSync(qrCodeDir)) {
+  fs.mkdirSync(qrCodeDir, { recursive: true });
+}
+
+// Serve the QR code images statically
+app.use("/qrcodes", express.static(qrCodeDir));
 
 const v1Router = Router();
 
@@ -21,8 +41,49 @@ const WorkOrder = db.WorkOrder;
 const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
-// POST create new sales order - with SalesSkuDetails table
+async function generateQRCode(workOrder) {
+  try {
+    // Create a nicely formatted plain text representation of the work order
+    const textContent = `
+Work Order: ${workOrder.work_generate_id}
+SKU: ${workOrder.sku_name || "N/A"}
+Quantity: ${workOrder.qty || "N/A"}
+Manufacture: ${workOrder.manufacture || "N/A"}
+Status: ${workOrder.status || "N/A"}
+${workOrder.description ? `Description: ${workOrder.description}` : ""}
+${
+  workOrder.edd
+    ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+    : ""
+}
+`.trim();
 
+    // Generate a unique filename
+    const qrFileName = `wo_${workOrder.work_generate_id.replace(
+      /[^a-zA-Z0-9]/g,
+      "_"
+    )}_${Date.now()}.png`;
+    const qrFilePath = path.join(qrCodeDir, qrFileName);
+
+    // Generate QR code with the plain text
+    await QRCode.toFile(qrFilePath, textContent, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 300,
+    });
+
+    // Return the URL to access the QR code
+    const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
+    return `${baseUrl}/qrcodes/${qrFileName}`;
+  } catch (error) {
+    logger.error("Error generating QR code:", error);
+    throw error;
+  }
+}
+
+
+// POST create new sales order - with SalesSkuDetails table
+// POST create new sales order - with SalesSkuDetails table
 v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
 
@@ -39,8 +100,11 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-
-    const sales_generate_id = await generateId(req.user.company_id, SalesOrder, "sale");
+    const sales_generate_id = await generateId(
+      req.user.company_id,
+      SalesOrder,
+      "sale"
+    );
     // Create Sales Order - get company_id and user info from JWT token
     const newSalesOrder = await SalesOrder.create(
       {
@@ -94,42 +158,66 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       transaction,
     });
 
-    // Insert Work Orders
-    const workOrders = workDetails.map((work) => ({
-      company_id: req.user.company_id, // Get from token
-      client_id: work.client_id,
-      sales_order_id: newSalesOrder.id,
-      manufacture: work.manufacture,
-      sku_id: work.sku_id || null,
-      sku_name: work.sku_name || null,
-      sku_version: work.sku_version || null,
-      qty: work.qty || null,
-      edd: work.edd || null,
-      description: work.description || null,
-      acceptable_excess_units: work.acceptable_excess_units || null,
-      planned_start_date: work.planned_start_date || null,
-      planned_end_date: work.planned_end_date || null,
-      outsource_name: work.outsource_name || null,
-      priority: work.priority || null,
-      progress: work.progress || null,
-      created_by: req.user.id,
-      updated_by: req.user.id,
-      status: "active",
-      work_order_sku_values: work.work_order_sku_values || null,
-    }));
+    // Prepare work orders with work_generate_id
+    const workOrdersWithIds = await Promise.all(
+      workDetails.map(async (work) => {
+        const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
+        return {
+          work_generate_id: work_generate_id,
+          company_id: req.user.company_id, // Get from token
+          client_id: work.client_id,
+          sales_order_id: newSalesOrder.id,
+          manufacture: work.manufacture,
+          sku_id: work.sku_id || null,
+          sku_name: work.sku_name || null,
+          sku_version: work.sku_version || null,
+          qty: work.qty || null,
+          edd: work.edd || null,
+          description: work.description || null,
+          acceptable_excess_units: work.acceptable_excess_units || null,
+          planned_start_date: work.planned_start_date || null,
+          planned_end_date: work.planned_end_date || null,
+          outsource_name: work.outsource_name || null,
+          priority: work.priority || null,
+          progress: work.progress || null,
+          created_by: req.user.id,
+          updated_by: req.user.id,
+          status: "active",
+          work_order_sku_values: work.work_order_sku_values || null,
+        };
+      })
+    );
 
-    const createdWorkOrders = await WorkOrder.bulkCreate(workOrders, {
+    // Create work orders
+    const createdWorkOrders = await WorkOrder.bulkCreate(workOrdersWithIds, {
       transaction,
     });
 
+    // Generate QR codes and update each work order
+    for (const workOrder of createdWorkOrders) {
+      try {
+        const qrCodeUrl = await generateQRCode(workOrder);
+        await workOrder.update({ qr_code_url: qrCodeUrl }, { transaction });
+      } catch (error) {
+        logger.error(`Error generating QR code for work order ${workOrder.id}:`, error);
+        // Continue with the next work order even if this one fails
+      }
+    }
+
     // Commit transaction
     await transaction.commit();
+
+    // Reload work orders to get updated data including QR code URLs
+    const updatedWorkOrders = await WorkOrder.findAll({
+      where: { sales_order_id: newSalesOrder.id },
+      transaction: null // No longer in transaction after commit
+    });
 
     // Get the complete data with workOrders and skuDetails
     const completeData = {
       ...newSalesOrder.get({ plain: true }),
       skuDetails: createdSkuDetails.map((sku) => sku.get({ plain: true })),
-      workOrders: createdWorkOrders.map((wo) => wo.get({ plain: true })),
+      workOrders: updatedWorkOrders.map((work) => work.get({ plain: true })),
     };
 
     res.status(201).json({
@@ -226,7 +314,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       offset: parseInt(offset),
       include: includeConditions,
       order: [["created_at", "DESC"]],
-      distinct: true, 
+      distinct: true,
     });
 
     // Transform data
@@ -472,6 +560,9 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
       existingWorkMap.set(work.id, work);
     });
 
+    // Array to track all updated and new work orders
+    const updatedAndNewWorkOrders = [];
+
     for (const work of workDetails) {
       if (work.id && existingWorkMap.has(work.id)) {
         // Update existing work order
@@ -501,11 +592,15 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
           { transaction }
         );
 
+        updatedAndNewWorkOrders.push(existingWork);
         existingWorkMap.delete(work.id);
       } else {
-        // Create new work order
-        await WorkOrder.create(
+        // Create new work order with a generated ID
+        const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
+        
+        const newWorkOrder = await WorkOrder.create(
           {
+            work_generate_id: work_generate_id,
             sales_order_id: id,
             company_id: req.user.company_id,
             client_id: work.client_id,
@@ -530,6 +625,8 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
           },
           { transaction }
         );
+        
+        updatedAndNewWorkOrders.push(newWorkOrder);
       }
     }
 
@@ -543,6 +640,27 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
         },
         { transaction }
       );
+    }
+    
+    // Generate or update QR codes for all updated and new work orders
+    for (const workOrder of updatedAndNewWorkOrders) {
+      try {
+        // Skip if the work order already has a QR code URL and its data hasn't changed
+        if (workOrder.qr_code_url && !workOrder.changed('sku_name') && !workOrder.changed('qty') && 
+            !workOrder.changed('manufacture') && !workOrder.changed('status') && 
+            !workOrder.changed('description') && !workOrder.changed('edd')) {
+          continue;
+        }
+        
+        // Generate a new QR code
+        const qrCodeUrl = await generateQRCode(workOrder);
+        
+        // Update the work order with the QR code URL
+        await workOrder.update({ qr_code_url: qrCodeUrl }, { transaction });
+      } catch (error) {
+        logger.error(`Error generating QR code for work order ${workOrder.id}:`, error);
+        // Continue with other work orders even if this one fails
+      }
     }
 
     // Commit transaction
@@ -577,7 +695,6 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // DELETE sales order - changed to soft delete including associated records
 
 v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {

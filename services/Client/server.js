@@ -197,9 +197,27 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   try {
     const clientId = req.params.id;
 
-    const client = await Client.findByPk(clientId, {
+    // Validate client ID
+    if (!clientId) {
+      return res.status(400).json({ 
+        status: false, 
+        message: "Client ID is required" 
+      });
+    }
+
+    const client = await Client.findOne({
+      where: {
+        client_id: clientId, // Use client_id instead of primary key
+        // Optionally, add company_id for multi-tenant security
+        company_id: req.user.company_id
+      },
       include: [
-        { model: Address, as: "addresses" },
+        { 
+          model: Address, 
+          as: "addresses",
+          // Optional: filter addresses if needed
+          // where: { status: 'active' }
+        },
         {
           model: User,
           as: "creator",
@@ -207,24 +225,62 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         },
         {
           model: User,
-          as: "updater  ",
+          as: "updater", // Fixed typo in 'updater'
           attributes: ["id", "name", "email"],
-        },
+        }
       ],
+      // Optional: specify which client attributes to return
+      attributes: {
+        exclude: ['password', 'sensitive_data'] // Exclude sensitive fields if any
+      }
     });
 
+    // Check if client exists
     if (!client) {
-      return res
-        .status(404)
-        .json({ status: false, message: "Client not found" });
+      return res.status(404).json({ 
+        status: false, 
+        message: "Client not found or you do not have access to this client" 
+      });
     }
 
-    const response = { status: true, data: client };
+    // Convert to plain object to customize response if needed
+    const clientData = client.toJSON();
+
+    // Optional: Transform response
+    const response = { 
+      status: true, 
+      data: {
+        ...clientData,
+        // Add any additional transformations
+        addresses: clientData.addresses || [],
+        creator: clientData.creator || null,
+        updater: clientData.updater || null
+      }
+    };
 
     return res.status(200).json(response);
   } catch (error) {
-    logger.error("Client Fetch by ID Error:", error);
-    return res.status(500).json({ status: false, message: error.message });
+    // More detailed error logging
+    logger.error("Client Fetch by ID Error:", {
+      clientId: req.params.id,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
+
+    // Differentiate between different types of errors
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        status: false, 
+        message: "Validation Error",
+        errors: error.errors.map(e => e.message)
+      });
+    }
+
+    return res.status(500).json({ 
+      status: false, 
+      message: "Internal Server Error", 
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 
