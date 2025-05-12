@@ -10,6 +10,10 @@ const GRN = sequelize.define("GRN", {
     autoIncrement: true,
     primaryKey: true,
   },
+  grn_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
   po_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,

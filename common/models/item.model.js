@@ -10,6 +10,10 @@ const ItemMaster = sequelize.define('ItemMaster', {
         autoIncrement: true,
         primaryKey: true
       },
+      item_generate_id:{
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
       item_code: {
         type: DataTypes.STRING(50),
         allowNull: false,

@@ -5,6 +5,8 @@ import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
+
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
 const User =db.User;
@@ -53,7 +55,9 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
 v1Router.post("/items", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction(); 
   try {
+    const item_generate_id = await generateId(req.user.company_id, ItemMaster, "item");
     const { itemData, ...rest } = req.body; 
+    rest.item_generate_id = item_generate_id;
     rest.created_by = req.user.id;
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
