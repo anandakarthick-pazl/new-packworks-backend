@@ -1,3 +1,8 @@
+-- 12/05/2025
+ALTER TABLE sku
+ADD lwh VARCHAR(255) NULL;
+
+
 -- 09/04/2025
 
 ALTER TABLE companies
