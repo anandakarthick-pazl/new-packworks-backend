@@ -6,6 +6,7 @@ import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 dotenv.config();
 
@@ -38,9 +39,12 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
+
+    const sales_generate_id = await generateId(req.user.company_id, SalesOrder, "sale");
     // Create Sales Order - get company_id and user info from JWT token
     const newSalesOrder = await SalesOrder.create(
       {
+        sales_generate_id: sales_generate_id,
         company_id: req.user.company_id,
         sales_ui_id: salesDetails.sales_ui_id || null,
         client_id: salesDetails.client_id,
@@ -56,6 +60,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
         total_amount: salesDetails.total_amount,
         sgst: salesDetails.sgst,
         cgst: salesDetails.cgst,
+        igst: salesDetails.igst || null,
         total_incl_gst: salesDetails.total_incl_gst,
         created_by: req.user.id,
         updated_by: req.user.id,
@@ -77,6 +82,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       sgst: sku.sgst,
       sgst_amount: sku.sgst_amount,
       cgst: sku.cgst,
+      igst: sku.igst || null,
       cgst_amount: sku.cgst_amount,
       total_incl__gst: sku.total_incl__gst,
       created_by: req.user.id,
@@ -94,6 +100,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       client_id: work.client_id,
       sales_order_id: newSalesOrder.id,
       manufacture: work.manufacture,
+      sku_id: work.sku_id || null,
       sku_name: work.sku_name || null,
       sku_version: work.sku_version || null,
       qty: work.qty || null,
@@ -108,6 +115,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       created_by: req.user.id,
       updated_by: req.user.id,
       status: "active",
+      work_order_sku_values: work.work_order_sku_values || null,
     }));
 
     const createdWorkOrders = await WorkOrder.bulkCreate(workOrders, {
@@ -218,7 +226,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       offset: parseInt(offset),
       include: includeConditions,
       order: [["created_at", "DESC"]],
-      distinct: true, // Important when including associations to get correct count
+      distinct: true, 
     });
 
     // Transform data
@@ -358,6 +366,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
         total_amount: salesDetails.total_amount,
         sgst: salesDetails.sgst,
         cgst: salesDetails.cgst,
+        igst: salesDetails.igst || null,
         total_incl_gst: salesDetails.total_incl_gst,
         status: salesDetails.status || salesOrder.status, // Keep existing status if not provided
         updated_by: req.user.id, // Update with current user ID from token
@@ -399,6 +408,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             sgst: sku.sgst,
             sgst_amount: sku.sgst_amount,
             cgst: sku.cgst,
+            igst: sku.igst || null,
             cgst_amount: sku.cgst_amount,
             total_incl__gst: sku.total_incl__gst,
             updated_by: req.user.id,
@@ -424,6 +434,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             sgst: sku.sgst,
             sgst_amount: sku.sgst_amount,
             cgst: sku.cgst,
+            igst: sku.igst || null,
             cgst_amount: sku.cgst_amount,
             total_incl__gst: sku.total_incl__gst,
             created_by: req.user.id,
@@ -470,6 +481,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             company_id: req.user.company_id,
             client_id: work.client_id,
             manufacture: work.manufacture,
+            sku_id: work.sku_id || null,
             sku_name: work.sku_name || null,
             sku_version: work.sku_version || null,
             qty: work.qty || null,
@@ -484,6 +496,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             progress: work.progress || null,
             updated_by: req.user.id,
             updated_at: new Date(),
+            work_order_sku_values: work.work_order_sku_values || null,
           },
           { transaction }
         );
@@ -497,6 +510,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             company_id: req.user.company_id,
             client_id: work.client_id,
             manufacture: work.manufacture,
+            sku_id: work.sku_id || null,
             sku_name: work.sku_name || null,
             sku_version: work.sku_version || null,
             qty: work.qty || null,
@@ -512,6 +526,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             created_by: req.user.id,
             updated_by: req.user.id,
             status: "active",
+            work_order_sku_values: work.work_order_sku_values || null,
           },
           { transaction }
         );

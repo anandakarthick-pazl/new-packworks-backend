@@ -11,6 +11,10 @@ const Machine = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    machine_generate_id:{
+      type: DataTypes.STRING(200),
+      allowNull: true,
+    },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -44,11 +48,11 @@ const Machine = sequelize.define(
     },
     purchase_date: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
+      allowNull: true,
     },
     installation_date: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
+      allowNull: true,
     },
     machine_status: {
       type: DataTypes.ENUM("Active", "Inactive", "Under Maintenance"),
@@ -83,9 +87,9 @@ const Machine = sequelize.define(
     ip_address: {
       type: DataTypes.STRING,
       allowNull: true,
-      validate: {
-        isIP: true,
-      },
+      // validate: {
+      //   isIP: true,
+      // },
     },
     warranty_expiry: {
       type: DataTypes.DATEONLY,

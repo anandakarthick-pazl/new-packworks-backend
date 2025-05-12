@@ -5,10 +5,17 @@ import User from "../user.model.js";
 
 
 const PurchaseOrder = sequelize.define('PurchaseOrder', {
-      po_id: {
+      id: {
         type: DataTypes.INTEGER.UNSIGNED,
         autoIncrement: true,
         primaryKey: true
+      },
+      purchase_generate_id:{
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
+      po_code: {
+        type: DataTypes.STRING(100)
       },
       company_id: {
         type: DataTypes.INTEGER.UNSIGNED,
@@ -47,6 +54,30 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       },
       freight_terms: {
         type: DataTypes.STRING(50)
+      },
+      total_qty: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      cgst_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      sgst_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      tax_amount: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: true,
+      },
+      total_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
       },
       status: {
         type: DataTypes.ENUM("active", "inactive"),

@@ -42,7 +42,6 @@ Client.init(
     entity_type: {
       type: DataTypes.ENUM("Client", "Vendor"),
       allowNull: false,
-      defaultValue: "Client",
     },
     customer_type: {
       type: DataTypes.ENUM("Business", "Individual"),
@@ -88,6 +87,7 @@ Client.init(
     opening_balance: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
+      defaultValue: 0.0,
     },
     payment_terms: {
       type: DataTypes.STRING,

@@ -1,3 +1,138 @@
+-- 12/05/2025
+ALTER TABLE sku
+ADD lwh VARCHAR(255) NULL;
+
+
+-- 09/04/2025
+
+ALTER TABLE companies
+ADD COLUMN company_state_id INT NULL;
+
+CREATE TABLE `states` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NULL,
+  `country_code` VARCHAR(3) NULL,
+  `states` VARCHAR(200) NULL,
+  `status` VARCHAR(50) NULL DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 08/05/2025
+ALTER TABLE work_order
+ADD COLUMN work_order_sku_values JSON NULL;
+
+ALTER TABLE sku
+ADD COLUMN gst_percentage DECIMAL(5,2) NULL;
+
+CREATE TABLE `sku_options` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NOT NULL,
+  `sku_id` INT UNSIGNED NOT NULL,
+  `sku_version_id` INT UNSIGNED DEFAULT NULL,
+  `field_path` VARCHAR(255) NOT NULL COMMENT 'Path to the field (e.g., "sku_values.0.gsm")',
+  `field_name` VARCHAR(100) NOT NULL COMMENT 'Name of the field (e.g., "gsm")',
+  `field_value` VARCHAR(255) NOT NULL COMMENT 'Value of the field (e.g., "210")',
+  `status` VARCHAR(50) NOT NULL DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 
+ALTER TABLE invoice_settings
+ADD COLUMN route_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN route_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN route_digit INT NOT NULL;
+
+ALTER TABLE route
+ADD COLUMN route_generate_id VARCHAR(255) NULL;
+
+ALTER TABLE invoice_settings
+ADD COLUMN process_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN process_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN process_digit INT NOT NULL;
+
+ALTER TABLE process_name
+ADD COLUMN process_generate_id VARCHAR(255) NULL;
+
+-- 02/05/2025
+ALTER TABLE invoice_settings
+ADD COLUMN employee_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN employee_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN employee_digit INT NOT NULL;
+
+--29/04/2025
+
+ALTER TABLE invoice_settings
+ADD COLUMN machine_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN machine_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN machine_digit INT NOT NULL;
+
+ALTER TABLE machines
+ADD COLUMN machine_generate_id VARCHAR(255) NULL;
+
+-- 28/04/2025
+ALTER TABLE invoice_settings
+ADD COLUMN client_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN client_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN client_digit INT NOT NULL,
+ADD COLUMN vendor_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN vendor_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN vendor_digit INT NOT NULL;
+
+-- sku
+ALTER TABLE invoice_settings
+ADD COLUMN sku_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sku_digit INT NOT NULL;
+
+-- sales_order
+ALTER TABLE invoice_settings
+ADD COLUMN sale_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sale_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN sale_digit INT NOT NULL;
+
+ALTER TABLE sales_order
+ADD COLUMN sales_generate_id VARCHAR(255) NULL;
+
+-- work order
+ALTER TABLE invoice_settings
+ADD COLUMN work_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_digit INT NOT NULL;
+
+ALTER TABLE work_order
+ADD COLUMN work_generate_id VARCHAR(255) NULL;
+
+
+-- 22/04/2025
+
+ALTER TABLE sku
+ADD COLUMN route JSON NULL;
+
+CREATE TABLE route (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id INT UNSIGNED NOT NULL,
+    route_name VARCHAR(255) NOT NULL,
+    route_process JSON NOT NULL,
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active';
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by INT UNSIGNED NOT NULL,
+    updated_by INT UNSIGNED NOT NULL
+ );
+
+
 -- 15/04/2025
 CREATE TABLE machine_flow (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -3,15 +3,15 @@ import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
 
-const ProcessName = sequelize.define(
-  "ProcessName",
+const Route = sequelize.define(
+  "Route",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
-    process_generate_id:{
+    route_generate_id:{
       type: DataTypes.STRING(200),
       allowNull: true,
     },
@@ -23,11 +23,19 @@ const ProcessName = sequelize.define(
         key: "id",
       },
       onUpdate: "CASCADE",
-      onDelete: "CASCADE",
     },
-    process_name: {
+    route_name: {
       type: DataTypes.STRING(255),
       allowNull: false,
+    },
+    route_process: {
+      type: DataTypes.JSON,
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
     },
     created_at: {
       type: DataTypes.DATE,
@@ -38,11 +46,6 @@ const ProcessName = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active",
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -62,24 +65,25 @@ const ProcessName = sequelize.define(
     },
   },
   {
-    tableName: "process_name",
+    tableName: "route",
     timestamps: false,
     underscored: true,
   }
 );
+
 // Associations
-Company.hasMany(ProcessName, { foreignKey: "company_id" });
-ProcessName.belongsTo(Company, { foreignKey: "company_id" });
+Company.hasMany(Route, { foreignKey: "company_id" });
+Route.belongsTo(Company, { foreignKey: "company_id" });
 
-User.hasMany(ProcessName, { foreignKey: "created_by" });
-User.hasMany(ProcessName, { foreignKey: "updated_by" });
-ProcessName.belongsTo(User, {
+User.hasMany(Route, { foreignKey: "created_by" });
+User.hasMany(Route, { foreignKey: "updated_by" });
+Route.belongsTo(User, {
   foreignKey: "created_by",
-  as: "process_creator",
+  as: "route_creator",
 });
-ProcessName.belongsTo(User, {
+Route.belongsTo(User, {
   foreignKey: "updated_by",
-  as: "process_updater",
+  as: "route_updater",
 });
 
-export default ProcessName;
+export default Route;

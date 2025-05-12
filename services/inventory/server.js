@@ -5,6 +5,7 @@ import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
@@ -40,10 +41,14 @@ v1Router.get("/inventory",authenticateJWT,async(req,res)=>{
           limit: limitNumber,
           offset: offset,
         });
+
+        const totalCount = await Inventory.count({ where: whereCondition });
+
         return res.status(200).json({
           success: true,
           message: "Inventory data fetched successfully",
           data: inventoryData,
+          totalCount: totalCount,
         });
   }catch(error){
     console.error(error.message);
@@ -59,7 +64,9 @@ v1Router.get("/inventory",authenticateJWT,async(req,res)=>{
 v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
   const transaction = await sequelize.transaction();
   try{
+    const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
     const { ...rest } = req.body;
+    rest.inventory_generate_id = inventory_generate_id;
     rest.created_by = req.user.id;
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
@@ -67,7 +74,7 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
     // Validate Item
     const itemId = req.body.item_id;
     const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
+      where: { id: itemId, status: "active" }
     });
     if (!validateItem) {
       return res.status(400).json({
@@ -75,11 +82,13 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
         message: `Invalid or inactive Item.`,
       });
     }
+    let inventory_type= validateItem.item_type;
+    rest.inventory_type = inventory_type;
 
     // Validate GRN
     const grnId = req.body.grn_id;
     const validateGrn = await GRN.findOne({
-      where: { grn_id: grnId, status: "active" }
+      where: { id: grnId, status: "active" }
     });
     if (!validateGrn) {
       return res.status(400).json({
@@ -91,7 +100,7 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
     // Validate GRN Item
     const grnItemId = req.body.grn_item_id;
     const validateGrnItem = await GRNItem.findOne({
-      where: { grn_item_id: grnItemId, status: "active" }
+      where: { id: grnItemId, status: "active" }
     });
     if (!validateGrnItem) {
       return res.status(400).json({
@@ -179,7 +188,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate Item
     const itemId = req.body.item_id;
     const validateItem = await ItemMaster.findOne({
-      where: { item_id: itemId, status: "active" }
+      where: { id: itemId, status: "active" }
     });
     if (!validateItem) {
       return res.status(400).json({
@@ -191,7 +200,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate GRN
     const grnId = req.body.grn_id;
     const validateGrn = await GRN.findOne({
-      where: { grn_id: grnId, status: "active" }
+      where: { id: grnId, status: "active" }
     });
     if (!validateGrn) {
       return res.status(400).json({
@@ -203,7 +212,7 @@ v1Router.put("/inventory/id/:id", authenticateJWT, async (req, res) => {
     // Validate GRN Item
     const grnItemId = req.body.grn_item_id;
     const validateGrnItem = await GRNItem.findOne({
-      where: { grn_item_id: grnItemId, status: "active" }
+      where: { id: grnItemId, status: "active" }
     });
     if (!validateGrnItem) {
       return res.status(400).json({

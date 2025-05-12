@@ -5,6 +5,8 @@ import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
+
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
 const User =db.User;
@@ -53,7 +55,9 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
 v1Router.post("/items", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction(); 
   try {
+    const item_generate_id = await generateId(req.user.company_id, ItemMaster, "item");
     const { itemData, ...rest } = req.body; 
+    rest.item_generate_id = item_generate_id;
     rest.created_by = req.user.id;
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
@@ -79,13 +83,13 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
 v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
   try {
     const item_id = req.params.id;
-    const itemData = await ItemMaster.findOne({ where: { item_id: item_id } });
+    const itemData = await ItemMaster.findOne({ where: { id: item_id } });
     return res.status(200).json({
       success: true,
       message: "Item data fetched successfully",
       data: itemData,
     });
-  } catch (error) {
+  } catch (error) {s
     console.error(error.message);
     return res.status(500).json({
       success: false,
@@ -118,7 +122,7 @@ v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
       });
     }
     await ItemMaster.update(rest, {
-      where: { item_id: itemId }, 
+      where: { id: itemId }, 
       transaction,
     });
     const updatedItem = await ItemMaster.findByPk(itemId, { transaction });
@@ -148,7 +152,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
         message:"item id is required"
       })
     }
-    const items= await ItemMaster.findOne({where:{item_id:itemId}});
+    const items= await ItemMaster.findOne({where:{ id:itemId }});
     if(!items){
       return res.status(404).json({
         success:false,
@@ -160,7 +164,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
         updated_by : req.user.id,
         deleted_at : new Date()
     },
-    {where:{item_id:itemId}}
+    {where:{id:itemId}}
     );
 
     return res.status(200).json({

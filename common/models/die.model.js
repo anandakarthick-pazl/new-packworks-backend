@@ -28,15 +28,23 @@ const Die = sequelize.define('Die',{
   },
   client: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   board_size: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
+  },
+  board_width: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  board_length: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   ups: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   created_at: {
     type: DataTypes.DATE,

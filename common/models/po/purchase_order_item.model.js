@@ -6,7 +6,7 @@ import PurchaseOrder from "../po/purchase_order.model.js";
 import ItemMaster from "../item.model.js";
 
 const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
-  po_item_id: {
+  id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
@@ -16,7 +16,7 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
     allowNull: false,
     references: {
       model: PurchaseOrder,
-      key: "po_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
   },
@@ -34,7 +34,7 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "item_id",
+      key: "id",
     },
     onUpdate: "CASCADE",
   },
@@ -59,6 +59,22 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
   },
   unit_price: {
     type: DataTypes.DECIMAL(15, 2),
+  },
+  cgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  cgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
+  sgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  sgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
   },
   amount: {
     type: DataTypes.DECIMAL(15, 2),
@@ -113,7 +129,7 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
   updatedAt: "updated_at",
   deletedAt: "deleted_at",
   // paranoid: true,
-  underscored: true,
+  // underscored: true,
 });
 
 // Associations

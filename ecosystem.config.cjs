@@ -112,7 +112,6 @@ module.exports = {
       },
     },
     {
-
       name: "package",
       script: "./services/package/server.js",
 
@@ -121,7 +120,6 @@ module.exports = {
       },
     },
     {
-
       name: "billing-Service",
       script: "./services/billing/server.js",
 
@@ -138,7 +136,6 @@ module.exports = {
       },
     },
     {
-
       name: "faq_categories-Service",
       script: "./services/faq-categories/server.js",
 
@@ -161,7 +158,6 @@ module.exports = {
       },
     },
     {
-
       name: "item",
       script: "./services/item/server.js",
       env: {
@@ -198,7 +194,19 @@ module.exports = {
         PORT: 3026,
       },
     },
-
-
+    {
+      name: "route",
+      script: "./services/route/server.js",
+      env: {
+        PORT: 3027,
+      },
+    },
+    // {
+    //   name: "production",
+    //   script: "./services/Production/server.js",
+    //   env: {
+    //     PORT: 3028,
+    //   },
+    // },
   ],
 };

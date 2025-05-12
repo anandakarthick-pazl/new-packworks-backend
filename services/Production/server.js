@@ -53,7 +53,6 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
       status: workDetails.status || "active",
       created_by: req.user.id,
       updated_by: req.user.id,
-      work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
     res.status(201).json({
@@ -200,7 +199,6 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
       status: workDetails.status || workOrder.status,
       created_by: req.user.id,
       updated_by: req.user.id,
-      work_order_sku_values: workDetails.work_order_sku_values || null,
     });
 
     res.json({
@@ -375,9 +373,9 @@ app.get("/health", (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/api", v1Router);
+app.use("/api/production", v1Router);
 await db.sequelize.sync();
-const PORT = 3006;
+const PORT = 3028;
 app.listen(PORT, () => {
-  console.log(`work order Service running on port ${PORT}`);
+  console.log(`Production Service running on port ${PORT}`);
 });

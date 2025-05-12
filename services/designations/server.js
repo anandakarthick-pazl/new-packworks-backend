@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
+// import redisClient, { clearClientCache } from "../../common/helper/redis.js";
 import {
   publishToQueue,
   rabbitChannel,
@@ -14,7 +14,7 @@ import {
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
-import Designation from "../../common/models/designation.model.js";
+import DesignationModel from "../../common/models/designation.model.js";
 
 dotenv.config();
 
@@ -23,7 +23,6 @@ app.use(json());
 app.use(cors());
 
 const v1Router = Router();
-
 
 // GET single work order by ID
 
@@ -111,9 +110,17 @@ const v1Router = Router();
 
 v1Router.post("/designations", authenticateJWT, async (req, res) => {
   try {
-    const { name, parent_id, added_by, last_updated_by } = req.body;
+    let { name, parent_id, added_by, last_updated_by } = req.body;
 
-    const newDesignation = await Designation.create({
+    // Convert parent_id to integer or null
+    parent_id = parent_id ? parseInt(parent_id) : null;
+
+    // Optional: Validate parent_id is a number or null
+    if (parent_id !== null && isNaN(parent_id)) {
+      return res.status(400).json({ success: false, error: "Invalid parent_id" });
+    }
+
+    const newDesignation = await DesignationModel.create({
       name,
       parent_id,
       added_by,
@@ -132,6 +139,7 @@ v1Router.post("/designations", authenticateJWT, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 /**
  * @swagger
@@ -197,7 +205,7 @@ v1Router.post("/designations", authenticateJWT, async (req, res) => {
 
 v1Router.get("/designations", authenticateJWT, async (req, res) => {
   try {
-    const Designations = await Designation.findAll();
+    const Designations = await DesignationModel.findAll();
     return res.status(200).json({
       success: true,
       data: Designations,
@@ -292,7 +300,7 @@ v1Router.get("/designations/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const Designation = await Designation.findOne({ where: { id } });
+    const Designation = await DesignationModel.findOne({ where: { id } });
 
     if (!Designation) {
       return res.status(404).json({
@@ -393,7 +401,8 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
     const { id } = req.params;
     const { name, parent_id, last_updated_by } = req.body;
 
-    const Designation = await Designation.findOne({ where: { id } });
+    // Find the existing designation
+    const Designation = await DesignationModel.findOne({ where: { id } });
 
     if (!Designation) {
       return res.status(404).json({
@@ -402,17 +411,28 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    await Designation.update({
-      name,
-      parent_id,
-      last_updated_by,
-      updated_at: new Date(),
+    // Update the designation with provided data
+    await DesignationModel.update(
+      {
+        name,
+        parent_id,
+        last_updated_by,
+        updated_at: new Date(),
+      },
+      {
+        where: { id },
+      }
+    );
+
+    // Refetch the updated record
+    const updatedDesignation = await DesignationModel.findOne({
+      where: { id },
     });
 
     return res.status(200).json({
       success: true,
       message: "Designation updated successfully",
-      data: Designation,
+      data: updatedDesignation,
     });
   } catch (error) {
     console.error("Error updating Designation:", error);
@@ -482,7 +502,7 @@ v1Router.delete("/designations/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const Designation = await Designation.findOne({ where: { id } });
+    const Designation = await DesignationModel.findOne({ where: { id } });
 
     if (!Designation) {
       return res.status(404).json({
@@ -508,7 +528,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
+    // redis: redisClient.status === "ready" ? "connected" : "disconnected",
     rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
@@ -516,7 +536,7 @@ app.get("/health", (req, res) => {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-  await redisClient.quit();
+  // await redisClient.quit();
   await closeRabbitMQConnection();
   process.exit(0);
 });

@@ -32,15 +32,17 @@ const Sku = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+    sku_ui_id: { type: DataTypes.STRING, allowNull: true },
     sku_name: { type: DataTypes.STRING, allowNull: false },
     client: { type: DataTypes.STRING, allowNull: false },
     ply: { type: DataTypes.INTEGER, allowNull: true },
     length: { type: DataTypes.FLOAT, allowNull: true },
     width: { type: DataTypes.FLOAT, allowNull: true },
     height: { type: DataTypes.FLOAT, allowNull: true },
+    lwh: { type: DataTypes.STRING, allowNull: true },
     unit: { type: DataTypes.STRING, allowNull: true },
     joints: { type: DataTypes.INTEGER, allowNull: true },
-    ups: { type: DataTypes.INTEGER, allowNull: true }, 
+    ups: { type: DataTypes.INTEGER, allowNull: true },
     select_dies: { type: DataTypes.STRING, allowNull: true },
     inner_outer_dimension: {
       type: DataTypes.ENUM("Inner", "Outer"),
@@ -49,7 +51,7 @@ const Sku = sequelize.define(
     flap_width: { type: DataTypes.FLOAT, allowNull: true },
     flap_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     length_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
-    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true }, //add new
+    width_trimming_tolerance: { type: DataTypes.FLOAT, allowNull: true },
     strict_adherence: {
       type: DataTypes.BOOLEAN,
       allowNull: true,
@@ -63,13 +65,13 @@ const Sku = sequelize.define(
     board_size_cm2: { type: DataTypes.STRING, allowNull: true },
     deckle_size: { type: DataTypes.FLOAT, allowNull: true },
     minimum_order_level: { type: DataTypes.INTEGER, allowNull: true },
+    gst_percentage: { type: DataTypes.FLOAT, allowNull: true },
 
     estimate_composite_item: { type: DataTypes.STRING, allowNull: true },
     description: { type: DataTypes.STRING, allowNull: true },
     default_sku_details: { type: DataTypes.STRING, allowNull: true },
     tags: { type: DataTypes.JSON, allowNull: true },
 
-    
     sku_type: { type: DataTypes.STRING, allowNull: true },
     sku_values: {
       type: Sequelize.JSON,
@@ -79,19 +81,23 @@ const Sku = sequelize.define(
     sku_version_limit: {
       type: DataTypes.INTEGER,
       allowNull: true,
-    }, //add
+    },
     composite_type: {
       type: DataTypes.ENUM("Partition", "Panel"),
       allowNull: true,
-    }, //add new
+    },
     part_count: {
       type: DataTypes.INTEGER,
       allowNull: true,
-    }, // add new
+    },
     part_value: {
       type: Sequelize.JSON,
       allowNull: true,
-    }, //add new
+    },
+    route: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

@@ -5,10 +5,14 @@ import User from "./user.model.js";
 
 
 const ItemMaster = sequelize.define('ItemMaster', {
-      item_id: {
+      id: {
         type: DataTypes.INTEGER.UNSIGNED,
         autoIncrement: true,
         primaryKey: true
+      },
+      item_generate_id:{
+        type: DataTypes.STRING(200),
+        allowNull: true,
       },
       item_code: {
         type: DataTypes.STRING(50),
@@ -56,6 +60,14 @@ const ItemMaster = sequelize.define('ItemMaster', {
       },
       reorder_level: {
         type: DataTypes.DECIMAL(15, 2)
+      },
+      cgst: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      sgst: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
       },
       standard_cost: {
         type: DataTypes.DECIMAL(15, 2)

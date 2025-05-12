@@ -42,8 +42,8 @@ const Address = sequelize.define(
       allowNull: false,
     },
     state: {
-      type: DataTypes.STRING,
-      allowNull: false,
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     pinCode: {
       type: DataTypes.STRING,

@@ -32,10 +32,13 @@ import GRN from "./grn/grn.model.js";
 import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
 import InventoryType from "./inventory/inventory_type.model.js";
-import PurchaseOrderReturn from "./po_return/purchase_order_return.model.js";
-import PurchaseOrderReturnItem from "./po_return/purchase_order_return_item.model.js";
-import StockAdjustment from "./sa/stock_adjustment.model.js";
-import StockAdjustmentItem from "./sa/stock_adjustment_item.model.js";
+import Route from "./route/route.model.js";
+import PurchaseOrderReturn from './po_return/purchase_order_return.model.js';
+import PurchaseOrderReturnItem from './po_return/purchase_order_return_item.model.js';
+import InvoiceSetting from "./invoiceSetting.model.js";
+import SkuOptions from "./skuModel/skuOptions.model.js";
+import States from "./commonModel/states.model.js";
+
 const db = {
   sequelize,
   User,
@@ -47,6 +50,7 @@ const db = {
   SkuType,
   Sku,
   SkuVersion,
+  SkuOptions,
   SalesOrder,
   SalesSkuDetails,
   WorkOrder,
@@ -70,11 +74,12 @@ const db = {
   GRN,
   GRNItem,
   Inventory,
-  InventoryType, 
+  InventoryType,
+  Route,
   PurchaseOrderReturn,
   PurchaseOrderReturnItem,
-  StockAdjustment,
-  StockAdjustmentItem
+  InvoiceSetting,
+  States,
 };
 
 export default db;
