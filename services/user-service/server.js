@@ -22,6 +22,7 @@ import Role from "../../common/models/role.model.js";
 import { logRequestResponse } from "../../common/middleware/errorLogger.js";
 import logger from "../../common/helper/logger.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import Company from "../../common/models/company.model.js";
 dotenv.config();
 
 const app = express();
@@ -134,7 +135,6 @@ v1Router.post("/register", authenticateJWT, async (req, res) => {
 
     // Step 6: Extract employee data from request body
     const {
-      
       address,
       hourly_rate,
       slack_username,
@@ -1152,7 +1152,6 @@ v1Router.put("/employees/:userId", authenticateJWT, async (req, res) => {
 //     return res.status(500).json(errorMessage);
 //   }
 // });
-
 v1Router.post(
   "/login",
   authenticateStaticToken,
@@ -1172,9 +1171,6 @@ v1Router.post(
 
       // 🔹 Find user by email
       const user = await User.findOne({ where: { email } });
-      const userAuth = await UserAuth.findOne({
-        where: { id: user.user_auth_id },
-      });
 
       if (!user) {
         return res.status(400).json({
@@ -1182,6 +1178,10 @@ v1Router.post(
           message: "Invalid email or password",
         });
       }
+
+      const userAuth = await UserAuth.findOne({
+        where: { id: user.user_auth_id },
+      });
 
       // 🔹 Compare passwords
       const isMatch = await bcrypt.compare(password, userAuth.password);
@@ -1192,7 +1192,13 @@ v1Router.post(
         });
       }
 
-      // 🔹 Generate JWT Token
+      // 🔹 Fetch company_state_id from Company table
+      const company = await Company.findOne({
+        where: { id: user.company_id },
+        attributes: ["company_state_id"],
+      });
+
+      // 🔹 Generate JWT Token (unchanged)
       const JWT_SECRET = process.env.JWT_SECRET;
 
       const token = jwt.sign(
@@ -1210,11 +1216,13 @@ v1Router.post(
       // 🔹 Update last login time
       await User.update({ last_login: new Date() }, { where: { id: user.id } });
 
+      // Return response with company_state_id added
       return res.status(200).json({
         status: true,
         message: "Login successful",
         token,
         user,
+        company_state_id: company ? company.company_state_id : null,
       });
     } catch (error) {
       console.error("❌ Error:", error.message);
@@ -1227,6 +1235,80 @@ v1Router.post(
     }
   }
 );
+// v1Router.post(
+//   "/login",
+//   authenticateStaticToken,
+//   validateLogin,
+//   async (req, res) => {
+//     try {
+//       const { email, password } = req.body;
+
+//       // 🔹 Check if required fields exist
+//       if (!email || !password) {
+//         return res.status(400).json({
+//           status: false,
+//           message: "Missing email or password",
+//           data: [],
+//         });
+//       }
+
+//       // 🔹 Find user by email
+//       const user = await User.findOne({ where: { email } });
+//       const userAuth = await UserAuth.findOne({
+//         where: { id: user.user_auth_id },
+//       });
+
+//       if (!user) {
+//         return res.status(400).json({
+//           status: false,
+//           message: "Invalid email or password",
+//         });
+//       }
+
+//       // 🔹 Compare passwords
+//       const isMatch = await bcrypt.compare(password, userAuth.password);
+//       if (!isMatch) {
+//         return res.status(400).json({
+//           status: false,
+//           message: "Invalid email or password",
+//         });
+//       }
+
+//       // 🔹 Generate JWT Token
+//       const JWT_SECRET = process.env.JWT_SECRET;
+
+//       const token = jwt.sign(
+//         { id: user.id, email: user.email, company_id: user.company_id },
+//         JWT_SECRET
+//         // { expiresIn: "1h" }
+//       );
+
+//       console.log("Generated Token Payload:", {
+//         id: user.id,
+//         email: user.email,
+//         company_id: user.company_id,
+//       });
+
+//       // 🔹 Update last login time
+//       await User.update({ last_login: new Date() }, { where: { id: user.id } });
+
+//       return res.status(200).json({
+//         status: true,
+//         message: "Login successful",
+//         token,
+//         user,
+//       });
+//     } catch (error) {
+//       console.error("❌ Error:", error.message);
+//       res.status(500).json({
+//         status: false,
+//         message: error.message,
+//         file: error.stack.split("\n")[1]?.trim(),
+//         data: [],
+//       });
+//     }
+//   }
+// );
 
 v1Router.get("/employees", authenticateJWT, async (req, res) => {
   try {
