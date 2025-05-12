@@ -187,64 +187,6 @@ v1Router.post("/attendance", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.post("/attendance", authenticateJWT, async (req, res) => {
-//   try {
-//     const { location_id, clock_in_time, clock_out_time, department_id } = req.body;
-
-//     if (!department_id || !Array.isArray(department_id) || department_id.length === 0) {+
-
-//       return res.status(400).json({
-//         success: false,
-//         message: "department_id must be a non-empty array",
-//       });
-//     }
-
-//     // Get all user IDs belonging to the given departments
-//     const employees = await EmployeeDetail.findAll({
-//       attributes: ["user_id", "department_id"],
-//       raw: true,
-//       where: {
-//         department_id: { [Op.in]: department_id },
-//         company_id: req.user.company_id,
-//       },
-//     });
-
-//     if (!employees.length) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "No users found in the specified departments",
-//       });
-//     }
-
-//     // Prepare attendance entries
-//     const attendanceData = employees.map(emp => ({
-//       company_id: req.user.company_id,
-//       user_id: emp.user_id,
-//       location_id,
-//       clock_in_time,
-//       clock_out_time,
-//       clock_in_ip: req.ip,
-//       clock_out_ip: req.ip,
-//       created_by: req.user.id,
-//       created_at: new Date(),
-//       department_id: emp.department_id,
-//     }));
-
-//     // Create attendance for all users
-//     const createdAttendance = await Attendance.bulkCreate(attendanceData);
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Attendance created for all users in the specified departments",
-//       data: createdAttendance,
-//     });
-
-//   } catch (error) {
-//     console.error("Error creating Attendance:", error);
-//     return res.status(500).json({ success: false, error: error.message });
-//   }
-// });
-
 
 
 v1Router.get("/attendance", authenticateJWT, async (req, res) => {
