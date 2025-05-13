@@ -20,7 +20,6 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import { validateClient } from "../../common/inputvalidation/validationClient.js";
-app.options('*', cors());
 
 dotenv.config();
 
