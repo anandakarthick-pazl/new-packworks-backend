@@ -15,6 +15,7 @@ import ExcelJS from "exceljs";
 import { Readable } from "stream";
 import validateUniqueKey from "../../common/inputvalidation/validteUniquKey.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+app.options('*', cors());
 
 dotenv.config();
 

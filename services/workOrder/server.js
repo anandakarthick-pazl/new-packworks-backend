@@ -8,6 +8,7 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode"; 
+app.options('*', cors());
 
 dotenv.config();
 
