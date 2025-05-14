@@ -203,7 +203,7 @@ module.exports = {
     },
     {
       name: "purchase-return",
-      script: "./services/route/server.js",
+      script: "./services/purchase-order-return/server.js",
       env: {
         PORT: 3028,
       },
