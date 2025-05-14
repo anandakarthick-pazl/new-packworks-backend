@@ -8,6 +8,8 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
 
 dotenv.config();
 
@@ -342,6 +344,313 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
+v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      client,
+      sku,
+      manufacture,
+      confirmation,
+      sales_status,
+      status = "active",
+    } = req.query;
+
+    // Build base filter conditions for SalesOrder
+    const where = {
+      status: status,
+      company_id: req.user.company_id, // Filter by the company ID from JWT token
+    };
+
+    // Add client search if provided
+    if (client) where.client = { [Op.like]: `%${client}%` };
+
+    // Add confirmation filter if provided
+    if (confirmation !== undefined) where.confirmation = confirmation;
+
+    // Add sales_status filter if provided
+    if (sales_status) where.sales_status = sales_status;
+
+    // Include conditions for related models
+    const includeConditions = [
+      {
+        model: WorkOrder,
+        as: "workOrders",
+        where: { status: "active" }, // Only include active work orders
+        required: false, // Don't require work orders by default (LEFT JOIN)
+        separate: true, // Use separate query to ensure work orders are properly fetched
+      },
+      {
+        model: SalesSkuDetails,
+        where: { status: "active" }, // Only include active SKU details
+        required: false, // Don't require SKU details by default (LEFT JOIN)
+        separate: true, // Use separate query to ensure SKU details are properly fetched
+      },
+      {
+        model: User,
+        as: "creator_sales",
+        attributes: ["id", "name", "email"],
+      },
+      {
+        model: User,
+        as: "updater_sales",
+        attributes: ["id", "name", "email"],
+      },
+    ];
+
+    // Add SKU search if provided
+    if (sku) {
+      includeConditions[1].where = {
+        ...includeConditions[1].where,
+        sku: { [Op.like]: `%${sku}%` },
+      };
+      includeConditions[1].required = true; // Make this association required when filtering
+    }
+
+    // Add manufacture search if provided
+    if (manufacture) {
+      includeConditions[0].where = {
+        ...includeConditions[0].where,
+        manufacture: { [Op.like]: `%${manufacture}%` },
+      };
+      includeConditions[0].required = true; // Make this association required when filtering
+    }
+
+    // Fetch all sales orders with filters (without pagination)
+    const { rows: salesOrders } = await SalesOrder.findAndCountAll({
+      where,
+      include: includeConditions,
+      order: [["created_at", "DESC"]],
+      distinct: true,
+    });
+
+    // Create a new Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    const salesOrderSheet = workbook.addWorksheet("Sales Orders");
+    const workOrderSheet = workbook.addWorksheet("Work Orders");
+    const skuDetailsSheet = workbook.addWorksheet("SKU Details");
+
+    // Set up sales order sheet headers
+    salesOrderSheet.columns = [
+      { header: "Sale Order ID", key: "id", width: 15 },
+      { header: "Company ID", key: "company_id", width: 10 },
+      { header: "Client", key: "client", width: 30 },
+      { header: "SO Number", key: "so_number", width: 15 },
+      { header: "PO Number", key: "po_number", width: 15 },
+      { header: "Delivery Date", key: "delivery_date", width: 20 },
+      { header: "Confirmation", key: "confirmation", width: 15 },
+      { header: "Sales Status", key: "sales_status", width: 15 },
+      { header: "Total Amount", key: "total_amount", width: 15 },
+      { header: "Currency", key: "currency", width: 10 },
+      { header: "Notes", key: "notes", width: 30 },
+      { header: "Status", key: "status", width: 10 },
+      { header: "Created By", key: "created_by_name", width: 20 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated By", key: "updated_by_name", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Set up work order sheet headers
+    workOrderSheet.columns = [
+      { header: "Work Order ID", key: "id", width: 15 },
+      { header: "Sales Order ID", key: "sales_order_id", width: 15 },
+      { header: "Manufacture", key: "manufacture", width: 30 },
+      { header: "WO Number", key: "wo_number", width: 15 },
+      { header: "Product Name", key: "product_name", width: 30 },
+      { header: "Quantity", key: "quantity", width: 10 },
+      { header: "Status", key: "status", width: 10 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Set up SKU details sheet headers
+    skuDetailsSheet.columns = [
+      { header: "SKU Detail ID", key: "id", width: 15 },
+      { header: "Sales Order ID", key: "sales_order_id", width: 15 },
+      { header: "SKU", key: "sku", width: 20 },
+      { header: "Description", key: "description", width: 30 },
+      { header: "Quantity", key: "quantity", width: 10 },
+      { header: "Unit Price", key: "unit_price", width: 15 },
+      { header: "Total Price", key: "total_price", width: 15 },
+      { header: "Status", key: "status", width: 10 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Add styles to header rows
+    const headerStyle = {
+      font: { bold: true, color: { argb: "FFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "4472C4" } },
+    };
+
+    salesOrderSheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    workOrderSheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    skuDetailsSheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    // Add data to sales order sheet and related sheets
+    salesOrders.forEach((order) => {
+      // Add sales order data
+      salesOrderSheet.addRow({
+        id: order.id,
+        company_id: order.company_id,
+        client: order.client,
+        so_number: order.so_number,
+        po_number: order.po_number,
+        delivery_date: order.delivery_date 
+          ? new Date(order.delivery_date).toLocaleDateString() 
+          : "N/A",
+        confirmation: order.confirmation ? "Yes" : "No",
+        sales_status: order.sales_status,
+        total_amount: order.total_amount,
+        currency: order.currency,
+        notes: order.notes,
+        status: order.status,
+        created_by_name: order.creator_sales ? order.creator_sales.name : "N/A",
+        created_at: order.created_at
+          ? new Date(order.created_at).toLocaleString()
+          : "N/A",
+        updated_by_name: order.updater_sales ? order.updater_sales.name : "N/A",
+        updated_at: order.updated_at
+          ? new Date(order.updated_at).toLocaleString()
+          : "N/A",
+      });
+
+      // Add work orders data if available
+      if (order.workOrders && order.workOrders.length > 0) {
+        order.workOrders.forEach((workOrder) => {
+          workOrderSheet.addRow({
+            id: workOrder.id,
+            sales_order_id: order.id,
+            manufacture: workOrder.manufacture,
+            wo_number: workOrder.wo_number,
+            product_name: workOrder.product_name,
+            quantity: workOrder.quantity,
+            status: workOrder.status,
+            created_at: workOrder.created_at
+              ? new Date(workOrder.created_at).toLocaleString()
+              : "N/A",
+            updated_at: workOrder.updated_at
+              ? new Date(workOrder.updated_at).toLocaleString()
+              : "N/A",
+          });
+        });
+      }
+
+      // Add SKU details data if available
+      if (order.SalesSkuDetails && order.SalesSkuDetails.length > 0) {
+        order.SalesSkuDetails.forEach((skuDetail) => {
+          skuDetailsSheet.addRow({
+            id: skuDetail.id,
+            sales_order_id: order.id,
+            sku: skuDetail.sku,
+            description: skuDetail.description,
+            quantity: skuDetail.quantity,
+            unit_price: skuDetail.unit_price,
+            total_price: skuDetail.total_price,
+            status: skuDetail.status,
+            created_at: skuDetail.created_at
+              ? new Date(skuDetail.created_at).toLocaleString()
+              : "N/A",
+            updated_at: skuDetail.updated_at
+              ? new Date(skuDetail.updated_at).toLocaleString()
+              : "N/A",
+          });
+        });
+      }
+    });
+
+    // Apply alternating row colors for better readability
+    salesOrderSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    workOrderSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    skuDetailsSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    // Create a readable stream for the workbook
+    const buffer = await workbook.xlsx.writeBuffer();
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Set response headers for file download
+    const clientSuffix = client ? `-${client}` : "";
+    const skuSuffix = sku ? `-${sku}` : "";
+    const manufactureSuffix = manufacture ? `-${manufacture}` : "";
+    const statusSuffix = sales_status ? `-${sales_status}` : "";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    
+    const filename = `sales-orders${clientSuffix}${skuSuffix}${manufactureSuffix}${statusSuffix}-${timestamp}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    // Log the download
+    logger.info(
+      `Sales Orders Excel download initiated by user ${
+        req.user.id
+      } with filters: ${JSON.stringify({
+        client,
+        sku,
+        manufacture,
+        confirmation,
+        sales_status,
+        status,
+      })}`
+    );
+  } catch (error) {
+    logger.error("Excel Download Error:", error);
+    return res.status(500).json({ status: false, message: error.message });
   }
 });
 // GET single sales order by ID (including associated records)

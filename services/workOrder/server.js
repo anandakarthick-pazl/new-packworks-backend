@@ -8,6 +8,8 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode"; 
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
 
 dotenv.config();
 
@@ -257,6 +259,179 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
+v1Router.get("/work-order/download/excel", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      manufacture,
+      sku_name,
+      status = "active", 
+      updateMissingQrCodes = "true", 
+    } = req.query;
+
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id,
+    };
+
+    // Status filtering - default to active, but allow 
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+
+    if (manufacture) {
+      whereClause.manufacture = manufacture;
+    }
+    if (sku_name) {
+      whereClause.sku_name = { [Op.like]: `%${sku_name}%` };
+    }
+
+    // Fetch all work orders without pagination but with filters
+    const { rows: workOrders } = await WorkOrder.findAndCountAll({
+      where: whereClause,
+      order: [["updated_at", "DESC"]],
+    });
+
+    // Process work orders - updating QR codes for those missing them if requested
+    const processedWorkOrders = await Promise.all(
+      workOrders.map(async (workOrder) => {
+        const plainWorkOrder = workOrder.get({ plain: true });
+
+        // If QR code URL is missing and update flag is true, generate and update
+        if (updateMissingQrCodes === "true" && !plainWorkOrder.qr_code_url) {
+          try {
+            const qrCodeUrl = await generateQRCode(workOrder);
+            await workOrder.update({ qr_code_url: qrCodeUrl });
+            plainWorkOrder.qr_code_url = qrCodeUrl;
+          } catch (qrError) {
+            logger.error(
+              `Error generating QR code for work order ${plainWorkOrder.id}:`,
+              qrError
+            );
+            // Continue with the process even if QR generation fails for this item
+          }
+        }
+
+        return plainWorkOrder;
+      })
+    );
+
+    // Create a new Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Work Orders");
+
+    // Set up work order sheet headers
+    worksheet.columns = [
+      { header: "Work Order ID", key: "id", width: 15 },
+      { header: "Company ID", key: "company_id", width: 10 },
+      { header: "Sales Order ID", key: "sales_order_id", width: 15 },
+      { header: "Manufacture", key: "manufacture", width: 30 },
+      { header: "WO Number", key: "wo_number", width: 15 },
+      { header: "Product Name", key: "product_name", width: 30 },
+      { header: "SKU Name", key: "sku_name", width: 20 },
+      { header: "Quantity", key: "quantity", width: 10 },
+      { header: "Target Date", key: "target_date", width: 15 },
+      { header: "QR Code URL", key: "qr_code_url", width: 40 },
+      { header: "Description", key: "description", width: 30 },
+      { header: "Notes", key: "notes", width: 30 },
+      { header: "Status", key: "status", width: 10 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Add styles to header row
+    const headerStyle = {
+      font: { bold: true, color: { argb: "FFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "4472C4" } },
+    };
+
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    // Add data to worksheet
+    processedWorkOrders.forEach((workOrder) => {
+      worksheet.addRow({
+        id: workOrder.id,
+        company_id: workOrder.company_id,
+        sales_order_id: workOrder.sales_order_id || "N/A",
+        manufacture: workOrder.manufacture,
+        wo_number: workOrder.wo_number,
+        product_name: workOrder.product_name,
+        sku_name: workOrder.sku_name,
+        quantity: workOrder.quantity,
+        target_date: workOrder.target_date
+          ? new Date(workOrder.target_date).toLocaleDateString()
+          : "N/A",
+        qr_code_url: workOrder.qr_code_url || "Not Generated",
+        description: workOrder.description,
+        notes: workOrder.notes,
+        status: workOrder.status,
+        created_at: workOrder.created_at
+          ? new Date(workOrder.created_at).toLocaleString()
+          : "N/A",
+        updated_at: workOrder.updated_at
+          ? new Date(workOrder.updated_at).toLocaleString()
+          : "N/A",
+      });
+    });
+
+    // Apply alternating row colors for better readability
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    // Create a readable stream for the workbook
+    const buffer = await workbook.xlsx.writeBuffer();
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Set response headers for file download
+    const manufactureSuffix = manufacture ? `-${manufacture}` : "";
+    const skuSuffix = sku_name ? `-${sku_name}` : "";
+    const statusSuffix = status !== "active" ? `-${status}` : "";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    
+    const filename = `work-orders${manufactureSuffix}${skuSuffix}${statusSuffix}-${timestamp}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    // Log the download
+    logger.info(
+      `Work Orders Excel download initiated by user ${
+        req.user.id
+      } with filters: ${JSON.stringify({
+        manufacture,
+        sku_name,
+        status,
+        updateMissingQrCodes,
+      })}`
+    );
+  } catch (error) {
+    logger.error("Excel Download Error:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+});
+
 // Update the other endpoints to return the QR code information
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
