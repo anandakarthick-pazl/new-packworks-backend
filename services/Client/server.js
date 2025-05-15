@@ -34,7 +34,6 @@ const Address = db.ClientAddress;
 const User = db.User;
 
 // 🔹 Create a Client (POST)
-
 v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -112,9 +111,7 @@ v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
       .json({ message: "Error adding client", error: error.message });
   }
 });
-
 // 🔹 Get All Clients (GET) with Addresses - Only active clients
-
 v1Router.get("/clients", authenticateJWT, async (req, res) => {
   try {
     let {
@@ -201,8 +198,6 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-
 // 🔹 Get a Single Client by ID with Addresses (GET)
 v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   try {
@@ -210,20 +205,20 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
 
     // Validate client ID
     if (!clientId) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "Client ID is required" 
+      return res.status(400).json({
+        status: false,
+        message: "Client ID is required",
       });
     }
 
     const client = await Client.findOne({
       where: {
         client_id: clientId, // Use client_id instead of primary key
-        company_id: req.user.company_id // Ensure tenant isolation
+        company_id: req.user.company_id, // Ensure tenant isolation
       },
       include: [
-        { 
-          model: Address, 
+        {
+          model: Address,
           as: "addresses",
         },
         {
@@ -235,18 +230,18 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
           model: User,
           as: "updater",
           attributes: ["id", "name", "email"],
-        }
+        },
       ],
       attributes: {
-        exclude: ['password', 'sensitive_data'] // Exclude sensitive fields if any
-      }
+        exclude: ["password", "sensitive_data"], // Exclude sensitive fields if any
+      },
     });
 
     // Check if client exists
     if (!client) {
-      return res.status(404).json({ 
-        status: false, 
-        message: "Client not found or you do not have access to this client" 
+      return res.status(404).json({
+        status: false,
+        message: "Client not found or you do not have access to this client",
       });
     }
 
@@ -263,14 +258,14 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     }
 
     // Build and return response
-    const response = { 
-      status: true, 
+    const response = {
+      status: true,
       data: {
         ...clientData,
         addresses: clientData.addresses || [],
         creator: clientData.creator || null,
-        updater: clientData.updater || null
-      }
+        updater: clientData.updater || null,
+      },
     };
 
     return res.status(200).json(response);
@@ -278,25 +273,25 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     logger.error("Client Fetch by ID Error:", {
       clientId: req.params.id,
       errorMessage: error.message,
-      errorStack: error.stack
+      errorStack: error.stack,
     });
 
-    if (error.name === 'SequelizeValidationError') {
-      return res.status(400).json({ 
-        status: false, 
+    if (error.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        status: false,
         message: "Validation Error",
-        errors: error.errors.map(e => e.message)
+        errors: error.errors.map((e) => e.message),
       });
     }
 
-    return res.status(500).json({ 
-      status: false, 
-      message: "Internal Server Error", 
-      errorDetails: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      errorDetails:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
-
 
 v1Router.put(
   "/clients/:id",
@@ -386,7 +381,6 @@ v1Router.put(
 );
 
 // 🔹 Soft Delete a Client (DELETE) - Changes status to inactive
-
 v1Router.delete("/clients/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -687,12 +681,13 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
   }
 });
 
+
 v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
   try {
     const { gst_number } = req.body;
-    const { company_id } = req.user; // Extract user ID from the request
+    const { company_id } = req.user;
 
-    // Validate request parameters
+    // ✅ Validate required inputs
     if (!company_id || !gst_number) {
       return res.status(400).json({
         success: false,
@@ -700,7 +695,7 @@ v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Check if GST already exists for the same company
+    // ✅ Check if GST already exists for the same company
     const existingClient = await Client.findOne({
       where: { company_id, gst_number },
     });
@@ -712,32 +707,58 @@ v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
         isExisting: true,
       });
     }
-    const gstKey = 'cfa094f23e71ae949b48752692059f56';
+
+    const gstKey = "cfa094f23e71ae949b48752692059f56"; // Replace with actual key or use from process.env
     if (!gstKey) {
       return res.status(500).json({
         success: false,
         message: "GST key is not configured",
       });
     }
-    // If GST not found in our database, fetch from third-party API
-    const thirdPartyUrl = `http://sheet.gstincheck.co.in/check/${gstKey}/${gst_number}`;
-    const thirdPartyResponse = await axios.get(thirdPartyUrl);
 
+    const thirdPartyUrl = `http://sheet.gstincheck.co.in/check/${gstKey}/${gst_number}`;
+
+    let thirdPartyResponse;
+
+    try {
+      thirdPartyResponse = await axios.get(thirdPartyUrl);
+    } catch (apiError) {
+      return res.status(502).json({
+        success: false,
+        message: "Failed to connect to GST API provider",
+        error: apiError.message,
+      });
+    }
+
+    const gstData = thirdPartyResponse?.data || {};
+
+    // ✅ Handle API limit / credit exhausted
+    if (!gstData.flag || gstData.errorCode === "CREDIT_NOT_AVAILABLE") {
+      return res.status(200).json({
+        success: false,
+        message: "GST API credit exhausted or no valid data returned",
+        isExisting: false,
+        gstDetails: {},
+      });
+    }
+
+    // ✅ Successful response
     return res.status(200).json({
       success: true,
       message: "GST details fetched successfully",
       isExisting: false,
-      gstDetails: thirdPartyResponse.data,
+      gstDetails: gstData.data,
     });
   } catch (error) {
     console.error("Error checking GST:", error);
     return res.status(500).json({
       success: false,
       message: "Error checking GST number",
-      error: error.message,
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
