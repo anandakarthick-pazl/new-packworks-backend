@@ -174,12 +174,22 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       order: [["client_id", "ASC"]],
       distinct: true,
     });
+
     console.log("count", count);
+
     const response = {
       status: true,
-      data: clients.map((client) => ({
-        ...client.toJSON(),
-      })),
+      data: clients.map((client) => {
+        const obj = client.toJSON();
+        if (typeof obj.documents === "string") {
+          try {
+            obj.documents = JSON.parse(obj.documents);
+          } catch (e) {
+            obj.documents = []; // fallback if invalid JSON
+          }
+        }
+        return obj;
+      }),
       totalPages: Math.ceil(count / limit),
       currentPage: page,
       totalRecords: count,
@@ -191,6 +201,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 });
+
 
 // 🔹 Get a Single Client by ID with Addresses (GET)
 v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
@@ -208,15 +219,12 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     const client = await Client.findOne({
       where: {
         client_id: clientId, // Use client_id instead of primary key
-        // Optionally, add company_id for multi-tenant security
-        company_id: req.user.company_id
+        company_id: req.user.company_id // Ensure tenant isolation
       },
       include: [
         { 
           model: Address, 
           as: "addresses",
-          // Optional: filter addresses if needed
-          // where: { status: 'active' }
         },
         {
           model: User,
@@ -225,11 +233,10 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         },
         {
           model: User,
-          as: "updater", // Fixed typo in 'updater'
+          as: "updater",
           attributes: ["id", "name", "email"],
         }
       ],
-      // Optional: specify which client attributes to return
       attributes: {
         exclude: ['password', 'sensitive_data'] // Exclude sensitive fields if any
       }
@@ -243,15 +250,23 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Convert to plain object to customize response if needed
+    // Convert to plain object
     const clientData = client.toJSON();
 
-    // Optional: Transform response
+    // Parse 'documents' if it's a string
+    if (typeof clientData.documents === "string") {
+      try {
+        clientData.documents = JSON.parse(clientData.documents);
+      } catch (e) {
+        clientData.documents = []; // fallback if invalid JSON
+      }
+    }
+
+    // Build and return response
     const response = { 
       status: true, 
       data: {
         ...clientData,
-        // Add any additional transformations
         addresses: clientData.addresses || [],
         creator: clientData.creator || null,
         updater: clientData.updater || null
@@ -260,14 +275,12 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json(response);
   } catch (error) {
-    // More detailed error logging
     logger.error("Client Fetch by ID Error:", {
       clientId: req.params.id,
       errorMessage: error.message,
       errorStack: error.stack
     });
 
-    // Differentiate between different types of errors
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({ 
         status: false, 
@@ -283,6 +296,7 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 v1Router.put(
   "/clients/:id",
