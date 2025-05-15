@@ -34,6 +34,8 @@ ADD COLUMN inventory_digit INT NOT NULL;
 
 ALTER TABLE inventory
 ADD COLUMN inventory_generate_id VARCHAR(255) NULL AFTER id;
+-- 
 
-
+-- 14/05/25
+ALTER TABLE purchase_order_returns_items MODIFY id INT(11) NOT NULL AUTO_INCREMENT;
 -- 

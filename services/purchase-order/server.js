@@ -524,7 +524,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       });
 
       if (!itemData) {
-        await transaction.rollback();
         return res.status(404).json({ error: `Item not found: ${item_id}` });
       }
 
@@ -533,7 +532,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       let sgst=itemData.sgst;
 
       if (unit_price == null || cgst == null || sgst == null) {
-        await transaction.rollback();
         return res.status(400).json({ error: `Missing unit price or tax values for item ${item_id}` });
       }
 
