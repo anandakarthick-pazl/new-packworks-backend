@@ -38,6 +38,7 @@ import PurchaseOrderReturnItem from './po_return/purchase_order_return_item.mode
 import InvoiceSetting from "./invoiceSetting.model.js";
 import SkuOptions from "./skuModel/skuOptions.model.js";
 import States from "./commonModel/states.model.js";
+import Color from "./commonModel/color.model.js";
 
 const db = {
   sequelize,
@@ -80,6 +81,7 @@ const db = {
   PurchaseOrderReturnItem,
   InvoiceSetting,
   States,
+  Color,
 };
 
 export default db;
