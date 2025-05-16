@@ -32,7 +32,9 @@
     "grn": "nodemon services/grn/server.js",
     "inventory": "nodemon services/inventory/server.js",
     "route": "nodemon services/route/server.js",
-    "purchase-return": "nodemon services/purchase-order-return/server.js"
+    "purchase-return": "nodemon services/purchase-order-return/server.js",
+    "production": "nodemon services/production/server.js",
+    "work-invoice": "nodemon services/work-invoice/server.js"
   },
   "keywords": [],
   "author": "",

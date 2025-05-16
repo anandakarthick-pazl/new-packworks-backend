@@ -208,12 +208,19 @@ module.exports = {
         PORT: 3028,
       },
     },
-    // {
-    //   name: "production",
-    //   script: "./services/Production/server.js",
-    //   env: {
-    //     PORT: 3028,
-    //   },
-    // },
+    {
+      name: "production",
+      script: "./services/Production/server.js",
+      env: {
+        PORT: 3029,
+      },
+    },
+    {
+      name: "work-invoice",
+      script: "./services/work-invoice/server.js",
+      env: {
+        PORT: 3030,
+      },
+    },
   ],
 };
