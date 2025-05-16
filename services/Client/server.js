@@ -168,7 +168,7 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
       ],
       limit,
       offset: (page - 1) * limit,
-      order: [["client_id", "ASC"]],
+      order: [["created_at", "DESC"]],
       distinct: true,
     });
 

@@ -116,13 +116,13 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
               { ply: { [Op.like]: `%${ply}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
               { sku_ui_id: { [Op.like]: `%${search}%` } },
-              {length: { [Op.like]: `%${search}%` } },
-              {width: { [Op.like]: `%${search}%` } },
-              {height: { [Op.like]: `%${search}%` } },
-              {lwh: { [Op.like]: `%${search}%` } },
-              {length_board_size_cm2: { [Op.like]: `%${search}%` } },
-              {width_board_size_cm2: { [Op.like]: `%${search}%` } },
-              {board_size_cm2: { [Op.like]: `%${search}%` } },
+              { length: { [Op.like]: `%${search}%` } },
+              { width: { [Op.like]: `%${search}%` } },
+              { height: { [Op.like]: `%${search}%` } },
+              { lwh: { [Op.like]: `%${search}%` } },
+              { length_board_size_cm2: { [Op.like]: `%${search}%` } },
+              { width_board_size_cm2: { [Op.like]: `%${search}%` } },
+              { board_size_cm2: { [Op.like]: `%${search}%` } },
             ],
           },
         ],
@@ -133,10 +133,12 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     const totalCount = await Sku.count({ where: whereCondition });
 
     // Fetch skus with pagination and search
+    // Add order parameter to sort by created_at in descending order (newest first)
     const skus = await Sku.findAll({
       where: whereCondition,
       limit: parseInt(limit),
       offset: parseInt(offset),
+      order: [["created_at", "DESC"]], 
       include: [
         {
           model: db.User,
@@ -488,7 +490,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
 v1Router.get(
   "/sku-details/download/excel",
   authenticateJWT,
-  async (req, res) => {                                   
+  async (req, res) => {
     try {
       const {
         search = "",
@@ -915,62 +917,65 @@ v1Router.get(
   }
 );
 
+v1Router.get(
+  "/sku-details/client-sku/:client_id",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { client_id } = req.params;
+      const { sku_name } = req.query;
 
-v1Router.get("/sku-details/client-sku/:client_id", authenticateJWT, async (req, res) => {
-  try {
-    const { client_id } = req.params;
-    const { sku_name } = req.query;
+      // Build the where condition with client_id
+      let whereCondition = {
+        client_id: client_id,
+        status: "active", // Default to active SKUs
+      };
 
-    // Build the where condition with client_id
-    let whereCondition = {
-      client_id: client_id,
-      status: "active", // Default to active SKUs
-    };
+      // Add sku_name search if provided
+      if (sku_name) {
+        whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+      }
 
-    // Add sku_name search if provided
-    if (sku_name) {
-      whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+      // Fetch all matching SKUs without pagination
+      const skus = await Sku.findAll({
+        where: whereCondition,
+        include: [
+          {
+            model: db.User,
+            as: "sku_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: db.User,
+            as: "sku_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+      });
+
+      // Format the SKU data
+      const formattedSkus = skus.map((sku) => ({
+        ...sku.toJSON(),
+        sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+        part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+        tags: sku.tags ? JSON.parse(sku.tags) : null,
+      }));
+
+      res.status(200).json({
+        data: formattedSkus,
+        count: formattedSkus.length,
+      });
+    } catch (error) {
+      logger.error("Error fetching client SKUs:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
     }
-
-    // Fetch all matching SKUs without pagination
-    const skus = await Sku.findAll({
-      where: whereCondition,
-      include: [
-        {
-          model: db.User,
-          as: "sku_creator",
-          attributes: ["id", "name"],
-          required: false,
-        },
-        {
-          model: db.User,
-          as: "sku_updater",
-          attributes: ["id", "name"],
-          required: false,
-        },
-      ],
-    });
-
-    // Format the SKU data
-    const formattedSkus = skus.map((sku) => ({
-      ...sku.toJSON(),
-      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
-      part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
-      tags: sku.tags ? JSON.parse(sku.tags) : null,
-    }));
-
-    res.status(200).json({
-      data: formattedSkus,
-      count: formattedSkus.length
-    });
-  } catch (error) {
-    logger.error("Error fetching client SKUs:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
   }
-});
+);
 
 // v1Router.get(
 //   "/sku-details/download/excel",
@@ -1744,7 +1749,6 @@ v1Router.delete(
   }
 );
 
-
 v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -1757,21 +1761,29 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
 
     // Check if sku_version_id exists if provided
     if (req.body.sku_version_id) {
-      const existingVersion = await SkuVersion.findByPk(req.body.sku_version_id);
+      const existingVersion = await SkuVersion.findByPk(
+        req.body.sku_version_id
+      );
       if (!existingVersion) {
         await t.rollback();
-        return res.status(404).json({ message: "Referenced SKU Version not found" });
+        return res
+          .status(404)
+          .json({ message: "Referenced SKU Version not found" });
       }
     }
 
     // Validate that field_options is provided
-    if (!req.body.field_options || !Array.isArray(req.body.field_options) || req.body.field_options.length === 0) {
+    if (
+      !req.body.field_options ||
+      !Array.isArray(req.body.field_options) ||
+      req.body.field_options.length === 0
+    ) {
       await t.rollback();
       return res.status(400).json({ message: "Field options are required" });
     }
 
     // Prepare the options for creation
-    const options = req.body.field_options.map(option => ({
+    const options = req.body.field_options.map((option) => ({
       sku_id: req.body.sku_id,
       sku_version_id: req.body.sku_version_id || null,
       field_path: option.field_path,
@@ -1779,7 +1791,7 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
       field_value: option.field_value,
       company_id: req.user.company_id,
       created_by: req.user.id,
-      status: "active"
+      status: "active",
     }));
 
     // Create all options
@@ -1810,56 +1822,63 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
 
 // 3. Add a endpoint to retrieve options for a specific SKU:
 
-v1Router.get("/sku-details/:skuId/options", authenticateJWT, async (req, res) => {
-  try {
-    const { skuId } = req.params;
-    const { field_path, field_name } = req.query;
-    
-    // Build query filters
-    const filter = {
-      sku_id: skuId,
-      company_id: req.user.company_id,
-      status: "active"
-    };
-    
-    // Add optional filters if provided
-    if (field_path) filter.field_path = field_path;
-    if (field_name) filter.field_name = field_name;
-    
-    // Get all options for the SKU with optional filters
-    const options = await SkuOptions.findAll({
-      where: filter,
-      order: [['created_at', 'DESC']]
-    });
-    
-    // Group options by field_path for easier frontend handling
-    const groupedOptions = options.reduce((acc, option) => {
-      if (!acc[option.field_path]) {
-        acc[option.field_path] = [];
-      }
-      // Prevent duplicates
-      if (!acc[option.field_path].some(o => o.field_value === option.field_value)) {
-        acc[option.field_path].push({
-          id: option.id,
-          field_name: option.field_name,
-          field_value: option.field_value
-        });
-      }
-      return acc;
-    }, {});
-    
-    res.status(200).json({
-      message: "SKU Options retrieved successfully",
-      options: groupedOptions
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error retrieving SKU Options",
-      error: error.message
-    });
-  }
-});
+v1Router.get(
+  "/sku-details/:skuId/options",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { skuId } = req.params;
+      const { field_path, field_name } = req.query;
 
+      // Build query filters
+      const filter = {
+        sku_id: skuId,
+        company_id: req.user.company_id,
+        status: "active",
+      };
+
+      // Add optional filters if provided
+      if (field_path) filter.field_path = field_path;
+      if (field_name) filter.field_name = field_name;
+
+      // Get all options for the SKU with optional filters
+      const options = await SkuOptions.findAll({
+        where: filter,
+        order: [["created_at", "DESC"]],
+      });
+
+      // Group options by field_path for easier frontend handling
+      const groupedOptions = options.reduce((acc, option) => {
+        if (!acc[option.field_path]) {
+          acc[option.field_path] = [];
+        }
+        // Prevent duplicates
+        if (
+          !acc[option.field_path].some(
+            (o) => o.field_value === option.field_value
+          )
+        ) {
+          acc[option.field_path].push({
+            id: option.id,
+            field_name: option.field_name,
+            field_value: option.field_value,
+          });
+        }
+        return acc;
+      }, {});
+
+      res.status(200).json({
+        message: "SKU Options retrieved successfully",
+        options: groupedOptions,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Error retrieving SKU Options",
+        error: error.message,
+      });
+    }
+  }
+);
 
 // sku-type apis
 v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
