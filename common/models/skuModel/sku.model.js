@@ -98,6 +98,10 @@ const Sku = sequelize.define(
       type: Sequelize.JSON,
       allowNull: true,
     },
+    print_type: {
+      type: DataTypes.ENUM("None", "Offset", "Flexo"),
+      allowNull: true,
+    },
     documents: {
       type: DataTypes.JSON,
       allowNull: true,
