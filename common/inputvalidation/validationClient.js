@@ -69,7 +69,7 @@ export const validateClient = async (req, res, next) => {
       attention: Joi.string().allow(null, ""),
       country: Joi.string().required(),
       city: Joi.string().required(),
-      state: Joi.string().required(),
+      state: Joi.number().integer().required(),
       pinCode: Joi.string().required(),
       phone: Joi.string().required(),
       faxNumber: Joi.string().allow(null, ""),
