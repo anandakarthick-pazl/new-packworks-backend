@@ -1,4 +1,8 @@
 -- 16/05/2025
+
+ALTER TABLE sku 
+ADD COLUMN documents JSON NULL;
+
 ALTER TABLE invoice_settings
 ADD COLUMN work_invoice_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 ADD COLUMN work_invoice_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
