@@ -15,7 +15,7 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
 
-app.use(cors());
+
 
 dotenv.config();
 
