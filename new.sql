@@ -38,4 +38,15 @@ ADD COLUMN inventory_generate_id VARCHAR(255) NULL AFTER id;
 
 -- 14/05/25
 ALTER TABLE purchase_order_returns_items MODIFY id INT(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE item_master
+MODIFY COLUMN item_type ENUM(
+  'reels', 
+  'pins', 
+  'semi-finished-goods',
+  'finished-goods', 
+  'raw-materials',
+  'corrugation-glue',
+  'pasting-glue'
+) NOT NULL DEFAULT 'raw-materials';
 -- 
