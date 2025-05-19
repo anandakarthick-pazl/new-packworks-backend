@@ -100,7 +100,7 @@ v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
       },
     });
     res.status(201).json({
-      message: "Client and Addresses added successfully",
+      message: `${entity_type} and Addresses added successfully`,
       client: newClient,
       addresses: createdAddresses,
     });
