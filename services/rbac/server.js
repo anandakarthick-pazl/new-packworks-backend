@@ -203,6 +203,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3009;
-app.listen(PORT, () => {
+app.listen(PORT,'0.0.0.0', () => {
   console.log(`RBAC Service running on port ${PORT}`);
 });
