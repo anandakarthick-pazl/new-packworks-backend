@@ -64,14 +64,14 @@ export const validateClient = async (req, res, next) => {
 
     // Define schema for address
     const addressSchema = Joi.object({
-      // Core fields - now optional or allow empty
+      // Core required fields
       id: Joi.number().integer().positive().optional(),
       attention: Joi.string().allow(null, ""),
-      country: Joi.string().allow(null, ""), // Allow empty
-      city: Joi.string().allow(null, ""), // Allow empty
-      state: Joi.number().integer().allow(null), // Allow null
-      pinCode: Joi.string().allow(null, ""), // Allow empty
-      phone: Joi.string().allow(null, ""), // Allow empty
+      country: Joi.string().required(),
+      city: Joi.string().required(),
+      state: Joi.number().integer().required(),
+      pinCode: Joi.string().required(),
+      phone: Joi.string().required(),
       faxNumber: Joi.string().allow(null, ""),
       status: Joi.string().valid("active", "inactive").default("active"),
 
