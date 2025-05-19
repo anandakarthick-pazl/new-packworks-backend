@@ -27,12 +27,8 @@ dotenv.config();
 
 const app = express();
 app.use(json());
-// app.use(cors());
-app.use(cors({
-  origin: '*', // You can specify specific origins instead of '*'
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
+
 
 const v1Router = Router();
 // app.use(logRequestResponse);
