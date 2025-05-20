@@ -40,7 +40,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       supplier_name: {
         type: DataTypes.STRING(100)
       },
-      supplier_address: {
+      billing_address: {
+        type: DataTypes.TEXT
+      },
+      shipping_address: {
         type: DataTypes.TEXT
       },
       supplier_contact: {
