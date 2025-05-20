@@ -649,6 +649,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3023;
-app.listen(PORT, () => {
+app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
   console.log(`Purchase running on port ${PORT}`);
 });

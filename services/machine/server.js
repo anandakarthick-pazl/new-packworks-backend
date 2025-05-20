@@ -2743,7 +2743,7 @@ app.use("/api/machines", v1Router);
 await db.sequelize.sync();
 const PORT = 3007;
 const service = "Machine Service";
-app.listen(PORT, () => {
+app.listen(process.env.PORT_MACHINE,'0.0.0.0', () => {
   console.log(`${service} running on port ${PORT}`);
 });
 

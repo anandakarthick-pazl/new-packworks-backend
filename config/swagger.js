@@ -1,7 +1,8 @@
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJSDoc from 'swagger-jsdoc';
-
+import dotenv from "dotenv";
+dotenv.config();
 // ✅ Swagger Configuration
 const swaggerOptions = {
     swaggerDefinition: {
@@ -65,6 +66,6 @@ export default function setupSwagger(app) {
 
 const app = express();
 setupSwagger(app);
-app.listen(PORT, () => {
+app.listen(process.env.PORT_SWAGGER, () => {
     console.log(`Server running at http://localhost:${PORT}/api-docs`);
 });

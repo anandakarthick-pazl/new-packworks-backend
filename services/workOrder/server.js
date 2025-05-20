@@ -7,7 +7,7 @@ import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
-import QRCode from "qrcode"; 
+import QRCode from "qrcode";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
 
@@ -48,11 +48,10 @@ Quantity: ${workOrder.qty || "N/A"}
 Manufacture: ${workOrder.manufacture || "N/A"}
 Status: ${workOrder.status || "N/A"}
 ${workOrder.description ? `Description: ${workOrder.description}` : ""}
-${
-  workOrder.edd
-    ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
-    : ""
-}
+${workOrder.edd
+        ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+        : ""
+      }
 `.trim();
 
     // Generate a unique filename
@@ -265,8 +264,8 @@ v1Router.get("/work-order/download/excel", authenticateJWT, async (req, res) => 
     const {
       manufacture,
       sku_name,
-      status = "active", 
-      updateMissingQrCodes = "true", 
+      status = "active",
+      updateMissingQrCodes = "true",
     } = req.query;
 
     // Build where clause for filtering
@@ -403,7 +402,7 @@ v1Router.get("/work-order/download/excel", authenticateJWT, async (req, res) => 
     const skuSuffix = sku_name ? `-${sku_name}` : "";
     const statusSuffix = status !== "active" ? `-${status}` : "";
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    
+
     const filename = `work-orders${manufactureSuffix}${skuSuffix}${statusSuffix}-${timestamp}.xlsx`;
 
     res.setHeader(
@@ -417,8 +416,7 @@ v1Router.get("/work-order/download/excel", authenticateJWT, async (req, res) => 
 
     // Log the download
     logger.info(
-      `Work Orders Excel download initiated by user ${
-        req.user.id
+      `Work Orders Excel download initiated by user ${req.user.id
       } with filters: ${JSON.stringify({
         manufacture,
         sku_name,
@@ -535,8 +533,8 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
 
     // Check if the user has permission to update this work order (same company)
     if (workOrder.company_id !== req.user.company_id) {
-      return res.status(403).json({ 
-        message: "You don't have permission to update this work order" 
+      return res.status(403).json({
+        message: "You don't have permission to update this work order"
       });
     }
 
@@ -570,7 +568,7 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
     });
 
     // Check if any QR code-relevant fields have changed
-    const needsNewQrCode = 
+    const needsNewQrCode =
       originalSku !== workDetails.sku_name ||
       originalQty !== workDetails.qty ||
       originalManufacture !== workDetails.manufacture ||
@@ -777,6 +775,6 @@ app.get("/health", (req, res) => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3006;
-app.listen(PORT, () => {
+app.listen(process.env.PORT_WORK_ORDER, '0.0.0.0', () => {
   console.log(`work order Service running on port ${PORT}`);
 });

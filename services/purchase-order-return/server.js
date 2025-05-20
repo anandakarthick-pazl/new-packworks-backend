@@ -390,6 +390,6 @@ app.use("/api", v1Router);
 await db.sequelize.sync();
 
 const PORT = 3028;
-app.listen(PORT, () => {
+app.listen(process.env.PORT_PURCHASE_RETURN,'0.0.0.0', () => {
   console.log(`Purchase Order Return API running on port ${PORT}`);
 });

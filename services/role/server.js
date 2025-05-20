@@ -248,6 +248,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3012;
-app.listen(PORT, () => {
+app.listen(process.env.PORT_ROLE,'0.0.0.0', () => {
   console.log(`Role Service running on port ${PORT}`);
 });

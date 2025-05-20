@@ -187,6 +187,6 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3022;
-app.listen(PORT, () => {
+app.listen(process.env.PORT_ITEM,'0.0.0.0', () => {
   console.log(`Item Master Service running on port ${PORT}`);
 });

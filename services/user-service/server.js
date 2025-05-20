@@ -1493,6 +1493,6 @@ app.use("/api/user", v1Router);
 await db.sequelize.sync();
 const PORT = 3002;
 const service = "User Service";
-app.listen(PORT, async () => {
+app.listen(process.env.PORT_USER, '0.0.0.0', async () => {
   console.log(`${service} running on port ${PORT}`);
 });
