@@ -27,14 +27,8 @@ dotenv.config();
 
 const app = express();
 app.use(json());
-// app.use(cors());
-app.use(cors({
-  origin: true, // This allows any origin
-  credentials: false,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
-}));
+app.use(cors());
+
 
 const v1Router = Router();
 // app.use(logRequestResponse);

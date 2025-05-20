@@ -15,15 +15,7 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
 
-app.use(cors({
-  origin: 'https://your-frontend-domain.com', // or use a function for dynamic origin
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
- 
-// Explicitly handle preflight requests
-app.options('*', cors());
+
 
 dotenv.config();
 
@@ -211,6 +203,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3009;
-app.listen(PORT, () => {
+app.listen(PORT,'0.0.0.0', () => {
   console.log(`RBAC Service running on port ${PORT}`);
 });
