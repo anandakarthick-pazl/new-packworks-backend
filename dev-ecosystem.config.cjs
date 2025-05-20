@@ -218,5 +218,12 @@ module.exports = {
         PORT: process.env.PORT_WORK_INVOICE,
       },
     },
+    {
+      name: "Stock-Adjustment",
+      script: "./services/stock-adjustment/server.js",
+      env: {
+        PORT: process.env.PORT_STOCK_ADJUSTMENT,
+      },
+    },
   ],
 };
