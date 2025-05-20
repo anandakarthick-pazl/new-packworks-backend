@@ -1,3 +1,12 @@
+-- 20/05/2025
+ALTER TABLE purchase_orders
+ADD COLUMN billing_address TEXT
+AFTER supplier_name;
+
+ALTER TABLE purchase_orders
+CHANGE COLUMN supplier_address shipping_address TEXT;
+
+
 -- 12/05/2025
 -- item
 ALTER TABLE invoice_settings
