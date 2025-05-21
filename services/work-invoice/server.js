@@ -233,5 +233,5 @@ app.use("/api/work-order-invoice", v1Router);
 await db.sequelize.sync();
 const PORT = 3030;
 app.listen(process.env.PORT_WORK_INVOICE, '0.0.0.0', () => {
-  console.log(`Work-Invoice Service running on port ${PORT}`);
+  console.log(`Work-Invoice Service running on port ${process.env.PORT_WORK_INVOICE}`);
 });

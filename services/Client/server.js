@@ -785,5 +785,5 @@ await db.sequelize.sync();
 const PORT = 3003;
 const service = "Client Service";
 app.listen(process.env.PORT_CLIENT,'0.0.0.0', () => {
-  console.log(`${service} running on port ${PORT}`);
+  console.log(`${service} running on port ${process.env.PORT_CLIENT}`);
 });

@@ -8,6 +8,9 @@ import sequelize from "../../common/database/database.js";
 // Import the Redis and RabbitMQ configurations
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
+
 dotenv.config();
 const app = express();
 app.use(json());
@@ -1000,56 +1003,179 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-// v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
 
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
 
-//     // Check if the machine exists for the given company
-//     const machine = await Machine.findOne({
-//       where: {
-//         id,
-//         company_id,
-//         status: "active",
-//       },
-//     });
+v1Router.get("/download/excel", authenticateJWT, async (req, res) => {
+  try {
+    const { search, machine_status } = req.query;
+    
+    const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
 
-//     if (!machine) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Machine not found or access denied",
-//       });
-//     }
+    // Apply search filter if provided
+    if (search) {
+      whereClause[Op.or] = [
+        { machine_name: { [Op.like]: `%${search}%` } },
+        { serial_number: { [Op.like]: `%${search}%` } },
+        { model_number: { [Op.like]: `%${search}%` } },
+        { manufacturer: { [Op.like]: `%${search}%` } },
+      ];
+    }
 
-//     // Soft delete: update status to inactive
-//     await machine.update(
-//       {
-//         status: "inactive",
-//         updated_by: user_id,
-//       },
-//       { transaction }
-//     );
+    // Apply machine status filter if provided
+    if (machine_status) {
+      whereClause.machine_status = machine_status;
+    }
 
-//     await transaction.commit();
+    // Fetch machines with the same filters as the GET API but without pagination
+    const machines = await Machine.findAll({
+      where: whereClause,
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name", "email"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name", "email"],
+        },
+      ],
+      order: [["updated_at", "DESC"]],
+    });
 
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Machine deleted successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error deleting machine: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete machine",
-//       error: error.message,
-//     });
-//   }
-// });
-// Update machine status (Active, Inactive, Under Maintenance)
+    // Create a new Excel workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Machines");
+
+    // Set up worksheet headers with all model fields
+    worksheet.columns = [
+      { header: "Machine ID", key: "machine_id", width: 10 },
+      { header: "Machine Name", key: "machine_name", width: 30 },
+      { header: "Serial Number", key: "serial_number", width: 20 },
+      { header: "Model Number", key: "model_number", width: 20 },
+      { header: "Manufacturer", key: "manufacturer", width: 20 },
+      { header: "Machine Status", key: "machine_status", width: 20 },
+      { header: "Purchase Date", key: "purchase_date", width: 15 },
+      { header: "Installation Date", key: "installation_date", width: 15 },
+      { header: "Location", key: "location", width: 20 },
+      { header: "Department", key: "department", width: 20 },
+      { header: "Warranty Expiry", key: "warranty_expiry", width: 15 },
+      { header: "Last Maintenance", key: "last_maintenance_date", width: 15 },
+      { header: "Next Maintenance", key: "next_maintenance_date", width: 15 },
+      { header: "Notes", key: "notes", width: 30 },
+      { header: "Company", key: "company_name", width: 20 },
+      { header: "Created By", key: "created_by_name", width: 20 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated By", key: "updated_by_name", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Add styles to header row
+    const headerStyle = {
+      font: { bold: true, color: { argb: "FFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "4472C4" } },
+    };
+
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    // Add data to worksheet
+    machines.forEach((machine) => {
+      worksheet.addRow({
+        machine_id: machine.id,
+        machine_name: machine.machine_name,
+        serial_number: machine.serial_number,
+        model_number: machine.model_number,
+        manufacturer: machine.manufacturer,
+        machine_status: machine.machine_status,
+        purchase_date: machine.purchase_date 
+          ? new Date(machine.purchase_date).toLocaleDateString() 
+          : "N/A",
+        installation_date: machine.installation_date 
+          ? new Date(machine.installation_date).toLocaleDateString() 
+          : "N/A",
+        location: machine.location,
+        department: machine.department,
+        warranty_expiry: machine.warranty_expiry 
+          ? new Date(machine.warranty_expiry).toLocaleDateString() 
+          : "N/A",
+        last_maintenance_date: machine.last_maintenance_date 
+          ? new Date(machine.last_maintenance_date).toLocaleDateString() 
+          : "N/A",
+        next_maintenance_date: machine.next_maintenance_date 
+          ? new Date(machine.next_maintenance_date).toLocaleDateString() 
+          : "N/A",
+        notes: machine.notes,
+        company_name: machine.Company ? machine.Company.company_name : "N/A",
+        created_by_name: machine.creator_machine ? machine.creator_machine.name : "N/A",
+        created_at: machine.created_at 
+          ? new Date(machine.created_at).toLocaleString() 
+          : "N/A",
+        updated_by_name: machine.updater_machine ? machine.updater_machine.name : "N/A",
+        updated_at: machine.updated_at 
+          ? new Date(machine.updated_at).toLocaleString() 
+          : "N/A",
+      });
+    });
+
+    // Apply alternating row colors for better readability
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    // Create a readable stream for the workbook
+    const buffer = await workbook.xlsx.writeBuffer();
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Set response headers for file download
+    const searchSuffix = search ? `-${search}` : "";
+    const statusSuffix = machine_status ? `-${machine_status}` : "";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `machines-data${searchSuffix}${statusSuffix}-${timestamp}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    // Log the download
+    logger.info(
+      `Machines Excel download initiated by user ${
+        req.user.id
+      } with filters: ${JSON.stringify({
+        search,
+        machine_status,
+      })}`
+    );
+  } catch (error) {
+    logger.error("Machines Excel Download Error:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+});
+
 v1Router.patch("/master/:id/status", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -2744,7 +2870,7 @@ await db.sequelize.sync();
 const PORT = 3007;
 const service = "Machine Service";
 app.listen(process.env.PORT_MACHINE,'0.0.0.0', () => {
-  console.log(`${service} running on port ${PORT}`);
+  console.log(`${service} running on port ${process.env.PORT_MACHINE}`);
 });
 
 export default app;

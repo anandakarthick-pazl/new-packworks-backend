@@ -881,5 +881,5 @@ app.use("/api/packages", v1Router);
 await db.sequelize.sync();
 const PORT = 3016;
 app.listen(process.env.PORT_PACKAGE,'0.0.0.0', () => {
-  console.log(`packages Service running on port ${PORT}`);
+  console.log(`packages Service running on port ${process.env.PORT_PACKAGE}`);
 });

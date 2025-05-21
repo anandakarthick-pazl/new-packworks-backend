@@ -377,5 +377,5 @@ app.use("/api/production", v1Router);
 await db.sequelize.sync();
 const PORT = 3029;
 app.listen(process.env.PORT_PRODUCTION, '0.0.0.0',() => {
-  console.log(`Production Service running on port ${PORT}`);
+  console.log(`Production Service running on port ${process.env.PORT_PRODUCTION}`);
 });

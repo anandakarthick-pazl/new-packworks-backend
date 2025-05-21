@@ -385,5 +385,5 @@ app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3031;
 app.listen(process.env.PORT_STOCK_ADJUSTMENT, '0.0.0.0',() => {
-  console.log(`Stock Adjustment running on port ${PORT}`);
+  console.log(`Stock Adjustment running on port ${process.env.PORT_STOCK_ADJUSTMENT}`);
 });

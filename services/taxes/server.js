@@ -484,6 +484,6 @@ app.use("/api/taxes", v1Router);
 await db.sequelize.sync();
 const PORT = 3021;
 app.listen(process.env.PORT_TAXES, '0.0.0.0', () => {
-  console.log(`Taxes Service running on port ${PORT}`);
+  console.log(`Taxes Service running on port ${process.env.PORT_TAXES}`);
 });
 
