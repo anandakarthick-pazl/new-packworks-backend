@@ -774,7 +774,7 @@ app.get("/health", (req, res) => {
 // Use Version 1 Router
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = process.env.PORT_WORK_ORDER;
+const PORT = process.env.PORT_WORKORDER;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`work order Service running on port ${PORT}`);
 });
