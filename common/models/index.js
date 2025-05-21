@@ -40,6 +40,10 @@ import SkuOptions from "./skuModel/skuOptions.model.js";
 import States from "./commonModel/states.model.js";
 import Color from "./commonModel/color.model.js";
 import WorkOrderInvoice from "./salesOrder/workOrderInvoice.model.js";
+import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
+import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
+import DebitNote from "./debit/debit_note.model.js";
+import CreditNote from "./credit/credit_note.model.js"; 
 
 const db = {
   sequelize,
@@ -84,6 +88,11 @@ const db = {
   States,
   Color,
   WorkOrderInvoice,
+  stockAdjustment,
+  stockAdjustmentItem,
+  DebitNote,
+  CreditNote,
+
 };
 
 export default db;

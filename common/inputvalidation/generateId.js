@@ -12,6 +12,9 @@ const ItemMaster = db.ItemMaster;
 const PurchaseOrder = db.PurchaseOrder;
 const GRN = db.GRN;
 const Inventory = db.Inventory;
+const stockAdjustment = db.stockAdjustment;
+const PurchaseOrderReturn = db.PurchaseOrderReturn;
+const debit_note = db.DebitNote;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
