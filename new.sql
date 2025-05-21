@@ -1,3 +1,12 @@
+-- 20/05/2025
+ALTER TABLE purchase_orders
+ADD COLUMN billing_address TEXT
+AFTER supplier_name;
+
+ALTER TABLE purchase_orders
+CHANGE COLUMN supplier_address shipping_address TEXT;
+
+
 -- 12/05/2025
 -- item
 ALTER TABLE invoice_settings
@@ -34,6 +43,19 @@ ADD COLUMN inventory_digit INT NOT NULL;
 
 ALTER TABLE inventory
 ADD COLUMN inventory_generate_id VARCHAR(255) NULL AFTER id;
+-- 
 
+-- 14/05/25
+ALTER TABLE purchase_order_returns_items MODIFY id INT(11) NOT NULL AUTO_INCREMENT;
 
+ALTER TABLE item_master
+MODIFY COLUMN item_type ENUM(
+  'reels', 
+  'pins', 
+  'semi-finished-goods',
+  'finished-goods', 
+  'raw-materials',
+  'corrugation-glue',
+  'pasting-glue'
+) NOT NULL DEFAULT 'raw-materials';
 -- 

@@ -29,6 +29,7 @@ const app = express();
 app.use(json());
 app.use(cors());
 
+
 const v1Router = Router();
 // app.use(logRequestResponse);
 const RABBITMQ_URL = process.env.RABBITMQ_URL;
@@ -1492,6 +1493,6 @@ app.use("/api/user", v1Router);
 await db.sequelize.sync();
 const PORT = 3002;
 const service = "User Service";
-app.listen(PORT, async () => {
-  console.log(`${service} running on port ${PORT}`);
+app.listen(process.env.PORT_USER, '0.0.0.0', async () => {
+  console.log(`${service} running on port ${process.env.PORT_USER}`);
 });

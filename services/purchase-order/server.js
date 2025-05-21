@@ -228,7 +228,8 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
         "po_code",
         "supplier_id",
         "supplier_name",
-        "supplier_address",
+        "billing_address",
+        "shipping_address",
         "supplier_contact",
         "supplier_email",
         "payment_terms",
@@ -524,7 +525,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       });
 
       if (!itemData) {
-        await transaction.rollback();
         return res.status(404).json({ error: `Item not found: ${item_id}` });
       }
 
@@ -533,7 +533,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       let sgst=itemData.sgst;
 
       if (unit_price == null || cgst == null || sgst == null) {
-        await transaction.rollback();
         return res.status(400).json({ error: `Missing unit price or tax values for item ${item_id}` });
       }
 
@@ -650,6 +649,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3023;
-app.listen(PORT, () => {
-  console.log(`Purchase running on port ${PORT}`);
+app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
+  console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);
 });

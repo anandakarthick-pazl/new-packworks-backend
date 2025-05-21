@@ -533,6 +533,6 @@ app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3014;
 const service = 'CompanyAddress Service';
-app.listen(PORT, async () => {
-    console.log(`${service} running on port ${PORT}`);
+app.listen(process.env.PORT_COMPANY_ADDRESS,'0.0.0.0', async () => {
+    console.log(`${service} running on port ${process.env.PORT_COMPANY_ADDRESS}`);
 });

@@ -15,6 +15,8 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import User from "../../common/models/user.model.js";
 import Company from "../../common/models/company.model.js";
 
+
+
 dotenv.config();
 
 const app = express();
@@ -201,6 +203,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3009;
-app.listen(PORT, () => {
-  console.log(`RBAC Service running on port ${PORT}`);
+app.listen(process.env.PORT_RBAC,'0.0.0.0', () => {
+  console.log(`RBAC Service running on port ${process.env.PORT_RBAC}`);
 });

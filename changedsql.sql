@@ -1,7 +1,61 @@
--- 12/05/2025
+-- 16/05/2025
+
+ALTER TABLE sku 
+ADD COLUMN documents JSON NULL;
+
+ALTER TABLE invoice_settings
+ADD COLUMN work_invoice_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_invoice_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN work_invoice_digit INT NOT NULL;
+
+CREATE TABLE `work_order_invoice` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NULL,
+  `client_id` INT UNSIGNED NULL,
+  `sku_id` INT UNSIGNED NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `invoice_number` VARCHAR(50) DEFAULT NULL,
+  `sale_id` INT UNSIGNED NULL,
+  `work_id` INT UNSIGNED NULL,
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `due_date` DATE DEFAULT NULL,
+  `total` DECIMAL(10,2) DEFAULT 0.00,
+  `balance` DECIMAL(10,2) DEFAULT 0.00,
+  `payment_expected_date` DATE DEFAULT NULL,
+  `transaction_type` VARCHAR(50) DEFAULT NULL,
+  `discount_type` VARCHAR(50) DEFAULT NULL,
+  `discount` DECIMAL(10,2) DEFAULT 0.00,
+  `total_tax` DECIMAL(10,2) DEFAULT 0.00, 
+  `total_amount` DECIMAL(10,2) DEFAULT 0.00,
+  `payment_status` VARCHAR(50) DEFAULT NULL,
+
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE `color` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NULL,
+  `color_name` VARCHAR(50) NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+- 12/05/2025
 ALTER TABLE sku
 ADD lwh VARCHAR(255) NULL;
 
+ALTER TABLE work_order
+ADD COLUMN qr_code_url TEXT NULL;
 
 -- 09/04/2025
 

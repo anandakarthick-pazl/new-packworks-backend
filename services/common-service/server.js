@@ -25,6 +25,7 @@ const Module = db.Module;
 const Company = db.Company;
 const Die = db.Die;
 const States = db.States;
+const Color = db.Color;
 const User = db.User;
 
 // Middleware to extract user details from token
@@ -900,6 +901,47 @@ v1Router.get("/states", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.get("/colors", authenticateJWT, async (req, res) => {
+  try {
+    const colors = await Color.findAll({
+      include: [
+        {
+          model: Company,
+          as: "company",
+          attributes: ["id", "company_name"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    res.status(200).json({
+      status: "success",
+      count: colors.length,
+      data: colors,
+    });
+  } catch (error) {
+    console.error("Error fetching colors data:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+
 // Basic Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -914,8 +956,8 @@ app.use("/api/common-service", v1Router);
 // Start the server
 await db.sequelize.sync();
 const PORT = 3008;
-app.listen(PORT, () => {
-  console.log(`Common Service running on port ${PORT}`);
+app.listen(process.env.PORT_COMMON,'0.0.0.0', () => {
+  console.log(`Common Service running on port ${process.env.PORT_COMMON}`);
 });
 
 export default app;

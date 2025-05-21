@@ -134,6 +134,11 @@ const WorkOrder = sequelize.define(
       allowNull: false,
       defaultValue: "Pending",
     },
+    qr_code_url: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "URL to access the QR code for this work order",
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,

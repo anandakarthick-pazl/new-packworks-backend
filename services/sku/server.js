@@ -116,13 +116,13 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
               { ply: { [Op.like]: `%${ply}%` } },
               { sku_type: { [Op.like]: `%${search}%` } },
               { sku_ui_id: { [Op.like]: `%${search}%` } },
-              {length: { [Op.like]: `%${search}%` } },
-              {width: { [Op.like]: `%${search}%` } },
-              {height: { [Op.like]: `%${search}%` } },
-              {lwh: { [Op.like]: `%${search}%` } },
-              {length_board_size_cm2: { [Op.like]: `%${search}%` } },
-              {width_board_size_cm2: { [Op.like]: `%${search}%` } },
-              {board_size_cm2: { [Op.like]: `%${search}%` } },
+              { length: { [Op.like]: `%${search}%` } },
+              { width: { [Op.like]: `%${search}%` } },
+              { height: { [Op.like]: `%${search}%` } },
+              { lwh: { [Op.like]: `%${search}%` } },
+              { length_board_size_cm2: { [Op.like]: `%${search}%` } },
+              { width_board_size_cm2: { [Op.like]: `%${search}%` } },
+              { board_size_cm2: { [Op.like]: `%${search}%` } },
             ],
           },
         ],
@@ -133,10 +133,12 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     const totalCount = await Sku.count({ where: whereCondition });
 
     // Fetch skus with pagination and search
+    // Add order parameter to sort by created_at in descending order (newest first)
     const skus = await Sku.findAll({
       where: whereCondition,
       limit: parseInt(limit),
       offset: parseInt(offset),
+      order: [["created_at", "DESC"]], 
       include: [
         {
           model: db.User,
@@ -194,6 +196,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
       part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
       tags: sku.tags ? JSON.parse(sku.tags) : null,
+      documents: sku.documents ? JSON.parse(sku.documents) : null,
       created_at: sku.created_at, // Include created_at timestamp
       updated_at: sku.updated_at, // Include updated_at timestamp
     }));
@@ -259,6 +262,8 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "part_count",
       "part_value",
       "route",
+      "print_type",
+      "documents",
       "estimate_composite_item",
       "description",
       "default_sku_details",
@@ -488,7 +493,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
 v1Router.get(
   "/sku-details/download/excel",
   authenticateJWT,
-  async (req, res) => {                                   
+  async (req, res) => {
     try {
       const {
         search = "",
@@ -571,6 +576,8 @@ v1Router.get(
         },
         { header: "Tags", key: "tags", width: 20 },
         { header: "route", key: "route", width: 20 },
+        {header: "Print Type", key: "print_type", width: 20 },
+        { header: "documents", key: "documents", width: 200 },
         { header: "Joints", key: "joints", width: 10 },
         { header: "UPS", key: "ups", width: 10 },
         { header: "Select Dies", key: "select_dies", width: 10 },
@@ -641,6 +648,8 @@ v1Router.get(
           default_sku_details: sku.default_sku_details,
           tags: sku.tags,
           route: sku.route,
+          print_type: sku.print_type,
+          documents: sku.documents,
           joints: sku.joints,
           ups: sku.ups,
           select_dies: sku.select_dies,
@@ -915,369 +924,66 @@ v1Router.get(
   }
 );
 
+v1Router.get(
+  "/sku-details/client-sku/:client_id",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { client_id } = req.params;
+      const { sku_name } = req.query;
 
-v1Router.get("/sku-details/client-sku/:client_id", authenticateJWT, async (req, res) => {
-  try {
-    const { client_id } = req.params;
-    const { sku_name } = req.query;
+      // Build the where condition with client_id
+      let whereCondition = {
+        client_id: client_id,
+        status: "active", // Default to active SKUs
+      };
 
-    // Build the where condition with client_id
-    let whereCondition = {
-      client_id: client_id,
-      status: "active", // Default to active SKUs
-    };
+      // Add sku_name search if provided
+      if (sku_name) {
+        whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+      }
 
-    // Add sku_name search if provided
-    if (sku_name) {
-      whereCondition.sku_name = { [Op.like]: `%${sku_name}%` };
+      // Fetch all matching SKUs without pagination
+      const skus = await Sku.findAll({
+        where: whereCondition,
+        include: [
+          {
+            model: db.User,
+            as: "sku_creator",
+            attributes: ["id", "name"],
+            required: false,
+          },
+          {
+            model: db.User,
+            as: "sku_updater",
+            attributes: ["id", "name"],
+            required: false,
+          },
+        ],
+      });
+
+      // Format the SKU data
+      const formattedSkus = skus.map((sku) => ({
+        ...sku.toJSON(),
+        sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
+        part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+        tags: sku.tags ? JSON.parse(sku.tags) : null,
+      }));
+
+      res.status(200).json({
+        data: formattedSkus,
+        count: formattedSkus.length,
+      });
+    } catch (error) {
+      logger.error("Error fetching client SKUs:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
     }
-
-    // Fetch all matching SKUs without pagination
-    const skus = await Sku.findAll({
-      where: whereCondition,
-      include: [
-        {
-          model: db.User,
-          as: "sku_creator",
-          attributes: ["id", "name"],
-          required: false,
-        },
-        {
-          model: db.User,
-          as: "sku_updater",
-          attributes: ["id", "name"],
-          required: false,
-        },
-      ],
-    });
-
-    // Format the SKU data
-    const formattedSkus = skus.map((sku) => ({
-      ...sku.toJSON(),
-      sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
-      part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
-      tags: sku.tags ? JSON.parse(sku.tags) : null,
-    }));
-
-    res.status(200).json({
-      data: formattedSkus,
-      count: formattedSkus.length
-    });
-  } catch (error) {
-    logger.error("Error fetching client SKUs:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
   }
-});
+);
 
-// v1Router.get(
-//   "/sku-details/download/excel",
-//   authenticateJWT,
-//   async (req, res) => {
-//     try {
-//       const {
-//         search = "",
-//         status = "active",
-//         sku_type,
-//         client,
-//         includeInactive = false,
-//       } = req.query;
-
-//       // Build the where condition
-//       const whereCondition = {};
-
-//       // Status handling
-//       if (includeInactive !== "true") {
-//         whereCondition.status = status;
-//       }
-
-//       // Additional filters
-//       if (sku_type) whereCondition.sku_type = sku_type;
-//       if (client) whereCondition.client = client;
-
-//       // Search across multiple fields
-//       if (search) {
-//         whereCondition[Op.or] = [
-//           { sku_name: { [Op.like]: `%${search}%` } },
-//           { client: { [Op.like]: `%${search}%` } },
-//           { sku_type: { [Op.like]: `%${search}%` } },
-//           { reference_number: { [Op.like]: `%${search}%` } },
-//         ];
-//       }
-
-//       // Fetch SKUs with related data
-//       const { rows: skus } = await Sku.findAndCountAll({
-//         where: whereCondition,
-//         include: [
-//           {
-//             model: db.User,
-//             as: "sku_creator",
-//             attributes: ["id", "name", "email"],
-//           },
-//           {
-//             model: db.User,
-//             as: "sku_updater",
-//             attributes: ["id", "name", "email"],
-//           },
-//           {
-//             model: db.Client,
-//             attributes: [],
-//           },
-//         ],
-//         order: [["id", "ASC"]],
-//       });
-
-//       // Create a new Excel workbook
-//       const workbook = new ExcelJS.Workbook();
-//       const skuSheet = workbook.addWorksheet("SKU Details");
-
-//       // Define columns with comprehensive SKU details
-//       skuSheet.columns = [
-//         { header: "SKU ID", key: "id", width: 10 },
-//         { header: "SKU Name", key: "sku_name", width: 20 },
-//         { header: "Client", key: "client", width: 20 },
-//         { header: "SKU Type", key: "sku_type", width: 15 },
-//         { header: "Ply", key: "ply", width: 10 },
-//         { header: "Length (cm)", key: "length", width: 12 },
-//         { header: "Width (cm)", key: "width", width: 12 },
-//         { header: "Height (cm)", key: "height", width: 12 },
-//         { header: "Unit", key: "unit", width: 10 },
-//         {
-//           estimate_composite_item: "estimate_composite_item",
-//           key: "estimate_composite_item",
-//           width: 20,
-//         },
-//         { header: "description", key: "description", width: 20 },
-//         {
-//           header: "default_sku_details",
-//           key: "default_sku_details",
-//           width: 20,
-//         },
-//         { header: "tags", key: "tags", width: 20 },
-//         { header: "Joints", key: "joints", width: 10 },
-//         { header: "UPS", key: "ups", width: 10 },
-//         { header: "select_dies", key: "select_dies", width: 10 },
-//         { header: "Inner/Outer", key: "inner_outer_dimension", width: 15 },
-//         { header: "Flap Width", key: "flap_width", width: 12 },
-//         { header: "Flap Tolerance", key: "flap_tolerance", width: 15 },
-//         {
-//           header: "Length Trimming Tolerance",
-//           key: "length_trimming_tolerance",
-//           width: 20,
-//         },
-//         {
-//           header: "Width Trimming Tolerance",
-//           key: "width_trimming_tolerance",
-//           width: 20,
-//         },
-//         { header: "Strict Adherence", key: "strict_adherence", width: 15 },
-//         { header: "Customer Reference", key: "customer_reference", width: 20 },
-//         { header: "Reference Number", key: "reference_number", width: 20 },
-//         { header: "Internal ID", key: "internal_id", width: 15 },
-//         { header: "Board Size (cm²)", key: "board_size_cm2", width: 15 },
-//         { header: "Deckle Size", key: "deckle_size", width: 15 },
-//         {
-//           header: "Minimum Order Level",
-//           key: "minimum_order_level",
-//           width: 20,
-//         },
-//         // {
-//         //   header: "SKU Version Limit",
-//         //   key: "sku_version_limit",
-//         //   width: 15,
-//         // },
-//         { header: "Status", key: "status", width: 12 },
-//         { header: "Created By", key: "created_by_name", width: 20 },
-//         { header: "Created At", key: "created_at", width: 20 },
-//         { header: "Updated By", key: "updated_by_name", width: 20 },
-//         { header: "Updated At", key: "updated_at", width: 20 },
-//       ];
-
-//       // Header styling
-//       const headerStyle = {
-//         font: { bold: true, color: { argb: "FFFFFF" } },
-//         fill: {
-//           type: "pattern",
-//           pattern: "solid",
-//           fgColor: { argb: "4472C4" },
-//         },
-//         alignment: { horizontal: "center", vertical: "middle" },
-//       };
-
-//       // Apply header style
-//       skuSheet.getRow(1).eachCell((cell) => {
-//         cell.style = headerStyle;
-//       });
-
-//       // Add data to sheet
-//       skus.forEach((sku) => {
-//         let partValueDisplay = "";
-//         if (sku.part_value) {
-//           try {
-//             const partValueObj =
-//               typeof sku.part_value === "string"
-//                 ? JSON.parse(sku.part_value)
-//                 : sku.part_value;
-//             partValueDisplay = JSON.stringify(partValueObj);
-//           } catch (e) {
-//             partValueDisplay = "Error parsing JSON";
-//           }
-//         }
-//         skuSheet.addRow({
-//           id: sku.id,
-//           sku_name: sku.sku_name,
-//           client: sku.client,
-//           sku_type: sku.sku_type,
-//           composite_type: sku.composite_type,
-//           part_count: sku.part_count,
-//           part_value: partValueDisplay,
-//           ply: sku.ply,
-//           length: sku.length,
-//           width: sku.width,
-//           height: sku.height,
-//           unit: sku.unit,
-//           estimate_composite_item: sku.estimate_composite_item,
-//           description: sku.description,
-//           default_sku_details: sku.default_sku_details,
-//           tags: sku.tags,
-//           joints: sku.joints,
-//           ups: sku.ups,
-//           select_dies: sku.select_dies,
-//           inner_outer_dimension: sku.inner_outer_dimension,
-//           flap_width: sku.flap_width,
-//           flap_tolerance: sku.flap_tolerance,
-//           length_trimming_tolerance: sku.length_trimming_tolerance,
-//           width_trimming_tolerance: sku.width_trimming_tolerance,
-//           strict_adherence: sku.strict_adherence ? "Yes" : "No",
-//           customer_reference: sku.customer_reference,
-//           reference_number: sku.reference_number,
-//           internal_id: sku.internal_id,
-//           board_size_cm2: sku.board_size_cm2,
-//           deckle_size: sku.deckle_size,
-//           minimum_order_level: sku.minimum_order_level,
-//           // sku_version_limit: sku.sku_version_limit,
-//           status: sku.status,
-//           created_by_name: sku.sku_creator ? sku.sku_creator.name : "N/A",
-//           created_at: sku.created_at
-//             ? new Date(sku.created_at).toLocaleString()
-//             : "N/A",
-//           updated_by_name: sku.sku_updater ? sku.sku_updater.name : "N/A",
-//           updated_at: sku.updated_at
-//             ? new Date(sku.updated_at).toLocaleString()
-//             : "N/A",
-//         });
-//       });
-
-//       // Optional: add a second sheet for part values if needed
-//       if (skus.some((sku) => sku.part_value)) {
-//         const partsSheet = workbook.addWorksheet("Part Values");
-
-//         partsSheet.columns = [
-//           { header: "SKU ID", key: "id", width: 10 },
-//           { header: "SKU Name", key: "sku_name", width: 20 },
-//           { header: "Composite Type", key: "composite_type", width: 15 },
-//           { header: "Part Count", key: "part_count", width: 12 },
-//           { header: "Part Values", key: "part_value", width: 50 },
-//         ];
-
-//         // Apply header style
-//         partsSheet.getRow(1).eachCell((cell) => {
-//           cell.style = headerStyle;
-//         });
-
-//         // Add data
-//         skus.forEach((sku) => {
-//           if (sku.part_value) {
-//             let partValueDisplay = "";
-//             try {
-//               const partValueObj =
-//                 typeof sku.part_value === "string"
-//                   ? JSON.parse(sku.part_value)
-//                   : sku.part_value;
-//               partValueDisplay = JSON.stringify(partValueObj, null, 2);
-//             } catch (e) {
-//               partValueDisplay = "Error parsing JSON";
-//             }
-
-//             partsSheet.addRow({
-//               id: sku.id,
-//               sku_name: sku.sku_name,
-//               composite_type: sku.composite_type,
-//               part_count: sku.part_count,
-//               part_value: partValueDisplay,
-//             });
-//           }
-//         });
-
-//         // Apply alternating row colors
-//         partsSheet.eachRow((row, rowNumber) => {
-//           if (rowNumber > 1) {
-//             const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
-//             row.eachCell((cell) => {
-//               cell.fill = {
-//                 type: "pattern",
-//                 pattern: "solid",
-//                 fgColor: { argb: fillColor },
-//               };
-//             });
-//           }
-//         });
-//       }
-
-//       // Apply alternating row colors
-//       skuSheet.eachRow((row, rowNumber) => {
-//         if (rowNumber > 1) {
-//           const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
-//           row.eachCell((cell) => {
-//             cell.fill = {
-//               type: "pattern",
-//               pattern: "solid",
-//               fgColor: { argb: fillColor },
-//             };
-//           });
-//         }
-//       });
-
-//       // Create a readable stream for the workbook
-//       const buffer = await workbook.xlsx.writeBuffer();
-//       const stream = new Readable();
-//       stream.push(buffer);
-//       stream.push(null);
-
-//       // Set response headers for file download
-//       const searchSuffix = search ? `-${search}` : "";
-//       const skuTypeSuffix = sku_type ? `-${sku_type}` : "";
-//       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-//       const filename = `sku-details${searchSuffix}${skuTypeSuffix}-${timestamp}.xlsx`;
-
-//       res.setHeader(
-//         "Content-Type",
-//         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-//       );
-//       res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
-
-//       // Pipe the stream to response
-//       stream.pipe(res);
-
-//       // Log the download
-//       logger.info(
-//         `SKU Excel download initiated by user ${
-//           req.user.id
-//         } with filters: ${JSON.stringify({
-//           search,
-//           status,
-//           sku_type,
-//           client,
-//         })}`
-//       );
-//     } catch (error) {
-//       logger.error("SKU Excel Download Error:", error);
-//       return res.status(500).json({ status: false, message: error.message });
-//     }
-//   }
-// );
 
 v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -1744,7 +1450,6 @@ v1Router.delete(
   }
 );
 
-
 v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -1757,21 +1462,29 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
 
     // Check if sku_version_id exists if provided
     if (req.body.sku_version_id) {
-      const existingVersion = await SkuVersion.findByPk(req.body.sku_version_id);
+      const existingVersion = await SkuVersion.findByPk(
+        req.body.sku_version_id
+      );
       if (!existingVersion) {
         await t.rollback();
-        return res.status(404).json({ message: "Referenced SKU Version not found" });
+        return res
+          .status(404)
+          .json({ message: "Referenced SKU Version not found" });
       }
     }
 
     // Validate that field_options is provided
-    if (!req.body.field_options || !Array.isArray(req.body.field_options) || req.body.field_options.length === 0) {
+    if (
+      !req.body.field_options ||
+      !Array.isArray(req.body.field_options) ||
+      req.body.field_options.length === 0
+    ) {
       await t.rollback();
       return res.status(400).json({ message: "Field options are required" });
     }
 
     // Prepare the options for creation
-    const options = req.body.field_options.map(option => ({
+    const options = req.body.field_options.map((option) => ({
       sku_id: req.body.sku_id,
       sku_version_id: req.body.sku_version_id || null,
       field_path: option.field_path,
@@ -1779,7 +1492,7 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
       field_value: option.field_value,
       company_id: req.user.company_id,
       created_by: req.user.id,
-      status: "active"
+      status: "active",
     }));
 
     // Create all options
@@ -1810,56 +1523,63 @@ v1Router.post("/sku-details/options", authenticateJWT, async (req, res) => {
 
 // 3. Add a endpoint to retrieve options for a specific SKU:
 
-v1Router.get("/sku-details/:skuId/options", authenticateJWT, async (req, res) => {
-  try {
-    const { skuId } = req.params;
-    const { field_path, field_name } = req.query;
-    
-    // Build query filters
-    const filter = {
-      sku_id: skuId,
-      company_id: req.user.company_id,
-      status: "active"
-    };
-    
-    // Add optional filters if provided
-    if (field_path) filter.field_path = field_path;
-    if (field_name) filter.field_name = field_name;
-    
-    // Get all options for the SKU with optional filters
-    const options = await SkuOptions.findAll({
-      where: filter,
-      order: [['created_at', 'DESC']]
-    });
-    
-    // Group options by field_path for easier frontend handling
-    const groupedOptions = options.reduce((acc, option) => {
-      if (!acc[option.field_path]) {
-        acc[option.field_path] = [];
-      }
-      // Prevent duplicates
-      if (!acc[option.field_path].some(o => o.field_value === option.field_value)) {
-        acc[option.field_path].push({
-          id: option.id,
-          field_name: option.field_name,
-          field_value: option.field_value
-        });
-      }
-      return acc;
-    }, {});
-    
-    res.status(200).json({
-      message: "SKU Options retrieved successfully",
-      options: groupedOptions
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error retrieving SKU Options",
-      error: error.message
-    });
-  }
-});
+v1Router.get(
+  "/sku-details/:skuId/options",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { skuId } = req.params;
+      const { field_path, field_name } = req.query;
 
+      // Build query filters
+      const filter = {
+        sku_id: skuId,
+        company_id: req.user.company_id,
+        status: "active",
+      };
+
+      // Add optional filters if provided
+      if (field_path) filter.field_path = field_path;
+      if (field_name) filter.field_name = field_name;
+
+      // Get all options for the SKU with optional filters
+      const options = await SkuOptions.findAll({
+        where: filter,
+        order: [["created_at", "DESC"]],
+      });
+
+      // Group options by field_path for easier frontend handling
+      const groupedOptions = options.reduce((acc, option) => {
+        if (!acc[option.field_path]) {
+          acc[option.field_path] = [];
+        }
+        // Prevent duplicates
+        if (
+          !acc[option.field_path].some(
+            (o) => o.field_value === option.field_value
+          )
+        ) {
+          acc[option.field_path].push({
+            id: option.id,
+            field_name: option.field_name,
+            field_value: option.field_value,
+          });
+        }
+        return acc;
+      }, {});
+
+      res.status(200).json({
+        message: "SKU Options retrieved successfully",
+        options: groupedOptions,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Error retrieving SKU Options",
+        error: error.message,
+      });
+    }
+  }
+);
 
 // sku-type apis
 v1Router.get("/sku-details/sku-type/get", authenticateJWT, async (req, res) => {
@@ -2044,6 +1764,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3004;
-app.listen(PORT, () => {
-  console.log(`SKU Service running on port ${PORT}`);
+app.listen(process.env.PORT_SKU,'0.0.0.0', () => {
+  console.log(`SKU Service running on port ${process.env.PORT_SKU}`);
 });

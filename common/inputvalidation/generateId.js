@@ -16,7 +16,7 @@ const Inventory = db.Inventory;
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
   const company = await InvoiceSetting.findByPk(companyId);
-  console.log(company, "companyss");
+  console.log(company, "companys");
   const prefix = company[`${prefixKey}_prefix`];
   const separator = company[`${prefixKey}_number_separator`] || "-";
   const ticketNumberDigit = company[`${prefixKey}_digit`] || 5;

@@ -23,41 +23,46 @@ const v1Router = Router();
 
 //////////////////////////////////////////////////////   Inventory   ///////////////////////////////////////////////////////////
 
-v1Router.get("/inventory",authenticateJWT,async(req,res)=>{
-  try{
-    const {search="",page="1",limit="10"}=req.query;
-    const pageNumber = Math.max(1,parseInt(page)||1);
-    const limitNumber = Math.max(10,parseInt(limit)||10);
-    const offset = (pageNumber-1)*limitNumber;
-    const whereCondition = {status:"active"};
+v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+  try {
+    const { search = "", page = "1", limit = "10" } = req.query;
+
+    const pageNumber = parseInt(page) || 1;
+    const limitNumber = parseInt(limit) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+
+    let whereCondition = { status: "active" };
+
     if (search.trim() !== "") {
-          whereCondition = {
-            ...whereCondition,
-            id : { [Op.like]: `%${search}%` },
-          };
-        }
-        const inventoryData = await Inventory.findAll({
-          where: whereCondition,
-          limit: limitNumber,
-          offset: offset,
-        });
+      whereCondition = {
+        ...whereCondition,
+        id: { [Op.like]: `%${search}%` },
+      };
+    }
 
-        const totalCount = await Inventory.count({ where: whereCondition });
+    const inventoryData = await Inventory.findAll({
+      where: whereCondition,
+      limit: limitNumber,
+      offset: offset,
+    });
 
-        return res.status(200).json({
-          success: true,
-          message: "Inventory data fetched successfully",
-          data: inventoryData,
-          totalCount: totalCount,
-        });
-  }catch(error){
+    const totalCount = await Inventory.count({ where: whereCondition });
+
+    return res.status(200).json({
+      success: true,
+      message: "Inventory data fetched successfully",
+      data: inventoryData,
+      totalCount: totalCount,
+    });
+  } catch (error) {
     console.error(error.message);
     return res.status(500).json({
-      success:false,
-      message:`inventory fetched error : ${error.message}`
+      success: false,
+      message: `inventory fetched error: ${error.message}`,
     });
   }
 });
+
 
 
 // Create Inventory 
@@ -343,6 +348,6 @@ v1Router.post('/inventory/type',authenticateJWT,async(req,res)=>{
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3025;
-app.listen(PORT, () => {
-  console.log(`Item Master Service running on port ${PORT}`);
+app.listen(process.env.PORT_INVENTORY,'0.0.0.0', () => {
+  console.log(`Item Master Service running on port ${process.env.PORT_INVENTORY}`);
 });
