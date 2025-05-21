@@ -30,7 +30,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
     allowNull: false,
     references: {
       model: GRNItem,
-      key: "grn_item_id"
+      key: "id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
@@ -41,7 +41,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
     allowNull: false,
     references: {
       model: ItemMaster,
-      key: "item_id"
+      key: "id"
     },
     onUpdate: "CASCADE",
     onDelete: "CASCADE"
@@ -125,12 +125,15 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
  
   updated_at: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+      allowNull: true,
+      defaultValue: null,
   },
  
   deleted_at: {
     type: DataTypes.DATE,
-    allowNull: true
+    allowNull: true,
+          defaultValue: null,
+
   }
 }, {  
   tableName: 'purchase_order_returns_items',
@@ -144,7 +147,7 @@ PurchaseOrderReturnItem.belongsTo(User, { foreignKey: "created_by", as: "creator
 PurchaseOrderReturnItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 // PurchaseOrderReturnItem.belongsTo(GRN, { foreignKey: "grn_id" });
 PurchaseOrderReturnItem.belongsTo(GRNItem, { foreignKey: "grn_item_id" });
- 
- 
+
+
  
 export default PurchaseOrderReturnItem;

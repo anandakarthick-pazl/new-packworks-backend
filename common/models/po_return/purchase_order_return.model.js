@@ -12,6 +12,10 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
     autoIncrement: true,
     primaryKey: true
   },
+  purchase_return_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
  
   grn_id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -96,11 +100,14 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
   },
   updated_at: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+      allowNull: true,
+      defaultValue: null,
   },
   deleted_at: {
     type: DataTypes.DATE,
-    allowNull: true
+    allowNull: true,
+          defaultValue: null,
+
   },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
