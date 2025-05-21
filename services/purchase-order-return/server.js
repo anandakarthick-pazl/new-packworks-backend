@@ -391,5 +391,5 @@ await db.sequelize.sync();
 
 const PORT = 3028;
 app.listen(process.env.PORT_PURCHASE_RETURN,'0.0.0.0', () => {
-  console.log(`Purchase Order Return API running on port ${PORT}`);
+  console.log(`Purchase Order Return API running on port ${process.env.PORT_PURCHASE_RETURN}`);
 });

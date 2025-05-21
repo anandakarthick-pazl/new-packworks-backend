@@ -2744,7 +2744,7 @@ await db.sequelize.sync();
 const PORT = 3007;
 const service = "Machine Service";
 app.listen(process.env.PORT_MACHINE,'0.0.0.0', () => {
-  console.log(`${service} running on port ${PORT}`);
+  console.log(`${service} running on port ${process.env.PORT_MACHINE}`);
 });
 
 export default app;

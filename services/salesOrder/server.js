@@ -1162,5 +1162,5 @@ app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3005;
 app.listen(process.env.PORT_SALES_ORDER,'0.0.0.0', () => {
-  console.log(`Sales order Service running on port ${PORT}`);
+  console.log(`Sales order Service running on port ${process.env.PORT_SALES_ORDER}`);
 });

@@ -367,5 +367,5 @@ app.use("/api/mapping", v1Router);
 await db.sequelize.sync();
 const PORT = 3027;
 app.listen(process.env.PORT_ROUTE,'0.0.0.0', () => {
-  console.log(`Route Service running on port ${PORT}`);
+  console.log(`Route Service running on port ${process.env.PORT_ROUTE}`);
 });

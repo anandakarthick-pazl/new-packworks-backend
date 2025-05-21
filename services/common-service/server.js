@@ -957,7 +957,7 @@ app.use("/api/common-service", v1Router);
 await db.sequelize.sync();
 const PORT = 3008;
 app.listen(process.env.PORT_COMMON,'0.0.0.0', () => {
-  console.log(`Common Service running on port ${PORT}`);
+  console.log(`Common Service running on port ${process.env.PORT_COMMON}`);
 });
 
 export default app;
