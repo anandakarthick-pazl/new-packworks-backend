@@ -1,3 +1,8 @@
+-- 22/05/2025
+ALTER TABLE item_master
+ADD COLUMN custom_fields JSON NULL;
+
+
 -- 16/05/2025
 
 ALTER TABLE sku 
