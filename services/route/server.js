@@ -91,7 +91,7 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
       order: [["updated_at", "DESC"]],
     });
 
-    // Process each route to include process names
+    // Process each route to include process names and count
     const processedRoutes = await Promise.all(
       rows.map(async (route) => {
         const routeData = route.get({ plain: true });
@@ -104,6 +104,9 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
           logger.error("Error parsing route_process JSON:", err);
           processIds = [];
         }
+
+        // Calculate process count
+        const processCount = Array.isArray(processIds) ? processIds.length : 0;
 
         // Only proceed with fetching process names if we have process IDs
         let processDetails = [];
@@ -135,6 +138,9 @@ v1Router.get("/route", authenticateJWT, async (req, res) => {
 
         // Replace route_process string with the array of process objects
         routeData.route_process = processDetails;
+        
+        // Add process count
+        routeData.process_count = processCount;
 
         // Remove the separate processes field if it exists
         if (routeData.processes) {
