@@ -75,6 +75,7 @@ Client.init(
     },
     mobile: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     PAN: {
       type: DataTypes.STRING,
