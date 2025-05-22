@@ -1,4 +1,10 @@
 -- 22/05/2025
+
+ALTER TABLE sku
+ADD COLUMN total_weight FLOAT DEFAULT 0.0,
+ADD COLUMN total_bursting_strength FLOAT DEFAULT 0.0;
+
+
 ALTER TABLE item_master
 ADD COLUMN custom_fields JSON NULL;
 
