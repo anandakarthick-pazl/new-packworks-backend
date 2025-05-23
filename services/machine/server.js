@@ -1305,6 +1305,14 @@ v1Router.get("/machine/status/:status", authenticateJWT, async (req, res) => {
   }
 });
 
+
+
+// machine process route
+
+
+
+
+
 // process crud api's
 // v1Router.get("/process", authenticateJWT, async (req, res) => {
 //   try {
