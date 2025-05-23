@@ -40,6 +40,7 @@ import SkuOptions from "./skuModel/skuOptions.model.js";
 import States from "./commonModel/states.model.js";
 import Color from "./commonModel/color.model.js";
 import WorkOrderInvoice from "./salesOrder/workOrderInvoice.model.js";
+import MachineRouteProcess from "./route/machineRouteProcess.model.js";
 
 const db = {
   sequelize,
@@ -84,6 +85,7 @@ const db = {
   States,
   Color,
   WorkOrderInvoice,
+  MachineRouteProcess,
 };
 
 export default db;

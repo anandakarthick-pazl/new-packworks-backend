@@ -52,5 +52,5 @@ process.on("SIGINT", async () => {
 await db.sequelize.sync();
 const PORT = 3015;
 app.listen(process.env.PORT_FILE_VIEW, '0.0.0.0', () => {
-  console.log(`File view and Setting Service running on port ${PORT}`);
+  console.log(`File view and Setting Service running on port ${process.env.PORT_FILE_VIEW}`);
 });

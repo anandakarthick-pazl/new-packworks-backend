@@ -138,7 +138,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
       where: whereCondition,
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [["created_at", "DESC"]], 
+      order: [["created_at", "DESC"]],
       include: [
         {
           model: db.User,
@@ -264,6 +264,10 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
       "route",
       "print_type",
       "documents",
+      "total_weight",
+      "total_bursting_strength",
+      "total_weight",
+      "total_bursting_strength",
       "estimate_composite_item",
       "description",
       "default_sku_details",
@@ -576,8 +580,9 @@ v1Router.get(
         },
         { header: "Tags", key: "tags", width: 20 },
         { header: "route", key: "route", width: 20 },
-        {header: "Print Type", key: "print_type", width: 20 },
+        { header: "Print Type", key: "print_type", width: 20 },
         { header: "documents", key: "documents", width: 200 },
+        
         { header: "Joints", key: "joints", width: 10 },
         { header: "UPS", key: "ups", width: 10 },
         { header: "Select Dies", key: "select_dies", width: 10 },
@@ -983,7 +988,6 @@ v1Router.get(
     }
   }
 );
-
 
 v1Router.post("/sku-details/sku-version", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
@@ -1764,6 +1768,6 @@ process.on("SIGINT", async () => {
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = 3004;
-app.listen(process.env.PORT_SKU,'0.0.0.0', () => {
-  console.log(`SKU Service running on port ${PORT}`);
+app.listen(process.env.PORT_SKU, "0.0.0.0", () => {
+  console.log(`SKU Service running on port ${process.env.PORT_SKU}`);
 });

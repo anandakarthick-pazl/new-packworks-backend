@@ -8,6 +8,9 @@ import sequelize from "../../common/database/database.js";
 // Import the Redis and RabbitMQ configurations
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
+
 dotenv.config();
 const app = express();
 app.use(json());
@@ -1000,56 +1003,179 @@ v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-// v1Router.delete("/master/delete/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
 
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
 
-//     // Check if the machine exists for the given company
-//     const machine = await Machine.findOne({
-//       where: {
-//         id,
-//         company_id,
-//         status: "active",
-//       },
-//     });
+v1Router.get("/download/excel", authenticateJWT, async (req, res) => {
+  try {
+    const { search, machine_status } = req.query;
+    
+    const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
 
-//     if (!machine) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Machine not found or access denied",
-//       });
-//     }
+    // Apply search filter if provided
+    if (search) {
+      whereClause[Op.or] = [
+        { machine_name: { [Op.like]: `%${search}%` } },
+        { serial_number: { [Op.like]: `%${search}%` } },
+        { model_number: { [Op.like]: `%${search}%` } },
+        { manufacturer: { [Op.like]: `%${search}%` } },
+      ];
+    }
 
-//     // Soft delete: update status to inactive
-//     await machine.update(
-//       {
-//         status: "inactive",
-//         updated_by: user_id,
-//       },
-//       { transaction }
-//     );
+    // Apply machine status filter if provided
+    if (machine_status) {
+      whereClause.machine_status = machine_status;
+    }
 
-//     await transaction.commit();
+    // Fetch machines with the same filters as the GET API but without pagination
+    const machines = await Machine.findAll({
+      where: whereClause,
+      include: [
+        { model: Company, attributes: ["id", "company_name"] },
+        {
+          model: User,
+          as: "creator_machine",
+          foreignKey: "created_by",
+          attributes: ["id", "name", "email"],
+        },
+        {
+          model: User,
+          as: "updater_machine",
+          foreignKey: "updated_by",
+          attributes: ["id", "name", "email"],
+        },
+      ],
+      order: [["updated_at", "DESC"]],
+    });
 
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Machine deleted successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error deleting machine: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete machine",
-//       error: error.message,
-//     });
-//   }
-// });
-// Update machine status (Active, Inactive, Under Maintenance)
+    // Create a new Excel workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Machines");
+
+    // Set up worksheet headers with all model fields
+    worksheet.columns = [
+      { header: "Machine ID", key: "machine_id", width: 10 },
+      { header: "Machine Name", key: "machine_name", width: 30 },
+      { header: "Serial Number", key: "serial_number", width: 20 },
+      { header: "Model Number", key: "model_number", width: 20 },
+      { header: "Manufacturer", key: "manufacturer", width: 20 },
+      { header: "Machine Status", key: "machine_status", width: 20 },
+      { header: "Purchase Date", key: "purchase_date", width: 15 },
+      { header: "Installation Date", key: "installation_date", width: 15 },
+      { header: "Location", key: "location", width: 20 },
+      { header: "Department", key: "department", width: 20 },
+      { header: "Warranty Expiry", key: "warranty_expiry", width: 15 },
+      { header: "Last Maintenance", key: "last_maintenance_date", width: 15 },
+      { header: "Next Maintenance", key: "next_maintenance_date", width: 15 },
+      { header: "Notes", key: "notes", width: 30 },
+      { header: "Company", key: "company_name", width: 20 },
+      { header: "Created By", key: "created_by_name", width: 20 },
+      { header: "Created At", key: "created_at", width: 20 },
+      { header: "Updated By", key: "updated_by_name", width: 20 },
+      { header: "Updated At", key: "updated_at", width: 20 },
+    ];
+
+    // Add styles to header row
+    const headerStyle = {
+      font: { bold: true, color: { argb: "FFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "4472C4" } },
+    };
+
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle;
+    });
+
+    // Add data to worksheet
+    machines.forEach((machine) => {
+      worksheet.addRow({
+        machine_id: machine.id,
+        machine_name: machine.machine_name,
+        serial_number: machine.serial_number,
+        model_number: machine.model_number,
+        manufacturer: machine.manufacturer,
+        machine_status: machine.machine_status,
+        purchase_date: machine.purchase_date 
+          ? new Date(machine.purchase_date).toLocaleDateString() 
+          : "N/A",
+        installation_date: machine.installation_date 
+          ? new Date(machine.installation_date).toLocaleDateString() 
+          : "N/A",
+        location: machine.location,
+        department: machine.department,
+        warranty_expiry: machine.warranty_expiry 
+          ? new Date(machine.warranty_expiry).toLocaleDateString() 
+          : "N/A",
+        last_maintenance_date: machine.last_maintenance_date 
+          ? new Date(machine.last_maintenance_date).toLocaleDateString() 
+          : "N/A",
+        next_maintenance_date: machine.next_maintenance_date 
+          ? new Date(machine.next_maintenance_date).toLocaleDateString() 
+          : "N/A",
+        notes: machine.notes,
+        company_name: machine.Company ? machine.Company.company_name : "N/A",
+        created_by_name: machine.creator_machine ? machine.creator_machine.name : "N/A",
+        created_at: machine.created_at 
+          ? new Date(machine.created_at).toLocaleString() 
+          : "N/A",
+        updated_by_name: machine.updater_machine ? machine.updater_machine.name : "N/A",
+        updated_at: machine.updated_at 
+          ? new Date(machine.updated_at).toLocaleString() 
+          : "N/A",
+      });
+    });
+
+    // Apply alternating row colors for better readability
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const fillColor = rowNumber % 2 === 0 ? "F2F2F2" : "FFFFFF";
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: fillColor },
+          };
+        });
+      }
+    });
+
+    // Create a readable stream for the workbook
+    const buffer = await workbook.xlsx.writeBuffer();
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Set response headers for file download
+    const searchSuffix = search ? `-${search}` : "";
+    const statusSuffix = machine_status ? `-${machine_status}` : "";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `machines-data${searchSuffix}${statusSuffix}-${timestamp}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    // Log the download
+    logger.info(
+      `Machines Excel download initiated by user ${
+        req.user.id
+      } with filters: ${JSON.stringify({
+        search,
+        machine_status,
+      })}`
+    );
+  } catch (error) {
+    logger.error("Machines Excel Download Error:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+});
+
 v1Router.patch("/master/:id/status", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -1178,7 +1304,68 @@ v1Router.get("/machine/status/:status", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+
+// machine process route
+
+
+
+
+
 // process crud api's
+// v1Router.get("/process", authenticateJWT, async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, search } = req.query;
+//     const offset = (page - 1) * limit;
+//     const where = {
+//       company_id: req.user.company_id, // Use company_id from auth context
+//       status: "active", // Always filter by active status only
+//     };
+
+//     // Apply search filter if provided
+//     if (search) {
+//       where.process_name = {
+//         [Op.like]: `%${search}%`,
+//       };
+//     }
+
+//     // Get total count for pagination
+//     const count = await ProcessName.count({ where });
+
+//     // Fetch processes with company and user info
+//     const processes = await ProcessName.findAll({
+//       where,
+//       limit: parseInt(limit),
+//       offset: parseInt(offset),
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: User, as: "process_creator", attributes: ["id", "name"] },
+//         { model: User, as: "process_updater", attributes: ["id", "name"] },
+//       ],
+//       order: [["updated_at", "DESC"]],
+//     });
+
+//     return res.status(200).json({
+//       status: "success",
+//       data: processes,
+//       pagination: {
+//         total: count,
+//         page: parseInt(page),
+//         limit: parseInt(limit),
+//         totalPages: Math.ceil(count / limit),
+//       },
+//     });
+//   } catch (error) {
+//     logger.error(`Error fetching processes: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to fetch processes",
+//       error: error.message,
+//     });
+//   }
+// });
+
 v1Router.get("/process", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, search } = req.query;
@@ -1198,7 +1385,7 @@ v1Router.get("/process", authenticateJWT, async (req, res) => {
     // Get total count for pagination
     const count = await ProcessName.count({ where });
 
-    // Fetch processes with company and user info
+    // Fetch processes with company and user info, including field count
     const processes = await ProcessName.findAll({
       where,
       limit: parseInt(limit),
@@ -1207,8 +1394,23 @@ v1Router.get("/process", authenticateJWT, async (req, res) => {
         { model: Company, attributes: ["id", "company_name"] },
         { model: User, as: "process_creator", attributes: ["id", "name"] },
         { model: User, as: "process_updater", attributes: ["id", "name"] },
+        {
+          model: MachineProcessField,
+          attributes: [],
+          where: { status: "active" },
+          required: false, // LEFT JOIN to include processes even with 0 fields
+        },
       ],
+      attributes: [
+        ...Object.keys(ProcessName.rawAttributes), // All original ProcessName attributes
+        [
+          sequelize.fn("COUNT", sequelize.col("MachineProcessFields.id")),
+          "field_count"
+        ]
+      ],
+      group: ["ProcessName.id"],
       order: [["updated_at", "DESC"]],
+      subQuery: false, // Important for proper GROUP BY with includes
     });
 
     return res.status(200).json({
@@ -1463,67 +1665,6 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-
-//     // Check if the process exists for the given company
-//     const process = await ProcessName.findOne({
-//       where: { id, company_id },
-//     });
-
-//     if (!process) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process not found or access denied",
-//       });
-//     }
-
-//     // Check if this process is used in MachineProcessValue
-//     const processInUse = await MachineProcessValue.findOne({
-//       where: {
-//         process_name_id: id,
-//       },
-//     });
-
-//     if (processInUse) {
-//       return res.status(400).json({
-//         status: "error",
-//         message:
-//           "Cannot delete process as it is associated with machine process values",
-//       });
-//     }
-
-//     // Soft delete: explicitly update only the needed fields
-//     await process.update(
-//       {
-//         status: "inactive",
-//         updated_at: req.user.id,
-//         updated_by: req.user.id,
-//       },
-//       { transaction }
-//     );
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process marked as inactive successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error soft-deleting process: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete process",
-//       error: error.message,
-//     });
-//   }
-// });
-// Get all values for a specific process
 v1Router.get(
   "/process/:process_id/values",
   authenticateJWT,
@@ -1959,133 +2100,6 @@ v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
-//   let transaction;
-
-//   try {
-//     transaction = await sequelize.transaction();
-
-//     const { id } = req.params;
-//     const { process_name_id, label, field_type, required, status } = req.body;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
-
-//     // Find the process field and ensure it belongs to the user's company
-//     const processField = await MachineProcessField.findOne({
-//       where: {
-//         id,
-//         company_id,
-//       },
-//     });
-
-//     if (!processField) {
-//       await transaction.rollback();
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process field not found or access denied",
-//       });
-//     }
-
-//     // If process_name_id is changing, verify the new process exists
-//     if (process_name_id && process_name_id !== processField.process_name_id) {
-//       const process = await ProcessName.findOne({
-//         where: {
-//           id: process_name_id,
-//           company_id,
-//           status: "active",
-//         },
-//       });
-
-//       if (!process) {
-//         await transaction.rollback();
-//         return res.status(404).json({
-//           status: "error",
-//           message: "New process not found or access denied",
-//         });
-//       }
-//     }
-
-//     // Check for duplicate label within the same process
-//     if (
-//       (label && label !== processField.label) ||
-//       (process_name_id && process_name_id !== processField.process_name_id)
-//     ) {
-//       const existingField = await MachineProcessField.findOne({
-//         where: {
-//           company_id,
-//           process_name_id: process_name_id || processField.process_name_id,
-//           label: label || processField.label,
-//           id: { [Op.ne]: id },
-//           status: "active",
-//         },
-//       });
-
-//       if (existingField) {
-//         await transaction.rollback();
-//         return res.status(409).json({
-//           status: "error",
-//           message: "Field label already exists for this process",
-//         });
-//       }
-//     }
-
-//     // Prepare the update data
-//     const updateData = {
-//       ...(process_name_id && { process_name_id }),
-//       ...(label && { label }),
-//       ...(field_type && { field_type }),
-//       ...(required !== undefined && { required: required ? 1 : 0 }),
-//       ...(status && { status }),
-//       updated_by: user_id,
-//     };
-
-//     // Update the field
-//     await processField.update(updateData, { transaction });
-//     await transaction.commit();
-
-//     // Fetch the updated field
-//     const updatedField = await MachineProcessField.findByPk(id, {
-//       include: [
-//         { model: Company, attributes: ["id", "company_name"] },
-//         { model: ProcessName, attributes: ["id", "process_name"] },
-//         {
-//           model: User,
-//           as: "creator",
-//           foreignKey: "created_by",
-//           attributes: ["id", "name"],
-//         },
-//         {
-//           model: User,
-//           as: "updater",
-//           foreignKey: "updated_by",
-//           attributes: ["id", "name"],
-//         },
-//       ],
-//     });
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process field updated successfully",
-//       data: updatedField,
-//     });
-//   } catch (error) {
-//     if (transaction) {
-//       try {
-//         await transaction.rollback();
-//       } catch (rollbackError) {
-//         logger.error(`Rollback failed: ${rollbackError.message}`);
-//       }
-//     }
-
-//     logger.error(`Error updating process field: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to update process field",
-//       error: error.message,
-//     });
-//   }
-// });
-
 // Delete (soft delete) a process field
 v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -2180,55 +2194,6 @@ v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// // Delete (soft delete) a process field
-// v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
-
-//     // Check if the process field exists for the given company
-//     const processField = await MachineProcessField.findOne({
-//       where: {
-//         id,
-//         company_id,
-//       },
-//     });
-
-//     if (!processField) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process field not found or access denied",
-//       });
-//     }
-
-//     // Soft delete: explicitly update only the needed fields
-//     await processField.update(
-//       {
-//         status: "inactive",
-//         updated_by: user_id,
-//       },
-//       { transaction }
-//     );
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process field marked as inactive successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error soft-deleting process field: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete process field",
-//       error: error.message,
-//     });
-//   }
-// });
 // Get all fields for a specific process
 v1Router.get(
   "/process/:process_id/fields",
@@ -2744,7 +2709,7 @@ await db.sequelize.sync();
 const PORT = 3007;
 const service = "Machine Service";
 app.listen(process.env.PORT_MACHINE,'0.0.0.0', () => {
-  console.log(`${service} running on port ${PORT}`);
+  console.log(`${service} running on port ${process.env.PORT_MACHINE}`);
 });
 
 export default app;

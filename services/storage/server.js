@@ -415,5 +415,5 @@ app.use("/api/file", v1Router);
 await db.sequelize.sync();
 const PORT = 3013;
 app.listen(process.env.PORT_STORAGE, '0.0.0.0', () => {
-  console.log(`File Storage and Setting Service running on port ${PORT}`);
+  console.log(`File Storage and Setting Service running on port ${process.env.PORT_STORAGE}`);
 });
