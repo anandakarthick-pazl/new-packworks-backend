@@ -24,7 +24,7 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
     const pageNumber = Math.max(1,parseInt(page)||1);
     const limitNumber = Math.max(10,parseInt(limit)||10);
     const offset =(pageNumber-1)*limitNumber;
-    let whereCondition = {status:"active"};
+    let whereCondition = {};
     if(search.trim() !== ""){
       whereCondition ={
         ...whereCondition,item_code:{[Op.like]:`%${search}%`},
