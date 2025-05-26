@@ -413,91 +413,91 @@ v1Router.delete("/machine-route-process/:id", authenticateJWT, async (req, res) 
 });
 
 // GET machine route processes by machine ID
-v1Router.get("/machine/:machineId/route-process", authenticateJWT, async (req, res) => {
-  const { machineId } = req.params;
+// v1Router.get("/machine/:machineId/route-process", authenticateJWT, async (req, res) => {
+//   const { machineId } = req.params;
 
-  try {
-    const machineRouteProcesses = await MachineRouteProcess.findAll({
-      where: {
-        machine_id: machineId,
-        company_id: req.user.company_id,
-        status: "active",
-      },
-      order: [["updated_at", "DESC"]],
-    });
+//   try {
+//     const machineRouteProcesses = await MachineRouteProcess.findAll({
+//       where: {
+//         machine_id: machineId,
+//         company_id: req.user.company_id,
+//         status: "active",
+//       },
+//       order: [["updated_at", "DESC"]],
+//     });
 
-    // Process each machine route process to include process names
-    const processedMachineRouteProcesses = await Promise.all(
-      machineRouteProcesses.map(async (machineRouteProcess) => {
-        const machineRouteProcessData = machineRouteProcess.get({ plain: true });
+//     // Process each machine route process to include process names
+//     const processedMachineRouteProcesses = await Promise.all(
+//       machineRouteProcesses.map(async (machineRouteProcess) => {
+//         const machineRouteProcessData = machineRouteProcess.get({ plain: true });
 
-        // Parse machine_route_process from JSON string to array of IDs (similar to route service)
-        let processIds;
-        try {
-          // If it's already an array, use it directly; if it's a string, parse it
-          if (Array.isArray(machineRouteProcessData.machine_route_process)) {
-            processIds = machineRouteProcessData.machine_route_process;
-          } else if (typeof machineRouteProcessData.machine_route_process === 'string') {
-            processIds = JSON.parse(machineRouteProcessData.machine_route_process);
-          } else {
-            processIds = machineRouteProcessData.machine_route_process || [];
-          }
-        } catch (err) {
-          logger.error("Error parsing machine_route_process JSON:", err);
-          processIds = [];
-        }
+//         // Parse machine_route_process from JSON string to array of IDs (similar to route service)
+//         let processIds;
+//         try {
+//           // If it's already an array, use it directly; if it's a string, parse it
+//           if (Array.isArray(machineRouteProcessData.machine_route_process)) {
+//             processIds = machineRouteProcessData.machine_route_process;
+//           } else if (typeof machineRouteProcessData.machine_route_process === 'string') {
+//             processIds = JSON.parse(machineRouteProcessData.machine_route_process);
+//           } else {
+//             processIds = machineRouteProcessData.machine_route_process || [];
+//           }
+//         } catch (err) {
+//           logger.error("Error parsing machine_route_process JSON:", err);
+//           processIds = [];
+//         }
 
-        // Ensure it's an array
-        if (!Array.isArray(processIds)) {
-          logger.error("machine_route_process is not an array:", processIds);
-          processIds = [];
-        }
+//         // Ensure it's an array
+//         if (!Array.isArray(processIds)) {
+//           logger.error("machine_route_process is not an array:", processIds);
+//           processIds = [];
+//         }
 
-        // Only proceed with fetching process names if we have process IDs
-        let processDetails = [];
-        if (processIds.length > 0) {
-          // Fetch process names for the process IDs
-          const processes = await ProcessName.findAll({
-            where: {
-              id: {
-                [Op.in]: processIds,
-              },
-            },
-            attributes: ["id", "process_name"],
-          });
+//         // Only proceed with fetching process names if we have process IDs
+//         let processDetails = [];
+//         if (processIds.length > 0) {
+//           // Fetch process names for the process IDs
+//           const processes = await ProcessName.findAll({
+//             where: {
+//               id: {
+//                 [Op.in]: processIds,
+//               },
+//             },
+//             attributes: ["id", "process_name"],
+//           });
 
-          // Create a map of id -> process for quick lookup
-          const processMap = {};
-          processes.forEach((process) => {
-            processMap[process.id] = {
-              id: process.id,
-              process_name: process.process_name,
-            };
-          });
+//           // Create a map of id -> process for quick lookup
+//           const processMap = {};
+//           processes.forEach((process) => {
+//             processMap[process.id] = {
+//               id: process.id,
+//               process_name: process.process_name,
+//             };
+//           });
 
-          // Map processes in the ORIGINAL order from machine_route_process
-          processDetails = processIds.map(
-            (id) => processMap[id] || { id, process_name: "Unknown" }
-          );
-        }
+//           // Map processes in the ORIGINAL order from machine_route_process
+//           processDetails = processIds.map(
+//             (id) => processMap[id] || { id, process_name: "Unknown" }
+//           );
+//         }
 
-        // Replace machine_route_process array with the array of process objects
-        machineRouteProcessData.machine_route_process = processDetails;
+//         // Replace machine_route_process array with the array of process objects
+//         machineRouteProcessData.machine_route_process = processDetails;
 
-        return machineRouteProcessData;
-      })
-    );
+//         return machineRouteProcessData;
+//       })
+//     );
 
-    res.json({
-      data: processedMachineRouteProcesses,
-    });
-  } catch (error) {
-    logger.error("Error fetching machine route processes by machine ID:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
+//     res.json({
+//       data: processedMachineRouteProcesses,
+//     });
+//   } catch (error) {
+//     logger.error("Error fetching machine route processes by machine ID:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 // POST create new route
 v1Router.post("/route", authenticateJWT, async (req, res) => {

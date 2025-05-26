@@ -1,3 +1,7 @@
+-- 26/05/2025
+ALTER TABLE machine_process_values
+ADD COLUMN machine_id INT UNSIGNED NOT NULL;
+
 -- 22/05/2025
 
 ALTER TABLE sku
