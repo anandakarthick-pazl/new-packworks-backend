@@ -1304,7 +1304,68 @@ v1Router.get("/machine/status/:status", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+
+// machine process route
+
+
+
+
+
 // process crud api's
+// v1Router.get("/process", authenticateJWT, async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, search } = req.query;
+//     const offset = (page - 1) * limit;
+//     const where = {
+//       company_id: req.user.company_id, // Use company_id from auth context
+//       status: "active", // Always filter by active status only
+//     };
+
+//     // Apply search filter if provided
+//     if (search) {
+//       where.process_name = {
+//         [Op.like]: `%${search}%`,
+//       };
+//     }
+
+//     // Get total count for pagination
+//     const count = await ProcessName.count({ where });
+
+//     // Fetch processes with company and user info
+//     const processes = await ProcessName.findAll({
+//       where,
+//       limit: parseInt(limit),
+//       offset: parseInt(offset),
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: User, as: "process_creator", attributes: ["id", "name"] },
+//         { model: User, as: "process_updater", attributes: ["id", "name"] },
+//       ],
+//       order: [["updated_at", "DESC"]],
+//     });
+
+//     return res.status(200).json({
+//       status: "success",
+//       data: processes,
+//       pagination: {
+//         total: count,
+//         page: parseInt(page),
+//         limit: parseInt(limit),
+//         totalPages: Math.ceil(count / limit),
+//       },
+//     });
+//   } catch (error) {
+//     logger.error(`Error fetching processes: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to fetch processes",
+//       error: error.message,
+//     });
+//   }
+// });
+
 v1Router.get("/process", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, search } = req.query;
@@ -1324,7 +1385,7 @@ v1Router.get("/process", authenticateJWT, async (req, res) => {
     // Get total count for pagination
     const count = await ProcessName.count({ where });
 
-    // Fetch processes with company and user info
+    // Fetch processes with company and user info, including field count
     const processes = await ProcessName.findAll({
       where,
       limit: parseInt(limit),
@@ -1333,8 +1394,23 @@ v1Router.get("/process", authenticateJWT, async (req, res) => {
         { model: Company, attributes: ["id", "company_name"] },
         { model: User, as: "process_creator", attributes: ["id", "name"] },
         { model: User, as: "process_updater", attributes: ["id", "name"] },
+        {
+          model: MachineProcessField,
+          attributes: [],
+          where: { status: "active" },
+          required: false, // LEFT JOIN to include processes even with 0 fields
+        },
       ],
+      attributes: [
+        ...Object.keys(ProcessName.rawAttributes), // All original ProcessName attributes
+        [
+          sequelize.fn("COUNT", sequelize.col("MachineProcessFields.id")),
+          "field_count"
+        ]
+      ],
+      group: ["ProcessName.id"],
       order: [["updated_at", "DESC"]],
+      subQuery: false, // Important for proper GROUP BY with includes
     });
 
     return res.status(200).json({
@@ -1589,67 +1665,6 @@ v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.delete("/process/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-
-//     // Check if the process exists for the given company
-//     const process = await ProcessName.findOne({
-//       where: { id, company_id },
-//     });
-
-//     if (!process) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process not found or access denied",
-//       });
-//     }
-
-//     // Check if this process is used in MachineProcessValue
-//     const processInUse = await MachineProcessValue.findOne({
-//       where: {
-//         process_name_id: id,
-//       },
-//     });
-
-//     if (processInUse) {
-//       return res.status(400).json({
-//         status: "error",
-//         message:
-//           "Cannot delete process as it is associated with machine process values",
-//       });
-//     }
-
-//     // Soft delete: explicitly update only the needed fields
-//     await process.update(
-//       {
-//         status: "inactive",
-//         updated_at: req.user.id,
-//         updated_by: req.user.id,
-//       },
-//       { transaction }
-//     );
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process marked as inactive successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error soft-deleting process: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete process",
-//       error: error.message,
-//     });
-//   }
-// });
-// Get all values for a specific process
 v1Router.get(
   "/process/:process_id/values",
   authenticateJWT,
@@ -2085,133 +2100,6 @@ v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.put("/process-fields/:id", authenticateJWT, async (req, res) => {
-//   let transaction;
-
-//   try {
-//     transaction = await sequelize.transaction();
-
-//     const { id } = req.params;
-//     const { process_name_id, label, field_type, required, status } = req.body;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
-
-//     // Find the process field and ensure it belongs to the user's company
-//     const processField = await MachineProcessField.findOne({
-//       where: {
-//         id,
-//         company_id,
-//       },
-//     });
-
-//     if (!processField) {
-//       await transaction.rollback();
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process field not found or access denied",
-//       });
-//     }
-
-//     // If process_name_id is changing, verify the new process exists
-//     if (process_name_id && process_name_id !== processField.process_name_id) {
-//       const process = await ProcessName.findOne({
-//         where: {
-//           id: process_name_id,
-//           company_id,
-//           status: "active",
-//         },
-//       });
-
-//       if (!process) {
-//         await transaction.rollback();
-//         return res.status(404).json({
-//           status: "error",
-//           message: "New process not found or access denied",
-//         });
-//       }
-//     }
-
-//     // Check for duplicate label within the same process
-//     if (
-//       (label && label !== processField.label) ||
-//       (process_name_id && process_name_id !== processField.process_name_id)
-//     ) {
-//       const existingField = await MachineProcessField.findOne({
-//         where: {
-//           company_id,
-//           process_name_id: process_name_id || processField.process_name_id,
-//           label: label || processField.label,
-//           id: { [Op.ne]: id },
-//           status: "active",
-//         },
-//       });
-
-//       if (existingField) {
-//         await transaction.rollback();
-//         return res.status(409).json({
-//           status: "error",
-//           message: "Field label already exists for this process",
-//         });
-//       }
-//     }
-
-//     // Prepare the update data
-//     const updateData = {
-//       ...(process_name_id && { process_name_id }),
-//       ...(label && { label }),
-//       ...(field_type && { field_type }),
-//       ...(required !== undefined && { required: required ? 1 : 0 }),
-//       ...(status && { status }),
-//       updated_by: user_id,
-//     };
-
-//     // Update the field
-//     await processField.update(updateData, { transaction });
-//     await transaction.commit();
-
-//     // Fetch the updated field
-//     const updatedField = await MachineProcessField.findByPk(id, {
-//       include: [
-//         { model: Company, attributes: ["id", "company_name"] },
-//         { model: ProcessName, attributes: ["id", "process_name"] },
-//         {
-//           model: User,
-//           as: "creator",
-//           foreignKey: "created_by",
-//           attributes: ["id", "name"],
-//         },
-//         {
-//           model: User,
-//           as: "updater",
-//           foreignKey: "updated_by",
-//           attributes: ["id", "name"],
-//         },
-//       ],
-//     });
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process field updated successfully",
-//       data: updatedField,
-//     });
-//   } catch (error) {
-//     if (transaction) {
-//       try {
-//         await transaction.rollback();
-//       } catch (rollbackError) {
-//         logger.error(`Rollback failed: ${rollbackError.message}`);
-//       }
-//     }
-
-//     logger.error(`Error updating process field: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to update process field",
-//       error: error.message,
-//     });
-//   }
-// });
-
 // Delete (soft delete) a process field
 v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -2306,55 +2194,6 @@ v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// // Delete (soft delete) a process field
-// v1Router.delete("/process-fields/:id", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const { id } = req.params;
-//     const company_id = req.user.company_id;
-//     const user_id = req.user.id;
-
-//     // Check if the process field exists for the given company
-//     const processField = await MachineProcessField.findOne({
-//       where: {
-//         id,
-//         company_id,
-//       },
-//     });
-
-//     if (!processField) {
-//       return res.status(404).json({
-//         status: "error",
-//         message: "Process field not found or access denied",
-//       });
-//     }
-
-//     // Soft delete: explicitly update only the needed fields
-//     await processField.update(
-//       {
-//         status: "inactive",
-//         updated_by: user_id,
-//       },
-//       { transaction }
-//     );
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       status: "success",
-//       message: "Process field marked as inactive successfully",
-//     });
-//   } catch (error) {
-//     await transaction.rollback();
-//     logger.error(`Error soft-deleting process field: ${error.message}`);
-//     return res.status(500).json({
-//       status: "error",
-//       message: "Failed to delete process field",
-//       error: error.message,
-//     });
-//   }
-// });
 // Get all fields for a specific process
 v1Router.get(
   "/process/:process_id/fields",
@@ -2422,10 +2261,148 @@ v1Router.get(
     }
   }
 );
-// Get all machine process values with pagination and search
+// // Get all machine process values
+// v1Router.get("/process-values", authenticateJWT, async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, search, process_name_id } = req.query;
+//     const offset = (page - 1) * limit;
+//     const where = {
+//       company_id: req.user.company_id,
+//       status: "active",
+//     };
+
+//     // Apply process_name_id filter if provided
+//     if (process_name_id) {
+//       where.process_name_id = process_name_id;
+//     }
+
+//     // Get total count for pagination
+//     const count = await MachineProcessValue.count({ where });
+
+//     // Fetch process values with related data
+//     const processValues = await MachineProcessValue.findAll({
+//       where,
+//       limit: parseInt(limit),
+//       offset: parseInt(offset),
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: ProcessName, attributes: ["id", "process_name"] },
+//         {
+//           model: User,
+//           as: "created_by_user",
+//           foreignKey: "created_by",
+//           attributes: ["id", "name"],
+//         },
+//         {
+//           model: User,
+//           as: "updated_by_user",
+//           foreignKey: "updated_by",
+//           attributes: ["id", "name"],
+//         },
+//       ],
+//       order: [["updated_at", "DESC"]],
+//     });
+
+//     // Parse process_value for each result
+//     processValues.forEach((value) => {
+//       if (value && typeof value.process_value === "string") {
+//         try {
+//           value.process_value = JSON.parse(value.process_value);
+//         } catch (parseError) {
+//           logger.error(
+//             `Error parsing process_value for ID ${value.id}: ${parseError.message}`
+//           );
+//           // Continue even if parsing fails
+//         }
+//       }
+//     });
+
+//     return res.status(200).json({
+//       status: "success",
+//       data: processValues,
+//       pagination: {
+//         total: count,
+//         page: parseInt(page),
+//         limit: parseInt(limit),
+//         totalPages: Math.ceil(count / limit),
+//       },
+//     });
+//   } catch (error) {
+//     logger.error(`Error fetching process values: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to fetch process values",
+//       error: error.message,
+//     });
+//   }
+// });
+// // Get a specific process value by ID
+// v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const company_id = req.user.company_id;
+
+//     const processValue = await MachineProcessValue.findOne({
+//       where: {
+//         id,
+//         company_id,
+//         status: "active",
+//       },
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: ProcessName, attributes: ["id", "process_name"] },
+//         {
+//           model: User,
+//           as: "created_by_user",
+//           foreignKey: "created_by",
+//           attributes: ["id", "name"],
+//         },
+//         {
+//           model: User,
+//           as: "updated_by_user",
+//           foreignKey: "updated_by",
+//           attributes: ["id", "name"],
+//         },
+//       ],
+//     });
+
+//     if (!processValue) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process value not found or access denied",
+//       });
+//     }
+
+//     // Parse process_value if it's a string
+//     if (processValue && typeof processValue.process_value === "string") {
+//       try {
+//         processValue.process_value = JSON.parse(processValue.process_value);
+//       } catch (parseError) {
+//         logger.error(
+//           `Error parsing process_value for ID ${processValue.id}: ${parseError.message}`
+//         );
+//         // Continue even if parsing fails
+//       }
+//     }
+
+//     return res.status(200).json({
+//       status: "success",
+//       data: processValue,
+//     });
+//   } catch (error) {
+//     logger.error(`Error fetching process value: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to fetch process value",
+//       error: error.message,
+//     });
+//   }
+// });
+
+// Get all machine process values
 v1Router.get("/process-values", authenticateJWT, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, process_name_id } = req.query;
+    const { page = 1, limit = 10, search, process_name_id, machine_id } = req.query;
     const offset = (page - 1) * limit;
     const where = {
       company_id: req.user.company_id,
@@ -2435,6 +2412,11 @@ v1Router.get("/process-values", authenticateJWT, async (req, res) => {
     // Apply process_name_id filter if provided
     if (process_name_id) {
       where.process_name_id = process_name_id;
+    }
+
+    // Apply machine_id filter if provided
+    if (machine_id) {
+      where.machine_id = machine_id;
     }
 
     // Get total count for pagination
@@ -2448,6 +2430,7 @@ v1Router.get("/process-values", authenticateJWT, async (req, res) => {
       include: [
         { model: Company, attributes: ["id", "company_name"] },
         { model: ProcessName, attributes: ["id", "process_name"] },
+        { model: Machine, attributes: ["id", "machine_name"] },
         {
           model: User,
           as: "created_by_user",
@@ -2497,6 +2480,7 @@ v1Router.get("/process-values", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 // Get a specific process value by ID
 v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
   try {
@@ -2512,6 +2496,7 @@ v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
       include: [
         { model: Company, attributes: ["id", "company_name"] },
         { model: ProcessName, attributes: ["id", "process_name"] },
+        { model: Machine, attributes: ["id", "machine_name"] },
         {
           model: User,
           as: "created_by_user",
@@ -2559,21 +2544,22 @@ v1Router.get("/process-values/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 v1Router.post("/process-values", authenticateJWT, async (req, res) => {
   let transaction;
   try {
     transaction = await sequelize.transaction();
 
-    const { process_name_id, process_value, status = "active" } = req.body;
+    const { process_name_id, process_value, machine_id, status = "active" } = req.body;
     const company_id = req.user.company_id;
     const user_id = req.user.id;
 
     // Validate required fields
-    if (!process_name_id || !process_value) {
+    if (!process_name_id || !process_value || !machine_id) {
       await transaction.rollback();
       return res.status(400).json({
         status: "error",
-        message: "Process name ID and process value are required",
+        message: "Process name ID, process value, and machine ID are required",
       });
     }
 
@@ -2594,10 +2580,11 @@ v1Router.post("/process-values", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Check if a process value already exists for this process_name_id
+    // Check if a process value already exists for this process_name_id and machine_id combination
     const existingProcessValue = await MachineProcessValue.findOne({
       where: {
         process_name_id,
+        machine_id,
         company_id,
       },
       transaction,
@@ -2608,7 +2595,7 @@ v1Router.post("/process-values", authenticateJWT, async (req, res) => {
       return res.status(400).json({
         status: "error",
         message:
-          "A value already exists for this process. Please update the existing value instead.",
+          "A value already exists for this process and machine combination. Please update the existing value instead.",
       });
     }
 
@@ -2617,6 +2604,7 @@ v1Router.post("/process-values", authenticateJWT, async (req, res) => {
       {
         company_id,
         process_name_id,
+        machine_id,
         process_value,
         status,
         created_by: user_id,
@@ -2634,6 +2622,7 @@ v1Router.post("/process-values", authenticateJWT, async (req, res) => {
         include: [
           { model: Company, attributes: ["id", "company_name"] },
           { model: ProcessName, attributes: ["id", "process_name"] },
+          { model: Machine, attributes: ["id", "machine_name"] }, // Added Machine include
           {
             model: User,
             as: "created_by_user",
@@ -2691,7 +2680,7 @@ v1Router.put("/process-values/:id", authenticateJWT, async (req, res) => {
     transaction = await sequelize.transaction();
 
     const { id } = req.params;
-    const { process_name_id, process_value, status } = req.body;
+    const { process_name_id, process_value, machine_id, status } = req.body;
     const company_id = req.user.company_id;
     const user_id = req.user.id;
 
@@ -2734,6 +2723,7 @@ v1Router.put("/process-values/:id", authenticateJWT, async (req, res) => {
     const updateData = {
       ...(process_name_id && { process_name_id }),
       ...(process_value && { process_value }),
+      ...(machine_id && { machine_id }),
       ...(status && { status }),
       updated_by: user_id,
     };
@@ -2747,6 +2737,7 @@ v1Router.put("/process-values/:id", authenticateJWT, async (req, res) => {
       include: [
         { model: Company, attributes: ["id", "company_name"] },
         { model: ProcessName, attributes: ["id", "process_name"] },
+        { model: Machine, attributes: ["id", "machine_name"] }, // Added Machine include
         {
           model: User,
           as: "created_by_user",
@@ -2797,6 +2788,245 @@ v1Router.put("/process-values/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+// v1Router.post("/process-values", authenticateJWT, async (req, res) => {
+//   let transaction;
+//   try {
+//     transaction = await sequelize.transaction();
+
+//     const { process_name_id, process_value, status = "active" } = req.body;
+//     const company_id = req.user.company_id;
+//     const user_id = req.user.id;
+
+//     // Validate required fields
+//     if (!process_name_id || !process_value) {
+//       await transaction.rollback();
+//       return res.status(400).json({
+//         status: "error",
+//         message: "Process name ID and process value are required",
+//       });
+//     }
+
+//     // Check if the process exists and belongs to the company
+//     const process = await ProcessName.findOne({
+//       where: {
+//         id: process_name_id,
+//         company_id,
+//         status: "active",
+//       },
+//     });
+
+//     if (!process) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process not found or access denied",
+//       });
+//     }
+
+//     // Check if a process value already exists for this process_name_id
+//     const existingProcessValue = await MachineProcessValue.findOne({
+//       where: {
+//         process_name_id,
+//         company_id,
+//       },
+//       transaction,
+//     });
+
+//     if (existingProcessValue) {
+//       await transaction.rollback();
+//       return res.status(400).json({
+//         status: "error",
+//         message:
+//           "A value already exists for this process. Please update the existing value instead.",
+//       });
+//     }
+
+//     // Create the process value
+//     const newProcessValue = await MachineProcessValue.create(
+//       {
+//         company_id,
+//         process_name_id,
+//         process_value,
+//         status,
+//         created_by: user_id,
+//         updated_by: user_id,
+//       },
+//       { transaction }
+//     );
+
+//     await transaction.commit();
+
+//     // Fetch the created value with related data
+//     const createdValue = await MachineProcessValue.findByPk(
+//       newProcessValue.id,
+//       {
+//         include: [
+//           { model: Company, attributes: ["id", "company_name"] },
+//           { model: ProcessName, attributes: ["id", "process_name"] },
+//           {
+//             model: User,
+//             as: "created_by_user",
+//             foreignKey: "created_by",
+//             attributes: ["id", "name"],
+//           },
+//           {
+//             model: User,
+//             as: "updated_by_user",
+//             foreignKey: "updated_by",
+//             attributes: ["id", "name"],
+//           },
+//         ],
+//       }
+//     );
+
+//     // Parse the process_value if it's a string
+//     if (createdValue && typeof createdValue.process_value === "string") {
+//       try {
+//         createdValue.process_value = JSON.parse(createdValue.process_value);
+//       } catch (parseError) {
+//         logger.error(`Error parsing process_value: ${parseError.message}`);
+//         // Continue even if parsing fails
+//       }
+//     }
+
+//     return res.status(201).json({
+//       status: "success",
+//       message: "Process value created successfully",
+//       data: createdValue,
+//     });
+//   } catch (error) {
+//     // If transaction exists and hasn't been committed yet, rollback
+//     if (transaction) {
+//       try {
+//         await transaction.rollback();
+//       } catch (rollbackError) {
+//         logger.error(`Rollback failed: ${rollbackError.message}`);
+//       }
+//     }
+//     logger.error(`Error creating process value: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to create process value",
+//       error: error.message,
+//     });
+//   }
+// });
+
+// // Update a process value
+// v1Router.put("/process-values/:id", authenticateJWT, async (req, res) => {
+//   let transaction;
+
+//   try {
+//     transaction = await sequelize.transaction();
+
+//     const { id } = req.params;
+//     const { process_name_id, process_value, status } = req.body;
+//     const company_id = req.user.company_id;
+//     const user_id = req.user.id;
+
+//     // Find the process value and ensure it belongs to the user's company
+//     const processValue = await MachineProcessValue.findOne({
+//       where: {
+//         id,
+//         company_id,
+//       },
+//     });
+
+//     if (!processValue) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Process value not found or access denied",
+//       });
+//     }
+
+//     // If process_name_id is changing, verify the new process exists
+//     if (process_name_id && process_name_id !== processValue.process_name_id) {
+//       const process = await ProcessName.findOne({
+//         where: {
+//           id: process_name_id,
+//           company_id,
+//           status: "active",
+//         },
+//       });
+
+//       if (!process) {
+//         await transaction.rollback();
+//         return res.status(404).json({
+//           status: "error",
+//           message: "New process not found or access denied",
+//         });
+//       }
+//     }
+
+//     // Prepare the update data
+//     const updateData = {
+//       ...(process_name_id && { process_name_id }),
+//       ...(process_value && { process_value }),
+//       ...(status && { status }),
+//       updated_by: user_id,
+//     };
+
+//     // Update the value
+//     await processValue.update(updateData, { transaction });
+//     await transaction.commit();
+
+//     // Fetch the updated value
+//     const updatedValue = await MachineProcessValue.findByPk(id, {
+//       include: [
+//         { model: Company, attributes: ["id", "company_name"] },
+//         { model: ProcessName, attributes: ["id", "process_name"] },
+//         {
+//           model: User,
+//           as: "created_by_user",
+//           foreignKey: "created_by",
+//           attributes: ["id", "name"],
+//         },
+//         {
+//           model: User,
+//           as: "updated_by_user",
+//           foreignKey: "updated_by",
+//           attributes: ["id", "name"],
+//         },
+//       ],
+//     });
+
+//     // Parse the JSON string in process_value if it's a valid JSON string
+//     if (
+//       updatedValue.process_value &&
+//       typeof updatedValue.process_value === "string"
+//     ) {
+//       try {
+//         updatedValue.process_value = JSON.parse(updatedValue.process_value);
+//       } catch (e) {
+//         // If it's not valid JSON, leave it as is
+//         logger.warn(`Could not parse process_value as JSON: ${e.message}`);
+//       }
+//     }
+
+//     return res.status(200).json({
+//       status: "success",
+//       message: "Process value updated successfully",
+//       data: updatedValue,
+//     });
+//   } catch (error) {
+//     if (transaction) {
+//       try {
+//         await transaction.rollback();
+//       } catch (rollbackError) {
+//         logger.error(`Rollback failed: ${rollbackError.message}`);
+//       }
+//     }
+
+//     logger.error(`Error updating process value: ${error.message}`);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "Failed to update process value",
+//       error: error.message,
+//     });
+//   }
+// });
 
 // Delete (soft delete) a process value
 v1Router.delete("/process-values/:id", authenticateJWT, async (req, res) => {

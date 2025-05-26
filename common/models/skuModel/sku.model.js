@@ -107,6 +107,14 @@ const Sku = sequelize.define(
       allowNull: true,
       defaultValue: [],
     },
+    total_weight: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    total_bursting_strength: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
