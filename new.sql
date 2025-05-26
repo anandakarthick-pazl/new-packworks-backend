@@ -1,3 +1,8 @@
+-- 23/05/2025
+ALTER TABLE item_master 
+DROP INDEX item_code,
+MODIFY COLUMN item_code VARCHAR(50) NULL;
+
 -- 20/05/2025
 ALTER TABLE purchase_orders
 ADD COLUMN billing_address TEXT

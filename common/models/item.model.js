@@ -17,8 +17,8 @@ const ItemMaster = sequelize.define(
     },
     item_code: {
       type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
+      allowNull: true,
+      // unique: true,
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
