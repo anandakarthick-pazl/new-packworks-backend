@@ -337,9 +337,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     const limitNumber = Math.max(1, parseInt(limit));
     const offset = (pageNumber - 1) * limitNumber;
 
-    const whereCondition = {
-      status: "active",
-    };
+    const whereCondition = {};
 
     // Enhanced search functionality across all relevant fields
     if (search.trim() !== "") {
@@ -362,6 +360,8 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
       include: [{ model: GRNItem }],
       order: [['updated_at', 'DESC']] 
     });
+    console.log("grns",grns);
+    
 
     const totalCount = await GRN.count({ where: whereCondition });
 
@@ -505,7 +505,7 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
 
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = 3024;
+const PORT = process.env.PORT_GRN;
 app.listen(process.env.PORT_GRN,'0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_GRN}`);
 });

@@ -1,3 +1,8 @@
+-- 23/05/2025
+ALTER TABLE item_master 
+DROP INDEX item_code,
+MODIFY COLUMN item_code VARCHAR(50) NULL;
+
 -- 21/05/2025
 
 --purchase_order_return

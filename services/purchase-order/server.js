@@ -78,7 +78,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     const limitNumber = Math.max(1, parseInt(limit));
     const offset = (pageNumber - 1) * limitNumber;
 
-    let where = { status: "active", decision: "approve" };
+    let where = {};
     if (search.trim()) {
       where.supplier_name = { [Op.like]: `%${search}%` };
     }
@@ -546,6 +546,8 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       }
 
       // Validate Inventory
+      console.log("inventory data",item_id,po_id,grn_id);
+      
       const inventory = await Inventory.findOne({ where: { item_id } });
       if (!inventory) {
         return res.status(404).json({ error: `Inventory not found for item ${item_id}` });

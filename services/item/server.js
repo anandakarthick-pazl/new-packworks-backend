@@ -24,7 +24,7 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
     const pageNumber = Math.max(1,parseInt(page)||1);
     const limitNumber = Math.max(10,parseInt(limit)||10);
     const offset =(pageNumber-1)*limitNumber;
-    let whereCondition = {status:"active"};
+    let whereCondition = {};
     if(search.trim() !== ""){
       whereCondition ={
         ...whereCondition,item_code:{[Op.like]:`%${search}%`},
@@ -186,7 +186,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
 
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = 3022;
+const PORT = process.env.PORT_ITEM;
 app.listen(process.env.PORT_ITEM,'0.0.0.0', () => {
   console.log(`Item Master Service running on port ${process.env.PORT_ITEM}`);
 });

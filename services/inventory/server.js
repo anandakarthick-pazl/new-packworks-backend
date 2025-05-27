@@ -31,7 +31,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const limitNumber = parseInt(limit) || 10;
     const offset = (pageNumber - 1) * limitNumber;
 
-    let whereCondition = { status: "active" };
+    let whereCondition = {};
 
     if (search.trim() !== "") {
       whereCondition = {
@@ -144,7 +144,7 @@ v1Router.get("/inventory/id/:id", authenticateJWT, async (req, res) => {
       });
     }
     const inventoryData = await Inventory.findOne({
-      where: { id: inventoryId, status: 'active' },
+      where: { id: inventoryId },
     });
     if (!inventoryData) {
       return res.status(404).json({
