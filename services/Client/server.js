@@ -766,6 +766,98 @@ v1Router.post("/clients/check-gst", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.patch("/clients/:id/status", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const userId = req.user.id; // Assuming user ID is available from JWT
+
+    // Validate required fields
+    if (!status) {
+      return res.status(400).json({
+        status: false,
+        message: "Status is required"
+      });
+    }
+
+    // Validate status value
+    const validStatuses = ['active', 'inactive'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        status: false,
+        message: "Invalid status. Must be 'active' or 'inactive'"
+      });
+    }
+
+    // Check if client exists
+    const client = await Client.findByPk(id);
+    if (!client) {
+      return res.status(404).json({
+        status: false,
+        message: "Client not found"
+      });
+    }
+
+    // Check if status is already the same
+    if (client.status === status) {
+      return res.status(200).json({
+        status: true,
+        message: `Client status is already ${status}`,
+        data: {
+          id: client.id,
+          client_ui_id: client.client_ui_id,
+          company_name: client.company_name,
+          display_name: client.display_name,
+          status: client.status,
+          updated_at: client.updated_at
+        }
+      });
+    }
+
+    // Update client status
+    await client.update({
+      status: status,
+      updated_by: userId,
+      updated_at: new Date()
+    });
+
+    // Fetch updated client with relations
+    const updatedClient = await Client.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: "updater",
+          attributes: ["id", "name", "email"],
+        },
+      ],
+    });
+
+    const response = {
+      status: true,
+      message: `Client status updated to ${status} successfully`,
+      data: {
+        id: updatedClient.id,
+        client_ui_id: updatedClient.client_ui_id,
+        company_name: updatedClient.company_name,
+        display_name: updatedClient.display_name,
+        status: updatedClient.status,
+        updated_at: updatedClient.updated_at,
+        updated_by: updatedClient.updater
+      }
+    };
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+    logger.error("Client Status Update Error:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+});
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
