@@ -3,8 +3,8 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
-import PurchaseOrderReturn from "../po_return/purchase_order_return.model.js"; 
-import PurchaseOrderReturnItem from "../po_return/purchase_order_return_item.model.js";
+import PurchaseOrderReturn from "../purchase_order_return/purchase_order_return.model.js"; 
+import PurchaseOrderReturnItem from "../purchase_order_return/purchase_order_return_item.model.js";
 import PurchaseOrder from "../po/purchase_order.model.js";
 import InvoiceSetting from "../invoiceSetting.model.js";
 import SalesOrder from "../salesOrder/salesOrder.model.js";
@@ -26,7 +26,7 @@ credit_note_generate_id: {
   allowNull: true,
 },
 
-sor_id: {
+sales_order_return_id: {
   type: DataTypes.INTEGER.UNSIGNED,
   allowNull: false,
   // references: {

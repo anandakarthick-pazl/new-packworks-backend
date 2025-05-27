@@ -39,7 +39,7 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
       reason,
       remark,
       debit_note_date,
-      por_id  // <-- you send only this
+      purchase_order_return_id  // <-- you send only this
     } = req.body;
 
     const user = req.user;
@@ -48,14 +48,14 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     if (!debit_note_date || isNaN(new Date(debit_note_date))) {
       throw new Error("Valid debit note date is required");
     }
-    if (!por_id) throw new Error("Purchase Order Return ID (por_id) is required");
+    if (!purchase_order_return_id) throw new Error("Purchase Order Return ID (purchase_order_return_id) is required");
 
     const existing = await debit_note.findOne({ where: { debit_note_number } });
     if (existing) throw new Error(`Debit Note with number ${debit_note_number} already exists`);
 
     // Get PurchaseOrderReturn with related items
     const poReturn = await PurchaseOrderReturn.findOne({
-      where: { id: por_id, company_id: user.company_id },
+      where: { id: purchase_order_return_id, company_id: user.company_id },
       include: [
         {
           model: PurchaseOrderReturnItem,
@@ -91,7 +91,7 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     // Create debit note WITHOUT storing item IDs
     const debitNote = await debit_note.create({
       debit_note_number,
-      por_id,
+      purchase_order_return_id,
       reference_id,
       company_id: user.company_id,
       supplier_id,
@@ -145,7 +145,7 @@ v1Router.get("/debit-note", authenticateJWT, async (req, res) => {
             },
             {
               model: PurchaseOrder, // ✅ Include Purchase Order details
-              attributes: [ "id","supplier_id", "supplier_name", "supplier_address", "supplier_contact", "supplier_email", "payment_terms", "freight_terms", "total_qty", "cgst_amount", "sgst_amount", "amount", "tax_amount", "total_amount", "status", "decision", "created_at", "updated_at", "created_by", "updated_by"] // Add any fields you need
+              attributes: [ "id","supplier_id", "supplier_name", "shipping_address", "supplier_contact", "supplier_email", "payment_terms", "freight_terms", "total_qty", "cgst_amount", "sgst_amount", "amount", "tax_amount", "total_amount", "status", "decision", "created_at", "updated_at", "created_by", "updated_by"] // Add any fields you need
             }
           ]
         }
@@ -197,7 +197,7 @@ v1Router.get("/debit-note/:id", authenticateJWT, async (req, res) => {
                 "valid_till",
                 "supplier_id",
                 "supplier_name",
-                "supplier_address",
+                "shipping_address",
                 "supplier_contact",
                 "supplier_email",
                 "payment_terms",
@@ -262,7 +262,7 @@ v1Router.put("/debit-note/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      por_id,
+      purchase_order_return_id,
       debit_note_number,
       reference_id,
       debit_note_date,
@@ -285,12 +285,12 @@ v1Router.put("/debit-note/:id", authenticateJWT, async (req, res) => {
       throw new Error(`Debit Note with id ${id} not found`);
     }
 
-    // If updating por_id, you might want to check if the new por_id exists (optional)
-    if (por_id !== undefined) {
-      // Optionally validate por_id existence here
-      // const poReturnExists = await PurchaseOrderReturn.findByPk(por_id);
-      // if (!poReturnExists) throw new Error(`Purchase Order Return with id ${por_id} not found`);
-      debitNote.por_id = por_id;
+    // If updating purchase_order_return_id, you might want to check if the new purchase_order_return_id exists (optional)
+    if (purchase_order_return_id !== undefined) {
+      // Optionally validate purchase_order_return_id existence here
+      // const poReturnExists = await PurchaseOrderReturn.findByPk(purchase_order_return_id);
+      // if (!poReturnExists) throw new Error(`Purchase Order Return with id ${purchase_order_return_id} not found`);
+      debitNote.purchase_order_return_id = purchase_order_return_id;
     }
 
     if (debit_note_number !== undefined) debitNote.debit_note_number = debit_note_number;

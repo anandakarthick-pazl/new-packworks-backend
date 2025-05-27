@@ -450,7 +450,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
       // Create PO Return Item
       const poReturnItem = await PurchaseOrderReturnItem.create({
-        por_id: poReturn.id,
+        purchase_order_return_id: poReturn.id,
         grn_item_id,
         item_id,
         company_id: req.user.company_id,
@@ -616,7 +616,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 
     // 6. Save return items
     for (const item of returnItems) {
-      item.por_id = poReturn.id;
+      item.purchase_order_return_id = poReturn.id;
       await PurchaseOrderReturnItem.create(item);
     }
 

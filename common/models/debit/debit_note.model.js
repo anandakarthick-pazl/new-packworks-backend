@@ -3,8 +3,8 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
-import PurchaseOrderReturn from "../po_return/purchase_order_return.model.js"; 
-import PurchaseOrderReturnItem from "../po_return/purchase_order_return_item.model.js";
+import PurchaseOrderReturn from "../purchase_order_return/purchase_order_return.model.js"; 
+import PurchaseOrderReturnItem from "../purchase_order_return/purchase_order_return_item.model.js";
 import PurchaseOrder from "../po/purchase_order.model.js";
 import InvoiceSetting from "../invoiceSetting.model.js";
 const DebitNote = sequelize.define('DebitNote', {
@@ -23,7 +23,7 @@ const DebitNote = sequelize.define('DebitNote', {
         type: DataTypes.STRING(200),
         allowNull: true,
       },
-  por_id: {
+  purchase_order_return_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
     references: {
@@ -150,7 +150,7 @@ const DebitNote = sequelize.define('DebitNote', {
 DebitNote.belongsTo(Company, { foreignKey: 'company_id' });
 DebitNote.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 DebitNote.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
-DebitNote.belongsTo(PurchaseOrderReturn, { foreignKey: 'por_id' });
+DebitNote.belongsTo(PurchaseOrderReturn, { foreignKey: 'purchase_order_return_id' });
 
 
 

@@ -14,7 +14,7 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
     primaryKey: true
   },
  
-  por_id: {
+  purchase_order_return_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
     references: {
