@@ -5,6 +5,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "migrate": "sequelize-cli db:migrate --config config/config.cjs",
+    "migrate:undo": "sequelize-cli db:migrate:undo --config config/config.cjs",
     "test": "echo \"Error: no test specified\" && exit 1",
     "company": "nodemon services/company/server.js",
     "user": "nodemon services/user-service/server.js",
