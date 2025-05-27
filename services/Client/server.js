@@ -111,28 +111,35 @@ v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
       .json({ message: "Error adding client", error: error.message });
   }
 });
-// 🔹 Get All Clients (GET) with Addresses - Only active clients
 v1Router.get("/clients", authenticateJWT, async (req, res) => {
   try {
     let {
       page = 1,
       limit = 10,
       search,
-      includeInactive = false,
+      status, // Changed from includeInactive to status filter
       entity_type,
     } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
 
     console.log("pages", page);
-    console.log("object", limit);
+    console.log("limit", limit);
 
     const whereClause = {};
 
-    // By default, only show active clients unless includeInactive is true
-    if (includeInactive !== "true") {
-      whereClause.status = "active";
+    // Add status filter if provided
+    if (status) {
+      // Accept 'active', 'inactive', or 'all'
+      if (status === 'active') {
+        whereClause.status = 'active';
+      } else if (status === 'inactive') {
+        whereClause.status = 'inactive';
+      }
+      // If status is 'all' or any other value, don't add status filter (show all)
     }
+    // If no status parameter is provided, show all clients (no filter applied)
+
     // Add entity_type filter if provided
     if (entity_type) {
       whereClause.entity_type = entity_type;
