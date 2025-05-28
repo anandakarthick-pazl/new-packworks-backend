@@ -405,6 +405,18 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    purchase_return_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_return_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_return_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",

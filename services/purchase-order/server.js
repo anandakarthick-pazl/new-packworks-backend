@@ -595,6 +595,8 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
         grn_id,
       });
     }
+// purchase_return_generate_id
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
 
     // 5. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({
@@ -614,6 +616,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       status: 'initiated',
       decision: 'approve',
       created_by: req.user.id,
+      purchase_return_generate_id: purchase_return_generate_id
     });
 
     // 6. Save return items
