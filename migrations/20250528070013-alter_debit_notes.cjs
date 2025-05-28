@@ -3,8 +3,8 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.sequelize.query(`ALTER TABLE purchase_order_returns
-      ADD COLUMN purchase_return_generate_id VARCHAR(200) NULL;`);
+    await queryInterface.sequelize.query(`ALTER TABLE debit_notes
+CHANGE purchase_order_return_id po_return_id INT(10) UNSIGNED NOT NULL;`);
   },
 
   async down(queryInterface, Sequelize) {
@@ -16,4 +16,5 @@ module.exports = {
      */
   }
 };
+
 
