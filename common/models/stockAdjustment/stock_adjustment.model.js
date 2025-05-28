@@ -2,6 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Inventory from "../inventory/inventory.model.js"; 
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
@@ -26,7 +27,7 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
     references: {
-      model: "Inventory",
+      model: Inventory,
       key: "id",
     },
     onUpdate: "CASCADE",
