@@ -450,7 +450,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
       // Create PO Return Item
       const poReturnItem = await PurchaseOrderReturnItem.create({
-        por_id: poReturn.id,
+        po_return_id: poReturn.id,
         grn_item_id,
         item_id,
         company_id: req.user.company_id,
@@ -621,7 +621,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 
     // 6. Save return items
     for (const item of returnItems) {
-      item.por_id = poReturn.id;
+      item.po_return_id = poReturn.id;
       await PurchaseOrderReturnItem.create(item);
     }
 
@@ -653,7 +653,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 //connection port
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = 3023;
+const PORT = process.env.PORT_PURCHASE;
 app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);
 });

@@ -9,6 +9,10 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     autoIncrement: true,
     primaryKey: true,
   },
+  stock_adjustment_generate_id: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
@@ -62,11 +66,24 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
       key: "id",
     },
   },
- 
+ deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
+  created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  updated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
 }, {
   tableName: "stock_adjustments",
-  timestamps: true,
-  underscored: true,
+  timestamps: false,
 });
 
 export default StockAdjustment;

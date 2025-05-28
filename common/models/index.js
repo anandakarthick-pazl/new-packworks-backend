@@ -33,14 +33,18 @@ import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
 import InventoryType from "./inventory/inventory_type.model.js";
 import Route from "./route/route.model.js";
-import PurchaseOrderReturn from "./po_return/purchase_order_return.model.js";
-import PurchaseOrderReturnItem from "./po_return/purchase_order_return_item.model.js";
+import PurchaseOrderReturn from "./purchase_order_return/purchase_order_return.model.js";
+import PurchaseOrderReturnItem from "./purchase_order_return/purchase_order_return_item.model.js";
 import InvoiceSetting from "./invoiceSetting.model.js";
 import SkuOptions from "./skuModel/skuOptions.model.js";
 import States from "./commonModel/states.model.js";
 import Color from "./commonModel/color.model.js";
 import WorkOrderInvoice from "./salesOrder/workOrderInvoice.model.js";
 import MachineRouteProcess from "./route/machineRouteProcess.model.js";
+import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
+import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
+import DebitNote from "./debit/debit_note.model.js";
+import CreditNote from "./credit/credit_note.model.js"; 
 
 const db = {
   sequelize,
@@ -86,6 +90,11 @@ const db = {
   Color,
   WorkOrderInvoice,
   MachineRouteProcess,
+  stockAdjustment,
+  stockAdjustmentItem,
+  DebitNote,
+  CreditNote,
+
 };
 
 export default db;

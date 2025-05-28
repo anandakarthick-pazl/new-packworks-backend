@@ -36,7 +36,10 @@
     "route": "nodemon services/route/server.js",
     "purchase-return": "nodemon services/purchase-order-return/server.js",
     "production": "nodemon services/production/server.js",
-    "work-invoice": "nodemon services/work-invoice/server.js"
+    "work-invoice": "nodemon services/work-invoice/server.js",
+    "stock-adjustment": "nodemon services/stock-adjustment/server.js",
+    "credit-note": "nodemon services/credit-note/server.js",
+    "debit-note": "nodemon services/debit-note/server.js"
   },
   "keywords": [],
   "author": "",
