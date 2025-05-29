@@ -29,6 +29,7 @@ const v1Router = Router();
 
 
 
+
 v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -39,7 +40,7 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
       reason,
       remark,
       debit_note_date,
-      po_return_id  // <-- you send only this
+      po_return_id
     } = req.body;
 
     const user = req.user;
@@ -51,21 +52,34 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     if (!po_return_id) throw new Error("Purchase Order Return ID (po_return_id) is required");
 
     const existing = await debit_note.findOne({ where: { debit_note_number } });
-    if (existing) throw new Error(`Debit Note with number ${debit_note_number} already exists`);
+    if (existing) throw new Error(`Debit Note ${debit_note_number} already exists`);
 
-    // Get PurchaseOrderReturn with related items
+    // 🔢 Auto-generate debit_note_generate_id like DN-001
+    const lastNote = await debit_note.findOne({
+      where: {
+        debit_note_generate_id: { [Op.like]: 'DN-%' }
+      },
+      order: [['created_at', 'DESC']],
+      attributes: ['debit_note_generate_id']
+    });
+
+    let debit_note_generate_id = "DN-001";
+    if (lastNote && lastNote.debit_note_generate_id) {
+      const match = lastNote.debit_note_generate_id.match(/DN-(\d+)/);
+      if (match) {
+        const nextNum = parseInt(match[1], 10) + 1;
+        debit_note_generate_id = `DN-${String(nextNum).padStart(3, '0')}`;
+      }
+    }
+
+    // Fetch PO Return with items and PO (for supplier)
     const poReturn = await PurchaseOrderReturn.findOne({
       where: { id: po_return_id, company_id: user.company_id },
       include: [
-        {
-          model: PurchaseOrderReturnItem,
-          as: "items"
-        },
-        {
-          model: PurchaseOrder,
-          attributes: ["id", "supplier_id"]
-        }
-      ]
+        { model: PurchaseOrderReturnItem, as: "items" },
+        { model: PurchaseOrder, attributes: ["id", "supplier_id"] }
+      ],
+      transaction
     });
 
     if (!poReturn) throw new Error("Purchase Order Return not found");
@@ -76,11 +90,8 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     const items = poReturn.items || [];
     if (!items.length) throw new Error("No Purchase Order Return Items found");
 
-    // Here you pick the matching item(s) — example: pick first item or filter by some logic
-    // For example, pick all items or filter by some condition:
-    const matchedItems = items; // or items.filter(item => item.someField === someValue);
+    const matchedItems = items;
 
-    // Use matchedItems details for calculations
     const rate = matchedItems[0]?.unit_price || 0;
     const amount = matchedItems.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
     const sub_total = amount;
@@ -88,9 +99,9 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     const tax_amount = parseFloat(poReturn.tax_amount || 0);
     const total_amount = sub_total + tax_amount;
 
-    // Create debit note WITHOUT storing item IDs
     const debitNote = await debit_note.create({
       debit_note_number,
+      debit_note_generate_id, // ⬅️ Auto-generated field
       po_return_id,
       reference_id,
       company_id: user.company_id,
@@ -115,13 +126,12 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
       success: true,
       message: "Debit Note created successfully",
       data: debitNote,
-      matched_items: matchedItems  // send the matched item details back if you want
+      matched_items: matchedItems
     });
 
   } catch (error) {
     await transaction.rollback();
     console.error(error);
-
     return res.status(500).json({
       success: false,
       message: `Creation failed: ${error.message}`,

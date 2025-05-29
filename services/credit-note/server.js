@@ -339,9 +339,7 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
   try {
     const {
       credit_note_number,
-      credit_note_generate_id,
       sales_order_return_id,
-      company_id,
       reference_id,
       rate,
       amount,
@@ -353,17 +351,34 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
       remark,
       credit_note_date,
       supplier_id,
-      status
     } = req.body;
 
     const user = req.user;
 
     if (!credit_note_number || !credit_note_date || !sales_order_return_id) {
-      throw new Error("Required fields missing (number, date, or sales_order_return_id)");
+      throw new Error("Required fields missing (credit_note_number, credit_note_date, or sales_order_return_id)");
     }
 
     const existing = await credit_note.findOne({ where: { credit_note_number } });
     if (existing) throw new Error(`Credit Note ${credit_note_number} already exists`);
+
+    // Auto-generate credit_note_generate_id in format CN-001
+    const lastNote = await credit_note.findOne({
+      where: {
+        credit_note_generate_id: { [Op.like]: 'CN-%' }
+      },
+      order: [['created_at', 'DESC']],
+      attributes: ['credit_note_generate_id']
+    });
+
+    let credit_note_generate_id = "CN-001";
+    if (lastNote && lastNote.credit_note_generate_id) {
+      const match = lastNote.credit_note_generate_id.match(/CN-(\d+)/);
+      if (match) {
+        const nextNum = parseInt(match[1], 10) + 1;
+        credit_note_generate_id = `CN-${String(nextNum).padStart(3, '0')}`;
+      }
+    }
 
     const note = await credit_note.create({
       credit_note_number,
@@ -381,7 +396,7 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
       reason,
       remark,
       credit_note_date,
-      status: status || "active",
+      status: "active",
       created_by: user.id,
       updated_by: user.id,
       created_at: new Date()
@@ -408,21 +423,21 @@ v1Router.get("/credit-note", authenticateJWT, async (req, res) => {
   try {
     const notes = await credit_note.findAll({
       where: { company_id: req.user.company_id },
-      order: [['created_at', 'DESC']]
+      order: [["created_at", "DESC"]],
     });
 
     return res.status(200).json({
       success: true,
-      message: "Fetched credit notes successfully",
-      data: notes
+      data: notes,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: `Fetch failed: ${error.message}`
+      message: `Fetch failed: ${error.message}`,
     });
   }
 });
+
 
 v1Router.get("/credit-note/:id", authenticateJWT, async (req, res) => {
   try {
@@ -445,15 +460,54 @@ v1Router.put("/credit-note/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const note = await credit_note.findByPk(req.params.id);
-    if (!note) throw new Error("Credit Note not found");
+    const creditNoteId = req.params.id;
+    const user = req.user;
 
-    Object.assign(note, req.body, {
-      updated_at: new Date(),
-      updated_by: req.user.id
+    const {
+      // credit_note_number, ← Removed from destructuring
+      sales_order_return_id,
+      reference_id,
+      supplier_id,
+      rate,
+      amount,
+      sub_total,
+      adjustment,
+      tax_amount,
+      total_amount,
+      reason,
+      remark,
+      credit_note_date,
+      status
+    } = req.body;
+
+    const note = await credit_note.findOne({
+      where: { id: creditNoteId, company_id: user.company_id }
     });
 
-    await note.save({ transaction });
+    if (!note) {
+      throw new Error("Credit Note not found or access denied");
+    }
+
+
+    await note.update({
+      // credit_note_number: not updated
+      sales_order_return_id,
+      reference_id,
+      supplier_id,
+      rate,
+      amount,
+      sub_total,
+      adjustment,
+      tax_amount,
+      total_amount,
+      reason,
+      remark,
+      credit_note_date,
+      status: status || note.status,
+      updated_by: user.id,
+      updated_at: new Date()
+    }, { transaction });
+
     await transaction.commit();
 
     return res.status(200).json({
@@ -461,14 +515,18 @@ v1Router.put("/credit-note/:id", authenticateJWT, async (req, res) => {
       message: "Credit Note updated successfully",
       data: note
     });
+
   } catch (error) {
     await transaction.rollback();
+    console.error(error);
     return res.status(500).json({
       success: false,
       message: `Update failed: ${error.message}`
     });
   }
 });
+
+
 
 v1Router.delete("/credit-note/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
