@@ -221,6 +221,56 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+
+// GET work order invoices by SKU ID
+v1Router.get("/get-by-sku/:sku_id", authenticateJWT, async (req, res) => {
+  try {
+    const { sku_id } = req.params;
+    const { status = "active" } = req.query;
+
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id,
+      sku_id: sku_id, // Filter by SKU ID
+    };
+
+    // Status filtering - default to active, but allow override
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    // Fetch from database
+    const invoices = await WorkOrderInvoice.findAll({
+      where: whereClause,
+      order: [["updated_at", "DESC"]],
+      include: [
+        {
+          model: WorkOrder,
+          as: "workOrder",
+          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+        },
+        {
+          model: SalesOrder,
+          as: "salesOrder",
+          attributes: ["id", "sales_generate_id", "status"],
+        },
+      ],
+    });
+
+    res.json({
+      message: `Work order invoices for SKU ID: ${sku_id}`,
+      sku_id: sku_id,
+      invoices: invoices.map((invoice) => invoice.get({ plain: true })),
+      total: invoices.length,
+    });
+  } catch (error) {
+    logger.error("Error fetching work order invoices by SKU ID:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
