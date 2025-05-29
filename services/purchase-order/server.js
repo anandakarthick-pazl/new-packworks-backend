@@ -70,6 +70,33 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
   }
 });
 
+//get all po
+v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
+  try {
+    const orders = await PurchaseOrder.findAll({
+      attributes: ["id", "purchase_generate_id"],
+      where: {
+        company_id: req.user.company_id,
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: orders,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase orders",
+    });
+  }
+});
+
+
+
+
+
 //get all Po
 v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
   try {
