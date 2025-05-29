@@ -41,6 +41,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       company_id: req.user.company_id,
       client_id: invoiceDetails.client_id,
       sku_id: invoiceDetails.sku_id || null,
+      sku_version_id: invoiceDetails.sku_version_id || null,
       status: invoiceDetails.status || "active",
       sale_id: invoiceDetails.sale_id || null,
       work_id: invoiceDetails.work_id || null,
