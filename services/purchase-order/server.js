@@ -215,6 +215,8 @@ v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
 v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => {
   try {
     const { po_id, grn_id } = req.query;
+    console.log("PO ID:", po_id, "GRN ID:", grn_id);
+    
 
     if (!po_id || !grn_id) {
       return res.status(400).json({ error: 'po_id and grn_id are required.' });
@@ -450,7 +452,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
       // Create PO Return Item
       const poReturnItem = await PurchaseOrderReturnItem.create({
-        por_id: poReturn.id,
+        po_return_id: poReturn.id,
         grn_item_id,
         item_id,
         company_id: req.user.company_id,
@@ -490,8 +492,11 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
 
 // create po return with calculation
+
+
 v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res) => {
   const { po_id, grn_id, items, reason, payment_terms, notes } = req.body;
+  console.log(" req.body : ", req.body);
 
   try {
     // 1. Validate Purchase Order
@@ -521,21 +526,19 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       const { grn_item_id, item_id, return_qty, unit_price, reason, notes } = item;
 
       const itemData = await Item.findOne({
-        where:{id:item_id}
+        where: { id: item_id }
       });
 
       if (!itemData) {
         return res.status(404).json({ error: `Item not found: ${item_id}` });
       }
 
-      // let unit_price=itemData.standard_cost;
-      let cgst=itemData.cgst;
-      let sgst=itemData.sgst;
+      let cgst = itemData.cgst;
+      let sgst = itemData.sgst;
 
       if (unit_price == null || cgst == null || sgst == null) {
         return res.status(400).json({ error: `Missing unit price or tax values for item ${item_id}` });
       }
-
 
       // Validate GRN Item
       const grnItem = await GRNItem.findOne({
@@ -546,8 +549,6 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       }
 
       // Validate Inventory
-      console.log("inventory data",item_id,po_id,grn_id);
-      
       const inventory = await Inventory.findOne({ where: { item_id } });
       if (!inventory) {
         return res.status(404).json({ error: `Inventory not found for item ${item_id}` });
@@ -596,7 +597,10 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       });
     }
 
-    // 5. Create PO Return
+    // 5. Generate purchase return ID
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
+
+    // 6. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({
       grn_id,
       po_id,
@@ -614,13 +618,69 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       status: 'initiated',
       decision: 'approve',
       created_by: req.user.id,
+      purchase_return_generate_id: purchase_return_generate_id
     });
 
-    // 6. Save return items
+    // 7. Save return items
     for (const item of returnItems) {
-      item.por_id = poReturn.id;
+      item.po_return_id = poReturn.id;
       await PurchaseOrderReturnItem.create(item);
     }
+
+    // 8. Check if all received items are fully returned
+    // 1. Get all PO Items for this PO
+    const allPoItems = await PurchaseOrderItem.findAll({ where: { po_id }, attributes: ['id', 'quantity', 'item_id'] });
+
+    // 2. Get all GRNs for this PO
+    const allGrns = await GRN.findAll({ where: { po_id }, attributes: ['id'] });
+    const allGrnIds = allGrns.map(grn => grn.id);
+
+    // 3. Get all GRN Items for these GRNs
+    const allGrnItems = await GRNItem.findAll({
+      where: { grn_id: allGrnIds },
+      attributes: ['po_item_id', 'item_id', 'quantity_received']
+    });
+
+    // 4. Get all PO Return Items for this PO (using po_return_id)
+    const allPoReturns = await PurchaseOrderReturn.findAll({
+      where: { po_id },
+      attributes: ['id']
+    });
+    const allPoReturnIds = allPoReturns.map(r => r.id);
+
+    const allReturnItems = await PurchaseOrderReturnItem.findAll({
+      where: { po_return_id: allPoReturnIds },
+      attributes: ['item_id', 'return_qty']
+    });
+
+    // 5. Check if all received items are fully returned
+    let allReturned = true;
+    for (const poItem of allPoItems) {
+      // Total received for this item
+      const totalReceived = allGrnItems
+        .filter(grnItem => grnItem.item_id === poItem.item_id)
+        .reduce((sum, grnItem) => sum + parseFloat(grnItem.quantity_received || 0), 0);
+
+      // Total returned for this item
+      const totalReturned = allReturnItems
+        .filter(retItem => retItem.item_id === poItem.item_id)
+        .reduce((sum, retItem) => sum + parseFloat(retItem.return_qty || 0), 0);
+
+        // Debug log for troubleshooting
+      console.log(`Item ${poItem.item_id}: totalReceived=${totalReceived}, totalReturned=${totalReturned}`);
+
+      // Use a small epsilon for float comparison
+      if (Math.abs(totalReturned - totalReceived) > 0.0001 && totalReturned < totalReceived) {
+        allReturned = false;
+        break;
+      }
+    }
+
+    // 6. Update PO status accordingly
+    await PurchaseOrder.update(
+      { po_status: allReturned ? "returned" : "amended" },
+      { where: { id: po_id } }
+    );
 
     return res.status(201).json({
       message: 'Purchase Order Return created successfully.',
@@ -631,7 +691,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
     console.error('Error creating PO return:', error);
     return res.status(500).json({ error: 'An error occurred while processing the return.' });
   }
-}); 
+});
 
 
 
@@ -650,7 +710,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 //connection port
 app.use("/api", v1Router);
 await db.sequelize.sync();
-const PORT = 3023;
+const PORT = process.env.PORT_PURCHASE;
 app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);
 });

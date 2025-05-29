@@ -2,12 +2,17 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Inventory from "../inventory/inventory.model.js"; 
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
+  },
+  stock_adjustment_generate_id: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
   },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -22,7 +27,7 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
     references: {
-      model: "Inventory",
+      model: Inventory,
       key: "id",
     },
     onUpdate: "CASCADE",
@@ -62,11 +67,24 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
       key: "id",
     },
   },
- 
+ deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
+  created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  updated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
 }, {
   tableName: "stock_adjustments",
-  timestamps: true,
-  underscored: true,
+  timestamps: false,
 });
 
 export default StockAdjustment;

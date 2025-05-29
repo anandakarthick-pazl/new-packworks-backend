@@ -27,20 +27,20 @@ const v1Router = Router();
 
 
 
+
+
+
 v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-        const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
-    
+    const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
     const { items, ...grnData } = req.body;
 
-    // Add user info
     grnData.created_by = req.user.id;
-    grnData.grn_generate_id = grn_generate_id;
     grnData.updated_by = req.user.id;
+    grnData.grn_generate_id = grn_generate_id;
     grnData.company_id = req.user.company_id;
 
-    // Validate PO
     const validatePo = await PurchaseOrder.findOne({
       where: { id: grnData.po_id, status: "active" },
       transaction
@@ -50,35 +50,21 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       throw new Error("Invalid or inactive Purchase Order.");
     }
 
-    // Create GRN
     const newGRN = await GRN.create(grnData, { transaction });
 
-    // Loop through items
     for (const item of items) {
       const {
-        po_item_id,
-        item_id,
-        item_code,
-        grn_item_name,
-        description,
-        quantity_ordered,
-        quantity_received,
-        accepted_quantity,
-        rejected_quantity,
-        notes,
-        work_order_no,
-        batch_no,
-        location
+        po_item_id, item_id, item_code, grn_item_name, description,
+        quantity_ordered, quantity_received, accepted_quantity,
+        rejected_quantity, notes, work_order_no, batch_no, location
       } = item;
 
-      // Validate PO item
       const poItem = await PurchaseOrderItem.findOne({
         where: { id: po_item_id },
         transaction
       });
       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
 
-      // Validate Item Master
       const itemMaster = await ItemMaster.findOne({
         where: { id: item_id },
         transaction
@@ -87,7 +73,6 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
       const itemType = itemMaster.item_type;
 
-      // Create GRN Item
       const newGRNItem = await GRNItem.create({
         grn_id: newGRN.id,
         po_item_id,
@@ -108,7 +93,8 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         company_id: req.user.company_id
       }, { transaction });
 
-      // Update or Create Inventory
+      const acceptedQty = parseFloat(accepted_quantity) || 0;
+
       const existingInventory = await Inventory.findOne({
         where: {
           item_id,
@@ -119,10 +105,9 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         transaction
       });
 
-      const acceptedQty = parseFloat(accepted_quantity) || 0;
-
       if (existingInventory) {
-        existingInventory.quantity_available = (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
+        existingInventory.quantity_available =
+          (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
         existingInventory.updated_by = req.user.id;
         await existingInventory.save({ transaction });
       } else {
@@ -146,6 +131,37 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       }
     }
 
+    const allPoItems = await PurchaseOrderItem.findAll({
+      where: { po_id: grnData.po_id },
+      transaction
+    });
+
+    const allGrns = await GRN.findAll({
+      where: { po_id: grnData.po_id },
+      transaction
+    });
+    const allGrnIds = allGrns.map(grn => grn.id);
+
+    const allGrnItems = await GRNItem.findAll({
+      where: { grn_id: allGrnIds },
+      transaction
+    });
+
+    // const allReceived = allPoItems.every(poItem =>
+    //   allGrnItems.some(grnItem => grnItem.po_item_id === poItem.id)
+    // );
+
+    const allReceived = allPoItems.every(poItem =>
+      allGrnItems
+        .filter(grnItem => grnItem.po_item_id === poItem.id)
+        .reduce((total, grnItem) => total + parseFloat(grnItem.quantity_received || 0), 0) >= parseFloat(poItem.quantity || 0)
+    );
+
+    await PurchaseOrder.update(
+      { po_status: allReceived ? "received" : "partialy-recieved" },
+      { where: { id: grnData.po_id }, transaction }      
+    );
+
     await transaction.commit();
 
     return res.status(200).json({
@@ -156,7 +172,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
-    console.error("GRN creation error:", error.message);
+    console.error("GRN creation error:", error);
     return res.status(500).json({
       success: false,
       message: `GRN creation failed: ${error.message}`
@@ -164,153 +180,6 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.post("/grn", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-//   try {
-//     const { items, ...grnData } = req.body;
-//     const { po_id } = grnData;
-
-
-//     // Add user info
-//     grnData.created_by = req.user.id;
-//     grnData.updated_by = req.user.id;
-//     grnData.company_id = req.user.company_id;
-
-//     // Validate PO
-//     const validatePo = await PurchaseOrder.findOne({
-//       where: { id: grnData.po_id, status: "active" },
-//       transaction
-//     });
-
-//     if (!validatePo) {
-//       throw new Error("Invalid or inactive Purchase Order.");
-//     }
-
-//     // Create GRN
-//     const newGRN = await GRN.create(grnData, { transaction });
-
-//     console.log("New GRN created with items:");
-
-//     // Loop through items
-//     for (const item of items) {
-//       const {
-//         po_item_id,
-//         item_id,
-//         item_code,
-//         grn_item_name,
-//         description,
-//         quantity_ordered,
-//         quantity_received,
-//         accepted_quantity,
-//         rejected_quantity,
-//         notes,
-//         work_order_no,
-//         batch_no,
-//         location
-//       } = item;
-
-//       // Validate PO item
-//       const poItem = await PurchaseOrderItem.findOne({
-//         where: { id:po_item_id },
-//         transaction
-//       });
-//       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
-
-//       // Validate Item Master
-//       const itemMaster = await ItemMaster.findOne({
-//         where: { id:item_id },
-//         transaction
-//       });
-//       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
-//       let itemType=itemMaster.item_type;
-
-//       // Create GRN Item
-//       const newGRNItem = await GRNItem.create({
-//         grn_id: newGRN.id,
-//         po_item_id,
-//         item_id,
-//         item_code,
-//         grn_item_name,
-//         description,
-//         quantity_ordered,
-//         quantity_received,
-//         accepted_quantity,
-//         rejected_quantity,
-//         notes,
-//         work_order_no,
-//         batch_no,
-//         location,
-//         created_by: req.user.id,
-//         updated_by: req.user.id,
-//         company_id: req.user.company_id
-//       }, { transaction });
-
-//       // Update Inventory with accepted_quantity only
-//       const existingInventory = await Inventory.findOne({
-//         where: {
-//           item_id,
-//           // batch_no: batch_no || null,
-//           location: location || null,
-//           status: 'active'
-//         },
-//         transaction
-//       });
-
-//       console.log("Existing Inventory:", existingInventory);
-      
-
-//       if (existingInventory) {
-//         console.log("existing inventory:", existingInventory.quantity_available);
-//         console.log("accepted quantity:", accepted_quantity);
-        
-        
-//         const currentQty = parseFloat(existingInventory.quantity_available) || 0;
-//         const acceptedQty = parseFloat(accepted_quantity) || 0;
-//         existingInventory.quantity_available = currentQty + acceptedQty;
-        
-//         console.log("newGRNItem inventory:", newGRNItem.quantity_available);
-
-//         existingInventory.updated_by = req.user.id;
-//         await existingInventory.save({ transaction });
-//       } else {
-//         console.log('test',existingInventory);
-//         await Inventory.create({
-//           company_id: req.user.company_id,
-//           item_id,
-//           item_code,
-//           grn_id: newGRN.grn_id,
-//           grn_item_id: newGRNItem.grn_item_id,
-//           po_id,
-//           inventory_type: itemType,
-//           work_order_no,
-//           description,
-//           quantity_available: accepted_quantity,
-//           batch_no,
-//           location,
-//           status: 'active',
-//           created_by: req.user.id,
-//           updated_by: req.user.id
-//         }, { transaction });
-//       }
-//     }
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "GRN and inventory updated successfully",
-//       data: newGRN
-//     });
-
-//   } catch (error) {
-//     await transaction.rollback();
-//     console.error("GRN creation error:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: `GRN creation failed: ${error.message}`
-//     });
-//   }
-// });
 
 
 
@@ -323,13 +192,6 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
 
 
-
-
-
-
-
-
-// get grn 
 v1Router.get("/grn", authenticateJWT, async (req, res) => {
   try {
     const { search = "", page = "1", limit = "10" } = req.query;
@@ -451,6 +313,43 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
   
         await GRNItem.create(item, { transaction });
       }
+
+
+
+       const poId = grn.po_id;
+
+      const allPoItems = await PurchaseOrderItem.findAll({
+        where: { po_id: poId },
+        transaction,
+      });
+      
+      const allGrns = await GRN.findAll({
+        where: { po_id: poId },
+        transaction,
+      });
+      const allGrnIds = allGrns.map(grn => grn.id);
+
+      const allGrnItems = await GRNItem.findAll({
+        where: { grn_id: allGrnIds },
+        transaction,
+      });
+
+
+
+    const allReceived = allPoItems.every(poItem =>
+      allGrnItems
+        .filter(grnItem => grnItem.po_item_id === poItem.id)
+        .reduce((total, grnItem) => total + parseFloat(grnItem.quantity_received || 0), 0) >= parseFloat(poItem.quantity || 0)
+    );
+
+          console.log("allReceived", allReceived);
+
+      await PurchaseOrder.update(
+        { po_status: allReceived ? "received" : "partialy-recieved" },
+        { where: { id: poId }, transaction }
+      );
+
+      console.log("allReceived", allReceived);
   
       await transaction.commit();
   

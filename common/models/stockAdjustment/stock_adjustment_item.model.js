@@ -4,6 +4,7 @@ import StockAdjustment from "./stock_adjustment.model.js";
 import ItemMaster from "../item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { Sequelize } from "sequelize";
 
 const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
   id: {
@@ -15,14 +16,14 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
       model: StockAdjustment,
-      key: "adjustment_id",
+      key: "id",
     },
   },
   item_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
       model: ItemMaster,
-      key: "item_id",
+      key: "id",
     },
   },
   previous_quantity: {
@@ -50,7 +51,6 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
     },
     
   },
- 
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
@@ -65,12 +65,26 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
       key: "id",
     },
   },
- 
+   created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  updated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue:null,
+    },
+
+
+   deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  }
 }, {
   tableName: "stock_adjustment_items",
-  timestamps: true,
-  paranoid: true,
-  underscored: true,
+  timestamps: false,
 });
 
 StockAdjustment.hasMany(StockAdjustmentItem, { foreignKey: "adjustment_id" });

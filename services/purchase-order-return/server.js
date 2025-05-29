@@ -9,7 +9,6 @@ import GRN from "../../common/models/grn/grn.model.js";
 import GRNItem from "../../common/models/grn/grn_item.model.js";
 import PurchaseOrderItem from "../../common/models/po/purchase_order_item.model.js";
 import "../../common/models/association.js";
-
 const Company = db.Company;
 const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
@@ -30,118 +29,130 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { grn_id, po_id } = req.body;
+    const {
+      grn_id,
+      po_id,
+      return_date,
+      reason,
+      decision,
+      notes,
+      return_items
+    } = req.body;
+
     const user = req.user;
 
-    const grn = await GRN.findOne({
-      where: { grn_id },
-      include: [
-        {
-          model: PurchaseOrder,
-          attributes: { exclude: ['created_at', 'updated_at'] },
-          include: [
-            {
-              model: PurchaseOrderItem,
-              attributes: { exclude: ['created_at', 'updated_at'] }
-            }
-          ]
-        }
-      ]
-    });
-
+    // Validate GRN
+    const grn = await GRN.findOne({ where: { id: grn_id } });
     if (!grn) throw new Error("GRN not found");
 
-    const purchaseOrder = grn.PurchaseOrder;
+    // Fetch Purchase Order with its items (no alias)
+    const po = await PurchaseOrder.findOne({
+      where: { po_id },
+      include: [PurchaseOrderItem] // ← no alias here
+    });
+    if (!po) throw new Error("Purchase Order not found");
 
-    if (po_id && purchaseOrder?.po_id !== po_id) {
-      throw new Error("Provided PO ID does not match GRN's Purchase Order");
-    }
+    // Map PO items by ID
+    const poItemsMap = {};
+    po.PurchaseOrderItems.forEach(item => {
+      poItemsMap[item.id] = item;
+    });
 
-    const purchaseOrderItems = purchaseOrder?.PurchaseOrderItems || [];
+    // Aggregate totals
+    let total_qty = 0, cgst_amount = 0, sgst_amount = 0, amount = 0, tax_amount = 0, total_amount = 0;
 
-    const total_qty = purchaseOrderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-
+    // Create Purchase Order Return
     const poReturn = await PurchaseOrderReturn.create({
       grn_id,
       po_id,
-      total_qty,
-      return_date: new Date(),
-      reason: "Auto-filled return",
-      status: "initiated",
-      decision: "approve",
-      payment_terms: purchaseOrder?.payment_terms || null,
+      return_date,
+      reason,
+      status,
+      decision,
+      notes,
       created_by: user.id,
-      
+      updated_by: user.id,
       company_id: user.company_id
+    }, { transaction });
+
+    // Process Return Items
+    for (const item of return_items) {
+      const poItem = poItemsMap[item.po_item_id];
+      if (!poItem) throw new Error(`PO Item not found for ID: ${item.po_item_id}`);
+
+      // Generate purchase_return_generate_id
+          const purchase_return_generate_id = await generateId(
+            req.user.company_id,
+            PurchaseOrderReturn,
+            "purchase_order_returns"
+            
+          );
+      const qty = item.return_qty;
+      const unitPrice = poItem.unit_price;
+      const itemAmount = qty * unitPrice;
+      const itemCgstAmount = itemAmount * (poItem.cgst / 100);
+      const itemSgstAmount = itemAmount * (poItem.sgst / 100);
+      const itemTaxAmount = itemCgstAmount + itemSgstAmount;
+      const itemTotalAmount = itemAmount + itemTaxAmount;
+
+      await PurchaseOrderReturnItem.create({
+        po_return_id: poReturn.id,
+        grn_item_id: item.grn_item_id,
+        item_id: poItem.item_id,
+        company_id: user.company_id,
+        return_qty: qty,
+        unit_price: unitPrice,
+        cgst: poItem.cgst,
+        cgst_amount: itemCgstAmount,
+        sgst: poItem.sgst,
+        sgst_amount: itemSgstAmount,
+        amount: itemAmount,
+        tax_amount: itemTaxAmount,
+        total_amount: itemTotalAmount,
+        reason: item.reason,
+        notes: item.notes,
+        created_by: user.id,
+        updated_by: user.id
+      }, { transaction });
+
+      total_qty += qty;
+      amount += itemAmount;
+      cgst_amount += itemCgstAmount;
+      sgst_amount += itemSgstAmount;
+      tax_amount += itemTaxAmount;
+      total_amount += itemTotalAmount;
+    }
+
+    // Update PO Return with totals
+    await poReturn.update({
+      total_qty,
+      cgst_amount,
+      sgst_amount,
+      amount,
+      tax_amount,
+      total_amount
     }, { transaction });
 
     await transaction.commit();
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
       message: "Purchase Order Return created successfully",
-      data: {
-        purchaseOrderReturn: {
-          id: poReturn.id,
-          grn_id: poReturn.grn_id,
-          po_id: poReturn.po_id,
-          total_qty: poReturn.total_qty,
-          return_date: poReturn.return_date,
-          reason: poReturn.reason,
-          status: poReturn.status,
-          decision: poReturn.decision,
-          payment_terms: poReturn.payment_terms,
-          created_by: poReturn.created_by,
-          company_id: poReturn.company_id,
-          created_at: poReturn.created_at
-          // ✅ updated_at is intentionally excluded
-        },
-        purchaseOrder,
-        purchaseOrderItems
-      }
+      data: poReturn
     });
 
   } catch (error) {
     await transaction.rollback();
     return res.status(500).json({
       success: false,
-      message: `Creation Failed: ${error.message}`
+      message: `Creation failed: ${error.message}`
     });
   }
 });
 
 
 
-// v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
-//   try {
-//     const user = req.user;
 
-//     const allReturns = await PurchaseOrderReturn.findAll({
-//       where: {
-//         company_id: user.company_id
-        
-//       },
-      
-//       order: [['created_at', 'DESC']]
-//     });
-
-//     // Group into approved and disapproved
-//     const approved = allReturns.filter(ret => ret.decision === 'approve');
-//     const disapproved = allReturns.filter(ret => ret.decision === 'disapprove');
-
-//     return res.status(200).json({
-//       success: true,
-//       approved,
-//       disapproved
-//     });
-
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to fetch Purchase Order Returns: ${error.message}`
-//     });
-//   }
-// });
 
 v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
   try {
@@ -195,6 +206,7 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
 
 
 v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
+  
   try {
     const user = req.user;
     const returnId = req.params.id;
@@ -234,10 +246,12 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
 
 
 v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
+   console.log("Update PO Request Body:", req.params.id);
   const transaction = await sequelize.transaction();
 
   try {
-    const { id } = req.params;
+    const id  = parseInt(req.params.id);
+    console.log("Update PO Request ID:", id);
     const {
       grn_id,
       po_id,
@@ -245,84 +259,138 @@ v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
       reason,
       status,
       decision,
-      total_qty,
-      cgst_amount,
-      sgst_amount,
-      amount,
-      tax_amount,
-      total_amount,
       notes,
-      
       return_items
     } = req.body;
 
     const user = req.user;
 
-    // Fetch the PurchaseOrderReturn record
-    const poReturn = await PurchaseOrderReturn.findOne({ where: { id } });
+    console.log("User ID:", user.id);
+
+    console.log("Request IF:", id);
+
+    // Fetch and validate main record
+    const poReturn = await PurchaseOrderReturn.findOne({ where: { id : id }, transaction });
     if (!poReturn) throw new Error("Purchase Order Return not found");
 
-    // Fetch GRN for validation (optional but kept for consistency)
-    const grn = await GRN.findOne({ where: { grn_id } });
+    console.log("PO Return:", poReturn);
+
+    const grn = await GRN.findOne({ where: { id: grn_id }, transaction });
     if (!grn) throw new Error("GRN not found");
 
-    // Update fields
-    poReturn.grn_id = grn_id || poReturn.grn_id;
-    poReturn.po_id = po_id || poReturn.po_id;
-    poReturn.return_date = return_date || poReturn.return_date;
-    poReturn.reason = reason || poReturn.reason;
-    poReturn.status = status || poReturn.status;
-    poReturn.decision = decision || poReturn.decision;
-    poReturn.total_qty = total_qty ?? poReturn.total_qty;
-    poReturn.cgst_amount = cgst_amount ?? poReturn.cgst_amount;
-    poReturn.sgst_amount = sgst_amount ?? poReturn.sgst_amount;
-    poReturn.amount = amount ?? poReturn.amount;
-    poReturn.tax_amount = tax_amount ?? poReturn.tax_amount;
-    poReturn.total_amount = total_amount ?? poReturn.total_amount;
-    poReturn.notes = req.body.notes || poReturn.notes; 
-    poReturn.updated_by = user.id;
+    console.log("GRN:", grn);
 
-    await poReturn.save({ transaction });
+    // Validate and update return items
+    if (!Array.isArray(return_items) || return_items.length === 0) {
+      throw new Error("return_items must be a non-empty array");
+    }
 
-    // Handle return items update
-    if (return_items && Array.isArray(return_items)) {
-      await PurchaseOrderReturnItem.destroy({
-        where: { purchase_order_return_id: id },
+    // Totals
+    let total_qty = 0;
+    let cgst_amount_total = 0;
+    let sgst_amount_total = 0;
+    let amount_total = 0;
+    let tax_amount_total = 0;
+    let total_amount_total = 0;
+
+    for (const item of return_items) {
+      console.log("Processing item:", item);
+      const existingItem = await PurchaseOrderReturnItem.findOne({
+        where: {
+          id: item.item_id,
+          po_return_id: id
+        },
         transaction
       });
 
-      for (const item of return_items) {
-        await PurchaseOrderReturnItem.create({
-          purchase_order_return_id: poReturn.id,
-          grn_item_id: item.grn_item_id,
-          item_id: item.item_id,
-          return_qty: item.return_qty,
-          unit_price: item.unit_price,
-          cgst: item.cgst,
-          cgst_amount: item.cgst_amount,
-          sgst: item.sgst,
-          sgst_amount: item.sgst_amount,
-          amount: item.amount,
-          tax_amount: item.tax_amount,
-          total_amount: item.total_amount,
-          reason: item.reason,
-          notes: item.notes, 
-          created_by: user.id,
-          updated_by: user.id
-        }, { transaction });
+      console.log("Existing Item:", existingItem);
+
+      if (!existingItem) {
+        throw new Error(`Return item with ID ${item.id} not found`);
       }
+
+      const itemData = await ItemMaster.findOne({ where: { id: item.item_id }, transaction });
+      if (!itemData) throw new Error(`Item not found: ${item.item_id}`);
+
+      const cgst = itemData.cgst ?? 0;
+      const sgst = itemData.sgst ?? 0;
+
+      const returnQty = parseFloat(item.return_qty ?? 0);
+      const unitPrice = parseFloat(item.unit_price ?? 0);
+
+      const amount = returnQty * unitPrice;
+      const cgst_amount = (amount * cgst) / 100;
+      const sgst_amount = (amount * sgst) / 100;
+      const tax_amount = cgst_amount + sgst_amount;
+      const total_amount = amount + tax_amount;
+
+      // Update item
+      await existingItem.update({
+        grn_item_id: item.grn_item_id,
+        item_id: item.item_id,
+        return_qty: returnQty,
+        unit_price: unitPrice,
+        cgst,
+        cgst_amount,
+        sgst,
+        sgst_amount,
+        amount,
+        tax_amount,
+        total_amount,
+        reason: item.reason?.trim() || null,
+        notes: item.notes?.trim() || null,
+        updated_by: user.id,
+        updated_at: new Date(),
+      }, { transaction });
+
+      // Add to totals
+      total_qty += returnQty;
+      cgst_amount_total += cgst_amount;
+      sgst_amount_total += sgst_amount;
+      amount_total += amount;
+      tax_amount_total += tax_amount;
+      total_amount_total += total_amount;
     }
+
+    // Update PO Return master record
+    await poReturn.update({
+      grn_id,
+      po_id,
+      return_date: return_date || poReturn.return_date,
+      reason: reason || poReturn.reason,
+      status: status || poReturn.status,
+      decision: decision || poReturn.decision,
+      total_qty,
+      cgst_amount: cgst_amount_total,
+      sgst_amount: sgst_amount_total,
+      amount: amount_total,
+      tax_amount: tax_amount_total,
+      total_amount: total_amount_total,
+      notes: notes || poReturn.notes,
+      updated_by: user.id,
+      updated_at: new Date(),
+    }, { transaction });
+
+    // Fetch updated items
+    const updatedItems = await PurchaseOrderReturnItem.findAll({
+      where: { po_return_id: id },
+      transaction
+    });
 
     await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Purchase Order Return and Return Items updated successfully",
-      data: poReturn
+      message: "Purchase Order Return updated successfully",
+      data: {
+        ...poReturn.toJSON(),
+        return_items: updatedItems
+      }
     });
 
   } catch (error) {
     await transaction.rollback();
+    console.error("Error updating Purchase Order Return:", error);
     return res.status(500).json({
       success: false,
       message: `Update Failed: ${error.message}`
@@ -332,9 +400,7 @@ v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
 
 
 
-
-
-
+// Soft delete the purchase order return and its items
 
 
 v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
@@ -343,15 +409,16 @@ v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) 
     const { id } = req.params;
     const user = req.user;
 
-    // Find the purchase order return by ID and company
+    // Find the purchase order return
     const poReturn = await PurchaseOrderReturn.findOne({
       where: {
-        id: id,  // ✅ use 'id', not 'por_id'
+        id: id,
         company_id: user.company_id,
         deleted_at: null
-      }
+      },
+      transaction
     });
-      
+
     if (!poReturn) {
       return res.status(404).json({
         success: false,
@@ -359,18 +426,35 @@ v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) 
       });
     }
 
-    // Soft delete: update status and decision, and set deleted_at
+    // Soft delete the main return record
     await poReturn.update({
       status: "cancelled",
       decision: "disapprove",
-      deleted_at: new Date()
+      deleted_at: new Date(),
+      updated_at: new Date(),
     }, { transaction });
+
+    // Soft delete associated return items
+    await PurchaseOrderReturnItem.update(
+      {
+        deleted_at: new Date(),
+        updated_at: new Date(),
+        updated_by: user.id
+      },
+      {
+        where: {
+          po_return_id: id,
+          deleted_at: null
+        },
+        transaction
+      }
+    );
 
     await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Purchase Order Return cancelled (soft deleted)"
+      message: "Purchase Order Return and its items cancelled successfully (soft deleted)"
     });
 
   } catch (error) {
@@ -385,11 +469,12 @@ v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) 
 
 
 
+
 // 🖥 Start the app
 app.use("/api", v1Router);
 await db.sequelize.sync();
 
-const PORT = 3028;
-app.listen(process.env.PORT_PURCHASE_RETURN,'0.0.0.0', () => {
+const PORT = process.env.PORT_PURCHASE_RETURN;
+app.listen(process.env.PORT_PURCHASE_RETURN, () => {
   console.log(`Purchase Order Return API running on port ${process.env.PORT_PURCHASE_RETURN}`);
 });
