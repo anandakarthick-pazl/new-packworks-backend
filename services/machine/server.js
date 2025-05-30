@@ -1453,6 +1453,8 @@ v1Router.post("/process", authenticateJWT, async (req, res) => {
       where: {
         company_id,
         process_name,
+        status: "active", // Only check for active processes
+
       },
     });
 
