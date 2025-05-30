@@ -4,7 +4,8 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.sequelize.query(`ALTER TABLE item_master
-MODIFY COLUMN category INT(11);`);
+      DROP COLUMN category,
+      ADD COLUMN category INT(11)`);
   },
 
   async down(queryInterface, Sequelize) {
@@ -16,5 +17,4 @@ MODIFY COLUMN category INT(11);`);
      */
   }
 };
-
 
