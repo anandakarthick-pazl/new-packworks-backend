@@ -1,4 +1,3 @@
-// Import dependencies and models
 import express from "express";
 import { json, Router } from "express";
 import cors from "cors";
@@ -7,11 +6,8 @@ import { NOW, Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
-
-
-
-// Import models
 import db from "../../common/models/index.js";
+
 const StockAdjustment = db.stockAdjustment;
 const StockAdjustmentItem = db.stockAdjustmentItem;
 const Inventory = db.Inventory;
@@ -19,98 +15,56 @@ const ItemMaster = db.ItemMaster;
 const User = db.User;
 const Company = db.Company;
 
-// Express setup
-dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+dotenv.config();
 
 
-// Create Stock Adjustment
+
+//get all items based on inventory
+v1Router.get("/stock-adjustments/items", authenticateJWT, async (req, res) => {
+    try {
+        const inventory_data = await Inventory.findAll({
+            attributes: ['item_id'],
+        });
+        const itemIds = [...new Set(inventory_data.map(inv => inv.item_id))];
+        const items = await ItemMaster.findAll({
+            where: { id: itemIds },
+            attributes: ['id', 'item_generate_id', 'item_name']
+        });
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch items' });
+    }
+});
+
+// Create stock adjustment
 v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
-
   try {
-    const { remarks, reason, items } = req.body;
-
-    // Basic validations
-    if (!remarks || !reason) {
-      return res.status(400).json({
-        success: false,
-        message: "'remarks' and 'reason' are required",
-      });
-    }
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "'items' must be a non-empty array",
-      });
-    }
-
-    // 🔢 Auto-generate stock_adjustment_generate_id like SA-001
-    const lastAdjustment = await StockAdjustment.findOne({
-      where: {
-        company_id: req.user.company_id,
-        stock_adjustment_generate_id: { [Op.like]: 'SA-%' },
-      },
-      order: [['created_at', 'DESC']],
-      transaction,
-    });
-
-    let stock_adjustment_generate_id = "SA-001";
-    if (lastAdjustment && lastAdjustment.stock_adjustment_generate_id) {
-      const match = lastAdjustment.stock_adjustment_generate_id.match(/SA-(\d+)/);
-      if (match) {
-        const nextNum = parseInt(match[1], 10) + 1;
-        stock_adjustment_generate_id = `SA-${String(nextNum).padStart(3, '0')}`;
-      }
-    }
-
-    // ⚠️ Get inventory ID from first item
-    const firstItemId = items[0].item_id;
-    const firstInventory = await Inventory.findOne({
-      where: { item_id: firstItemId, company_id: req.user.company_id },
-      transaction,
-    });
-
-    if (!firstInventory) {
-      return res.status(404).json({
-        success: false,
-        message: `Inventory not found for item_id: ${firstItemId}`,
-      });
-    }
-
+    const { remarks, items } = req.body;
+    const stockAdjustmentId = await generateId(req.user.company_id, StockAdjustment, "stock_adjustment");
     const company_id = req.user.company_id;
 
-    // Create main StockAdjustment record using first inventory
     const adjustment = await StockAdjustment.create(
       {
-        stock_adjustment_generate_id,
-        inventory_id: firstInventory.id,
+        stock_adjustment_generate_id:stockAdjustmentId,
         company_id,
         adjustment_date: new Date(),
-        reason,
         remarks,
-        status: "active",
         created_by: req.user.id,
         updated_by: req.user.id,
       },
       { transaction }
     );
 
-    // Process each adjustment item
-    for (const item of items) {
-      const { type, adjustment_quantity, item_id } = item;
-      const quantity = parseFloat(adjustment_quantity || 0);
+    const adjustmentItemsCreated = [];
 
-      if (!["increase", "decrease"].includes(type)) {
-        return res.status(400).json({
-          success: false,
-          message: "Item type must be 'increase' or 'decrease'",
-        });
-      }
+    for (const item of items) {
+      const { type, adjustment_quantity, item_id, reason } = item;
+      const quantity = parseFloat(adjustment_quantity || 0);
 
       const existingInventory = await Inventory.findOne({
         where: { item_id, company_id },
@@ -118,30 +72,26 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
       });
 
       if (!existingInventory) {
-        return res.status(404).json({
-          success: false,
-          message: `Inventory not found for item_id: ${item_id}`,
-        });
+        throw new Error(`Inventory not found for item_id: ${item_id}`);
       }
 
       const previous_quantity = parseFloat(existingInventory.quantity_available || 0);
-      let new_quantity = type === "increase"
-        ? previous_quantity + quantity
-        : previous_quantity - quantity;
+      let new_quantity =
+        type === "increase"
+          ? previous_quantity + quantity
+          : previous_quantity - quantity;
 
       if (type === "decrease" && quantity > previous_quantity) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot decrease more than available quantity",
-        });
+        throw new Error("Cannot decrease more than available quantity");
       }
 
-      await StockAdjustmentItem.create(
+      const adjustment_item = await StockAdjustmentItem.create(
         {
           adjustment_id: adjustment.id,
           item_id,
           inventory_id: existingInventory.id,
           previous_quantity,
+          reason,
           type,
           adjustment_quantity: quantity,
           difference: new_quantity,
@@ -152,44 +102,27 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
         { transaction }
       );
 
+      adjustmentItemsCreated.push(adjustment_item);
+
       await existingInventory.update(
         { quantity_available: new_quantity },
         { transaction }
       );
     }
 
-    // Commit transaction
     await transaction.commit();
-
-    // Prepare response
-    const {
-      deleted_at,
-      updated_by,
-      updated_at,
-      ...adjustmentData
-    } = adjustment.get({ plain: true });
-
-    const adjustmentItems = await StockAdjustmentItem.findAll({
-      where: { adjustment_id: adjustment.id },
-      attributes: {
-        exclude: ["deleted_at", "updated_by", "updated_at"],
-      },
-    });
-
     return res.status(201).json({
       success: true,
-      message: "Stock Adjustment created successfully",
-      data: {
-        adjustment: adjustmentData,
-        items: adjustmentItems,
-      },
+      data: { adjustment, adjustment_items: adjustmentItemsCreated },
+      message: "Stock adjustment created successfully",
+      adjustment_id: adjustment.id,
     });
   } catch (error) {
     await transaction.rollback();
-    console.error("Stock adjustment error:", error);
-    return res.status(500).json({
+    console.error("Stock adjustment error:", error.message);
+    return res.status(400).json({
       success: false,
-      message: error.message || "An unexpected error occurred",
+      message: error.message,
     });
   }
 });
@@ -209,7 +142,6 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
 
     if (search.trim() !== "") {
       whereCondition[Op.or] = [
-        { reason: { [Op.like]: `%${search}%` } },
         { remarks: { [Op.like]: `%${search}%` } },
       ];
 
@@ -252,6 +184,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
   }
 });
 
+
 // GET single stock adjustment by ID
 v1Router.get("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
   try {
@@ -262,7 +195,8 @@ v1Router.get("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
       include: [
         {
           model: StockAdjustmentItem,
-        }
+          as: 'StockAdjustmentItems',
+        },
       ],
     });
 
@@ -273,10 +207,37 @@ v1Router.get("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
       });
     }
 
+    const adjustmentData = adjustment.toJSON();
+
+    const itemIds = adjustmentData.StockAdjustmentItems.map(item => item.item_id);
+
+    const itemDetails = await ItemMaster.findAll({
+      where: { id: itemIds },
+      attributes: ['id', 'item_name'],
+    });
+
+    const itemMap = {};
+    itemDetails.forEach(item => {
+      itemMap[item.id] = item.item_name;
+    });
+
+    adjustmentData.StockAdjustmentItems = adjustmentData.StockAdjustmentItems.map(item => ({
+      ...item,
+      item_name: itemMap[item.item_id] || null,
+    }));
+
+    const [createdUser, updatedUser] = await Promise.all([
+      User.findOne({ where: { id: adjustmentData.created_by }, attributes: ['id', 'name', 'email'] }),
+      User.findOne({ where: { id: adjustmentData.updated_by }, attributes: ['id', 'name', 'email'] }),
+    ]);
+
+    adjustmentData.created_by_user = createdUser;
+    adjustmentData.updated_by_user = updatedUser;
+
     return res.status(200).json({
       success: true,
       message: "Stock adjustment fetched successfully",
-      data: adjustment,
+      data: adjustmentData,
     });
 
   } catch (error) {
@@ -288,21 +249,14 @@ v1Router.get("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-
-// PUT: Update adjustment
+// Update stock adjustment
 v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
+  const updatedItems = [];
 
   try {
     const adjustmentId = req.params.id;
-    const { remarks, reason, items } = req.body;
-
-    if (!remarks || !reason || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "'remarks', 'reason' and non-empty 'items' are required",
-      });
-    }
+    const { remarks, items } = req.body;
 
     const adjustment = await StockAdjustment.findByPk(adjustmentId, { transaction });
 
@@ -315,21 +269,22 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
 
     const company_id = req.user.company_id;
 
-    // Update main stock adjustment fields
-    await adjustment.update(
+    // Update the main stock adjustment record
+    const adjustmentdata = await adjustment.update(
       {
         remarks,
-        reason,
         updated_by: req.user.id,
         updated_at: new Date(),
       },
       { transaction }
     );
 
-    // Process updates to each adjustment item
+    // Process and update each item in the adjustment
     for (const item of items) {
       const { item_id, type, adjustment_quantity } = item;
-      const quantity = parseFloat(adjustment_quantity || 0);
+      const quantity = isNaN(adjustment_quantity)
+        ? 0
+        : parseFloat(adjustment_quantity);
 
       if (!["increase", "decrease"].includes(type)) {
         return res.status(400).json({
@@ -362,11 +317,11 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
         });
       }
 
-      // Use current inventory value to calculate new quantity
       const previous_quantity = parseFloat(inventory.quantity_available || 0);
-      const new_quantity = type === "increase"
-        ? previous_quantity + quantity
-        : previous_quantity - quantity;
+      const new_quantity =
+        type === "increase"
+          ? previous_quantity + quantity
+          : previous_quantity - quantity;
 
       if (type === "decrease" && quantity > previous_quantity) {
         return res.status(400).json({
@@ -375,7 +330,7 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
         });
       }
 
-      await stockItem.update(
+      const updatedStockItem = await stockItem.update(
         {
           type,
           adjustment_quantity: quantity,
@@ -387,6 +342,8 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
         { transaction }
       );
 
+      updatedItems.push(updatedStockItem);
+
       await inventory.update(
         { quantity_available: new_quantity },
         { transaction }
@@ -397,6 +354,10 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      data: {
+        adjustment: adjustmentdata,
+        updated_items: updatedItems,
+      },
       message: "Stock Adjustment updated successfully",
     });
   } catch (error) {
@@ -468,9 +429,35 @@ v1Router.delete("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = process.env.PORT_STOCK_ADJUSTMENT;
 app.listen(PORT, () => {
   console.log(`Stock Adjustment running on port ${PORT}`);
 });
+
+

@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import express, { json, Router } from "express";
 import cors from "cors";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 const Categories = db.Categories;
 const Company = db.Company;
@@ -19,8 +20,11 @@ const v1Router = Router();
 v1Router.post("/category", authenticateJWT, async (req, res) => {
   try {
     // Merge user-related fields into the request body before create
+        const category_generate_id = await generateId(req.user.company_id, Categories, "CAT");
+    
     const newCategoryData = {
       ...req.body,
+      category_generate_id: category_generate_id,
       created_by: req.user.id,
       updated_by: req.user.id,
       company_id: req.user.company_id,
