@@ -61,11 +61,10 @@ v1Router.get("/sub-category", authenticateJWT, async (req, res) => {
 
     const { rows, count } = await Sub_categories.findAndCountAll({
       where: {
-        is_visible: 1,
+        // is_visible: 1,
         sub_category_name: {
           [Op.like]: `%${search}%`,
         },
-        is_visible: 1,
       },
       offset,
       limit,

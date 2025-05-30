@@ -15,6 +15,8 @@ const PurchaseOrder = db.PurchaseOrder;
 const ItemMaster = db.ItemMaster;
 const PurchaseOrderItem = db.PurchaseOrderItem;
 const Inventory = db.Inventory;
+const Categories = db.Categories;
+const Sub_categories = db.Sub_categories;
 
 
 dotenv.config();
@@ -71,7 +73,8 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       });
       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
 
-      const itemType = itemMaster.item_type;
+      const category = itemMaster.category;
+      const sub_category = itemMaster.sub_category;
 
       const newGRNItem = await GRNItem.create({
         grn_id: newGRN.id,
@@ -118,7 +121,9 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           grn_id: newGRN.id,
           grn_item_id: newGRNItem.id,
           po_id: grnData.po_id,
-          inventory_type: itemType,
+          category:category,
+          sub_category:sub_category,
+          // inventory_type: itemType,
           work_order_no,
           description,
           quantity_available: acceptedQty,

@@ -43,20 +43,24 @@ const ItemMaster = sequelize.define(
       type: DataTypes.STRING(10),
     },
     category: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.INTEGER(11),
     },
-    item_type: {
-      type: DataTypes.ENUM(
-        "reels",
-        "glues",
-        "pins",
-        "finished-goods",
-        "semi-finished-goods",
-        "raw-materials"
-      ),
-      allowNull: false,
-      defaultValue: "raw-materials",
+    sub_category: {
+      type: DataTypes.INTEGER(11),
+      allowNull: true,
     },
+    // item_type: {
+    //   type: DataTypes.ENUM(
+    //     "reels",
+    //     "glues",
+    //     "pins",
+    //     "finished-goods",
+    //     "semi-finished-goods",
+    //     "raw-materials"
+    //   ),
+    //   allowNull: false,
+    //   defaultValue: "raw-materials",
+    // },
     specifications: {
       type: DataTypes.TEXT,
     },

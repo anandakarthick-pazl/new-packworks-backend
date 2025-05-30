@@ -87,8 +87,12 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
         message: `Invalid or inactive Item.`,
       });
     }
-    let inventory_type= validateItem.item_type;
-    rest.inventory_type = inventory_type;
+
+      let category = validateItem.category;
+      let sub_category = validateItem.sub_category;
+
+    rest.category = category;
+    rest.sub_category = sub_category;
 
     // Validate GRN
     const grnId = req.body.grn_id;
