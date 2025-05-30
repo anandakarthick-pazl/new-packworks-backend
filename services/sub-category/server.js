@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import express, { json, Router } from "express";
 import cors from "cors";
 import { authenticateJWT } from "../../common/middleware/auth.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
@@ -19,6 +20,7 @@ const v1Router = Router();
 // Create category
 v1Router.post("/sub-category", authenticateJWT, async (req, res) => {
   try {
+    const sub_category_generate_id = await generateId(req.user.company_id, Sub_categories, "SUBCAT");
     const category = await Categories.findOne({
     where: {
         id: req.body.category_id,
@@ -36,6 +38,7 @@ v1Router.post("/sub-category", authenticateJWT, async (req, res) => {
     
     const newSubcategory = {
       ...req.body,
+      sub_category_generate_id: sub_category_generate_id,
       created_by: req.user.id,
       updated_by: req.user.id,
       company_id: req.user.company_id,

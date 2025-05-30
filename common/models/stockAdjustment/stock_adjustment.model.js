@@ -2,7 +2,6 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
-import Inventory from "../inventory/inventory.model.js"; 
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
@@ -23,14 +22,9 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     },
     onUpdate: "CASCADE",
   },
-  inventory_id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    references: {
-      model: Inventory,
-      key: "id",
-    },
-    onUpdate: "CASCADE",
+   inventory_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
   },
 
   adjustment_date: {
@@ -39,10 +33,10 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     defaultValue: DataTypes.NOW,
 
   },
-  reason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
+  // reason: {
+  //   type: DataTypes.TEXT,
+  //   allowNull: true,
+  // },
   remarks: {
     type: DataTypes.TEXT,
     allowNull: false,
@@ -86,5 +80,7 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
   tableName: "stock_adjustments",
   timestamps: false,
 });
+
+
 
 export default StockAdjustment;

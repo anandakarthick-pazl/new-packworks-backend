@@ -26,6 +26,10 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
       key: "id",
     },
   },
+  reason:{
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
   previous_quantity: {
     type: DataTypes.DECIMAL(15, 2),
     allowNull: true,
