@@ -385,9 +385,9 @@ v1Router.delete("/debit-note/:id", authenticateJWT, async (req, res) => {
 
 // 🖥 Start the app
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 
 const PORT = 3031;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`debit note API running on port ${PORT}`);
 });

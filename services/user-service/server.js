@@ -1490,7 +1490,7 @@ v1Router.get("/health", (req, res) => {
 // Use Version 1 Router
 app.use("/api/user", v1Router);
 
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3002;
 const service = "User Service";
 app.listen(process.env.PORT_USER, '0.0.0.0', async () => {
