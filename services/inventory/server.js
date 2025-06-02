@@ -23,9 +23,16 @@ const v1Router = Router();
 
 //////////////////////////////////////////////////////   Inventory   ///////////////////////////////////////////////////////////
 
+// Get Inventory based on search, pagination, categoryId, and subCategoryId
 v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   try {
-    const { search = "", page = "1", limit = "10" } = req.query;
+    const {
+      search = "",
+      page = "1",
+      limit = "10",
+      categoryId,
+      subCategoryId
+    } = req.query;
 
     const pageNumber = parseInt(page) || 1;
     const limitNumber = parseInt(limit) || 10;
@@ -33,12 +40,30 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
     let whereCondition = {};
 
+    // Filter by search (e.g., id or name)
     if (search.trim() !== "") {
       whereCondition = {
         ...whereCondition,
-        id: { [Op.like]: `%${search}%` },
+        [Op.or]: [
+          { id: { [Op.like]: `%${search}%` } },
+          { inventory_generate_id: { [Op.like]: `%${search}%` } },
+          // { name: { [Op.like]: `%${search}%` } }, // assuming inventory has name
+        ]
       };
     }
+
+    // Filter by categoryId
+    if (categoryId) {
+      whereCondition.category = categoryId;
+    }
+
+    // Filter by subCategoryId
+    if (subCategoryId) {
+      whereCondition.sub_category = subCategoryId;
+    }
+
+    console.log("Where Condition:", whereCondition);
+    
 
     const inventoryData = await Inventory.findAll({
       where: whereCondition,
@@ -65,6 +90,49 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 
 
+
+// v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+//   try {
+//     const { search = "", page = "1", limit = "10" } = req.query;
+
+//     const pageNumber = parseInt(page) || 1;
+//     const limitNumber = parseInt(limit) || 10;
+//     const offset = (pageNumber - 1) * limitNumber;
+
+//     let whereCondition = {};
+
+//     if (search.trim() !== "") {
+//       whereCondition = {
+//         ...whereCondition,
+//         id: { [Op.like]: `%${search}%` },
+//       };
+//     }
+
+//     const inventoryData = await Inventory.findAll({
+//       where: whereCondition,
+//       limit: limitNumber,
+//       offset: offset,
+//     });
+
+//     const totalCount = await Inventory.count({ where: whereCondition });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Inventory data fetched successfully",
+//       data: inventoryData,
+//       totalCount: totalCount,
+//     });
+//   } catch (error) {
+//     console.error(error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: `inventory fetched error: ${error.message}`,
+//     });
+//   }
+// });
+
+
+
 // Create Inventory 
 v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
   const transaction = await sequelize.transaction();
@@ -87,8 +155,12 @@ v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
         message: `Invalid or inactive Item.`,
       });
     }
-    let inventory_type= validateItem.item_type;
-    rest.inventory_type = inventory_type;
+
+      let category = validateItem.category;
+      let sub_category = validateItem.sub_category;
+
+    rest.category = category;
+    rest.sub_category = sub_category;
 
     // Validate GRN
     const grnId = req.body.grn_id;
@@ -346,7 +418,7 @@ v1Router.post('/inventory/type',authenticateJWT,async(req,res)=>{
 
 
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3025;
 app.listen(process.env.PORT_INVENTORY,'0.0.0.0', () => {
   console.log(`Item Master Service running on port ${process.env.PORT_INVENTORY}`);

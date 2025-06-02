@@ -39,7 +39,9 @@
     "work-invoice": "nodemon services/work-invoice/server.js",
     "stock-adjustment": "nodemon services/stock-adjustment/server.js",
     "credit-note": "nodemon services/credit-note/server.js",
-    "debit-note": "nodemon services/debit-note/server.js"
+    "debit-note": "nodemon services/debit-note/server.js",
+    "category": "nodemon services/category/server.js",
+    "sub-category": "nodemon services/sub-category/server.js"
   },
   "keywords": [],
   "author": "",

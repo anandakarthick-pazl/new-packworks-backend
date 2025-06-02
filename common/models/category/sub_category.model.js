@@ -1,15 +1,15 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
-import Company from "../company.model.js";
 import User from "../user.model.js";
+import Company from "../company.model.js";
 
-const StockAdjustment = sequelize.define("StockAdjustment", {
+const SubCategory = sequelize.define("SubCategory", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
   },
-  stock_adjustment_generate_id: {
+  sub_category_generate_id: {
     type: DataTypes.STRING(200),
     allowNull: true,
   },
@@ -22,28 +22,31 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     },
     onUpdate: "CASCADE",
   },
-   inventory_id: {
+  category_id: {
     type: DataTypes.INTEGER,
-    allowNull: true,
+    allowNull: false,
   },
-
-  adjustment_date: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-    defaultValue: DataTypes.NOW,
-
-  },
-  // reason: {
-  //   type: DataTypes.TEXT,
-  //   allowNull: true,
-  // },
-  remarks: {
-    type: DataTypes.TEXT,
+  sub_category_name: {
+    type: DataTypes.STRING(100),
     allowNull: false,
   },
   status: {
     type: DataTypes.ENUM("active", "inactive"),
+    allowNull: false,
     defaultValue: "active",
+  },
+  is_visible: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+  updated_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
   },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -61,26 +64,9 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
       key: "id",
     },
   },
- deleted_at: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    defaultValue: null,
-  },
-  created_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-  updated_at: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: null,
-    },
 }, {
-  tableName: "stock_adjustments",
+  tableName: "product_sub_categories",
   timestamps: false,
 });
 
-
-
-export default StockAdjustment;
+export default SubCategory;

@@ -56,9 +56,16 @@ const Inventory = sequelize.define("Inventory", {
     onUpdate: "CASCADE",
     onDelete: "SET NULL",
   },
-  inventory_type: {
-    type: DataTypes.STRING(255),
-  },
+  // inventory_type: {
+  //   type: DataTypes.STRING(255),
+  // },
+  category: {
+      type: DataTypes.INTEGER(11),
+    },
+    sub_category: {
+      type: DataTypes.INTEGER(11),
+      allowNull: true,
+    },
   work_order_no: {
     type: DataTypes.STRING(255),
   },
