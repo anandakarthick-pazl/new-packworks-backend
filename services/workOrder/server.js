@@ -69,7 +69,7 @@ ${workOrder.edd
     });
 
     // Return the URL to access the QR code
-    const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
+    const baseUrl = `https://dev-packwork.pazl.info/api`;
     return `${baseUrl}/qrcodes/${qrFileName}`;
   } catch (error) {
     logger.error("Error generating QR code:", error);
@@ -142,6 +142,12 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
       created_by: req.user.id,
       updated_by: req.user.id,
       work_order_sku_values: workDetails.work_order_sku_values || null,
+      // excess_qty: workDetails.excess_qty || 0,
+      // pending_qty: workDetails.pending_qty || 0,
+      // manufactured_qty: workDetails.manufactured_qty || 0,
+      // priority: workDetails.priority || "Low",
+      // progress: workDetails.progress || "Pending",
+      // stage: workDetails.stage || "Production",
     });
 
     // Generate QR code for this work order
