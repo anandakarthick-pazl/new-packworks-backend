@@ -45,6 +45,7 @@ import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
 import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
 import DebitNote from "./debit/debit_note.model.js";
 import CreditNote from "./credit/credit_note.model.js"; 
+import WorkOrderStatus from "./commonModel/workOrderStatus.js";
 import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
 
@@ -91,6 +92,7 @@ const db = {
   States,
   Color,
   WorkOrderInvoice,
+  WorkOrderStatus,
   MachineRouteProcess,
   stockAdjustment,
   stockAdjustmentItem,

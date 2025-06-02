@@ -836,24 +836,31 @@ v1Router.get(
   }
 );
 
-// PUT update work order status (priority and progress only)
-v1Router.put(
+v1Router.patch(
   "/work-order/status/:workOrderId",
   authenticateJWT,
   async (req, res) => {
     try {
       const { workOrderId } = req.params;
-      const { priority, progress } = req.body;
+      const { 
+        priority, 
+        progress, 
+        excess_qty, 
+        pending_qty, 
+        manufactured_qty, 
+        stage 
+      } = req.body;
 
       // Get user details from authentication
       const userId = req.user.id;
       const companyId = req.user.company_id;
 
-      // Validate input
-      if (!priority && !progress) {
+      // Validate input - at least one field is required
+      const updatableFields = [priority, progress, excess_qty, pending_qty, manufactured_qty, stage];
+      if (!updatableFields.some(field => field !== undefined && field !== null)) {
         return res.status(400).json({
           success: false,
-          message: "At least one field (priority or progress) is required",
+          message: "At least one field (priority, progress, excess_qty, pending_qty, manufactured_qty, or stage) is required",
         });
       }
 
@@ -868,19 +875,37 @@ v1Router.put(
       // Validate progress value if provided
       const validProgressValues = [
         "Pending",
-        "Product Planning",
-        "Procurement Sourcing",
-        "Production Planning",
-        "Production",
-        "Quality Control",
-        "Packaging",
-        "Shipping",
+        "Raw Material Allocation",
+        "Production Planned",
+        "Completed",
+        "Invoiced"
       ];
 
       if (progress && !validProgressValues.includes(progress)) {
         return res.status(400).json({
           success: false,
           message: `Progress must be one of: ${validProgressValues.join(", ")}`,
+        });
+      }
+
+      // Validate quantity fields if provided (should be non-negative integers)
+      const quantityFields = { excess_qty, pending_qty, manufactured_qty };
+      for (const [fieldName, value] of Object.entries(quantityFields)) {
+        if (value !== undefined && value !== null) {
+          if (!Number.isInteger(value) || value < 0) {
+            return res.status(400).json({
+              success: false,
+              message: `${fieldName} must be a non-negative integer`,
+            });
+          }
+        }
+      }
+
+      // Validate stage field if provided (optional validation - adjust as needed)
+      if (stage !== undefined && stage !== null && typeof stage !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: "Stage must be a string",
         });
       }
 
@@ -901,8 +926,12 @@ v1Router.put(
 
       // Create update object with only the provided fields
       const updateData = {};
-      if (priority) updateData.priority = priority;
-      if (progress) updateData.progress = progress;
+      if (priority !== undefined) updateData.priority = priority;
+      if (progress !== undefined) updateData.progress = progress;
+      if (excess_qty !== undefined) updateData.excess_qty = excess_qty;
+      if (pending_qty !== undefined) updateData.pending_qty = pending_qty;
+      if (manufactured_qty !== undefined) updateData.manufactured_qty = manufactured_qty;
+      if (stage !== undefined) updateData.stage = stage;
 
       // Add audit fields
       updateData.updated_by = userId;

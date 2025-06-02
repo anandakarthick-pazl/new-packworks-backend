@@ -1,7 +1,8 @@
-import { DataTypes } from "sequelize";
+import { DataTypes, Sequelize } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import ProcessName from "./processName.model.js";
 
 const Machine = sequelize.define(
   "Machine",
@@ -11,7 +12,7 @@ const Machine = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    machine_generate_id:{
+    machine_generate_id: {
       type: DataTypes.STRING(200),
       allowNull: true,
     },
@@ -87,9 +88,6 @@ const Machine = sequelize.define(
     ip_address: {
       type: DataTypes.STRING,
       allowNull: true,
-      // validate: {
-      //   isIP: true,
-      // },
     },
     warranty_expiry: {
       type: DataTypes.DATEONLY,
@@ -98,6 +96,28 @@ const Machine = sequelize.define(
     remarks_notes: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    machine_process: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      get() {
+        const value = this.getDataValue("machine_process");
+        return value ? JSON.parse(value) : [];
+      },
+      set(value) {
+        this.setDataValue("machine_process", JSON.stringify(value));
+      },
+    },
+    machine_route: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      get() {
+        const value = this.getDataValue("machine_route");
+        return value ? JSON.parse(value) : [];
+      },
+      set(value) {
+        this.setDataValue("machine_route", JSON.stringify(value));
+      },
     },
     created_at: {
       type: DataTypes.DATE,
@@ -108,8 +128,7 @@ const Machine = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW, 
-
+      onUpdate: DataTypes.NOW,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -145,6 +164,19 @@ Company.hasMany(Machine, {
 Machine.belongsTo(Company, {
   foreignKey: "company_id",
 });
+Machine.belongsToMany(ProcessName, {
+  through: 'MachineProcess',
+  as: 'processes',
+  foreignKey: 'machine_id',
+  otherKey: 'process_id'
+});
+
+ProcessName.belongsToMany(Machine, {
+  through: 'MachineProcess',
+  as: 'machines',
+  foreignKey: 'process_id',
+  otherKey: 'machine_id'
+});
 
 User.hasMany(Machine, {
   foreignKey: "created_by",
@@ -153,10 +185,12 @@ User.hasMany(Machine, {
   foreignKey: "updated_by",
 });
 Machine.belongsTo(User, {
-  foreignKey: "created_by", as:"creator_machine",
+  foreignKey: "created_by",
+  as: "creator_machine",
 });
 Machine.belongsTo(User, {
-  foreignKey: "updated_by", as:"updater_machine",
+  foreignKey: "updated_by",
+  as: "updater_machine",
 });
 
 export default Machine;
