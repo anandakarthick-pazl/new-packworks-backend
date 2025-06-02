@@ -142,10 +142,11 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
 PurchaseOrderReturnItem.belongsTo(Company, { foreignKey: "company_id" });
 PurchaseOrderReturnItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 PurchaseOrderReturnItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
-// PurchaseOrderReturnItem.belongsTo(GRN, { foreignKey: "grn_id" });
 PurchaseOrderReturnItem.belongsTo(GRNItem, { foreignKey: "grn_item_id" });
- 
- PurchaseOrderReturnItem.belongsTo(PurchaseOrderReturn, { foreignKey: 'po_return_id', as: 'purchaseOrderReturn' });
+PurchaseOrderReturnItem.belongsTo(PurchaseOrderReturn, {
+  foreignKey: 'po_return_id',
+  as: 'purchaseOrderReturnId', // ✅ use this in include
+});
 
  
 export default PurchaseOrderReturnItem;

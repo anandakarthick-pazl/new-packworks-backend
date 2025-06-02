@@ -241,7 +241,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       include: [
         {
           model: PurchaseOrderReturn,
-          as: "purchaseOrderReturn",
+          as: 'purchaseOrderReturnId',
           attributes: ["id", "purchase_return_generate_id", "return_date", "reason"],
           include: [
             {
@@ -346,32 +346,55 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     }
 
     // Grouped inventory data
+    // const inventoryData = await Inventory.findAll({
+    //   attributes: [
+    //     'item_id',
+    //     'description',
+    //     'quantity_available',
+    //     'location',
+    //     'status',
+    //     'created_at',
+    //     'updated_at',
+    //     'category',
+    //     'sub_category',
+    //     'po_id',
+    //     'grn_id',
+    //     'grn_item_id',
+    //     'po_return_id',
+    //     'credit_note_id',
+    //     'debit_note_id',
+    //     'adjustment_id',
+    //     'work_order_id',
+    //     [fn('SUM', col('quantity_available')), 'total_quantity']
+    //   ],
+    //   where: whereCondition,
+    //   group: ['item_id'],
+    //   limit: limitNumber,
+    //   offset: offset,
+    // });
+
     const inventoryData = await Inventory.findAll({
-      attributes: [
-        'item_id',
-        'description',
-        'quantity_available',
-        'location',
-        'status',
-        'created_at',
-        'updated_at',
-        'category',
-        'sub_category',
-        'po_id',
-        'grn_id',
-        'grn_item_id',
-        'po_return_id',
-        'credit_note_id',
-        'debit_note_id',
-        'adjustment_id',
-        'work_order_id',
-        [fn('SUM', col('quantity_available')), 'total_quantity']
-      ],
-      where: whereCondition,
-      group: ['item_id'],
-      limit: limitNumber,
-      offset: offset,
-    });
+  attributes: [
+    'item_id',
+    [fn('SUM', col('quantity_available')), 'total_quantity'],
+    'location',
+    'status',
+    'created_at',
+    'updated_at',
+    
+  ],
+  where: whereCondition,
+  group: ['item_id'],
+  include: [
+    {
+      model: ItemMaster,
+      as: 'item',
+      attributes: ['description', 'category', 'sub_category','status']
+    }
+  ],
+  limit: limitNumber,
+  offset: offset,
+});
 
     // Get total count of unique item_ids (for pagination)
     const totalCountResult = await Inventory.findAll({

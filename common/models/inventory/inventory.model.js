@@ -144,7 +144,7 @@ const Inventory = sequelize.define("Inventory", {
 });
 
 ItemMaster.hasMany(Inventory, { foreignKey: "item_id" });
-Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" });
+Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" , as: 'item'  });
 
 GRN.hasMany(Inventory, { foreignKey: "grn_id" });
 Inventory.belongsTo(GRN, { foreignKey: "grn_id" });
