@@ -145,6 +145,7 @@ PurchaseOrderReturnItem.belongsTo(User, { foreignKey: "updated_by", as: "updater
 // PurchaseOrderReturnItem.belongsTo(GRN, { foreignKey: "grn_id" });
 PurchaseOrderReturnItem.belongsTo(GRNItem, { foreignKey: "grn_item_id" });
  
- 
+ PurchaseOrderReturnItem.belongsTo(PurchaseOrderReturn, { foreignKey: 'po_return_id', as: 'purchaseOrderReturn' });
+
  
 export default PurchaseOrderReturnItem;

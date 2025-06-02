@@ -651,7 +651,20 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
     // 7. Save return items
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
-      await PurchaseOrderReturnItem.create(item);
+      await PurchaseOrderReturnItem.create(item); 
+      
+      ///
+      await Inventory.update(
+        { po_return_id: poReturn.id },
+        {
+          where: {
+            item_id: item.item_id,
+            company_id: req.user.company_id
+          }
+        }
+      );
+      ///
+      
     }
 
     // 8. Check if all received items are fully returned

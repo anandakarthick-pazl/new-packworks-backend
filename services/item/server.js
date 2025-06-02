@@ -10,12 +10,69 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
 const User =db.User;
+const GRN = db.GRN;
+const GRNItem = db.GRNItem;
+const Inventory = db.Inventory;
+const PurchaseOrder = db.PurchaseOrder;
+const PurchaseOrderItem = db.PurchaseOrderItem;
+const PurchaseOrderReturn = db.PurchaseOrderReturn;
+const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
+const CreditNote = db.CreditNote;
+const DebitNote = db.DebitNote;
+const stockAdjustment = db.stockAdjustment;
+const stockAdjustmentItem = db.stockAdjustmentItem;
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+
+// v1Router.get("/items/status",authenticateJWT,async (req,res)=>{
+//   try {
+//     const items = await ItemMaster.findAll({
+//       attributes: ["id"],
+//      });
+
+//     if (!items || items.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No items found"
+//       });
+//     }
+
+//     const itemIds = items.map(item => item.id);
+//     const purchaseOrders = await PurchaseOrder.findAll({
+//       where: { item_id: itemIds },
+//       attributes: ["item_id", "status"]
+//     });
+
+
+//     const grnItems = await GRNItem.findAll({
+//       where: { item_id: itemIds },
+//       attributes: ["item_id", "status"]
+//     });
+
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Item statuses fetched successfully",
+//       data: items
+//     });
+//   } catch (error) {
+//     console.error(error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Error fetching item statuses"
+//     });
+//   }
+
+// });
+
+
+
+
 
 //get items  //item_code based search
 v1Router.get("/items",authenticateJWT,async (req,res)=>{
@@ -62,7 +119,20 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
     const item = await ItemMaster.create(rest, { transaction });
+    // await transaction.commit();
+
+    // Create Inventory record
+    const inventory = await Inventory.create({
+      item_id: item.id,
+      category: item.category || "default", 
+      sub_category: item.sub_category || "default",
+      company_id: req.user.company_id,
+      quantity_available: 0, 
+      created_by: req.user.id,
+    }, { transaction });
+
     await transaction.commit();
+
     return res.status(200).json({
       success: true,
       message: "Item Created Successfully",

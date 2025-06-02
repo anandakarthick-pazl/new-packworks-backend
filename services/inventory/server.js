@@ -1,19 +1,35 @@
 import express, { json, Router } from "express";
 import cors from "cors";
-import { Op } from "sequelize";
+import { fn, col, Op } from "sequelize";
 import db from "../../common/models/index.js"; 
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 
+// const ItemMaster = db.ItemMaster;
+// const Company = db.Company;
+// const Inventory = db.Inventory;
+// const User =db.User;
+// const InventoryType = db.InventoryType;
+// const GRN = db.GRN;
+// const GRNItem = db.GRNItem;
+
+
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
-const Inventory = db.Inventory;
 const User =db.User;
-const InventoryType = db.InventoryType;
 const GRN = db.GRN;
 const GRNItem = db.GRNItem;
+const Inventory = db.Inventory;
+const PurchaseOrder = db.PurchaseOrder;
+const PurchaseOrderItem = db.PurchaseOrderItem;
+const PurchaseOrderReturn = db.PurchaseOrderReturn;
+const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
+const CreditNote = db.CreditNote;
+const DebitNote = db.DebitNote;
+const stockAdjustment = db.stockAdjustment;
+const stockAdjustmentItem = db.stockAdjustmentItem;
 
 dotenv.config();
 const app = express();
@@ -22,10 +38,260 @@ app.use(cors());
 const v1Router = Router();
 
 //////////////////////////////////////////////////////   Inventory   ///////////////////////////////////////////////////////////
+//get inventory status
+// v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
+//   try {
+//     const itemId = req.params.id;
 
-// Get Inventory based on search, pagination, categoryId, and subCategoryId
-v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+//     const {
+//       PurchaseOrder,
+//       PurchaseOrderItem,
+//       GRN,
+//       GRNItem,
+//       PurchaseOrderReturn,
+//       PurchaseOrderReturnItem,
+//       User,
+//     } = db;
+
+//     // Store results
+//     const results = {};
+
+//     // Purchase Order Items
+//     const poItems = await PurchaseOrderItem.findAll({
+//       where: { item_id: itemId },
+//       include: [
+//         {
+//           model: PurchaseOrder,
+//           as: "purchaseOrder", // Ensure correct association alias
+//           attributes: [
+//             "id", "purchase_generate_id", "po_date", "supplier_id", "supplier_name", "supplier_contact", "billing_address",
+//             "shipping_address", "po_status",
+//           ],
+//           include: [
+//             {
+//               model: User,
+//               as: "creator",
+//               attributes: ["id", "name", "email"]
+//             }
+//           ]
+//         }
+//       ]
+//     });
+//     if (poItems.length > 0) {
+//       results.purchaseOrders = poItems;
+//     }
+
+//     // GRN Items
+//     const grnItems = await GRNItem.findAll({
+//       where: { item_id: itemId },
+//       include: [
+//         {
+//           model: GRN,
+//           as: "grn", // Ensure correct alias
+//           attributes: ["id", "grn_generate_id", "grn_date","invoice_no", "invoice_date", "received_by", "status"],
+//           include: [
+//             {
+//               model: User,
+//               as: "creator",
+//               attributes: ["id", "name", "email"]
+//             }
+//           ]
+//         }
+//       ]
+//     });
+//     if (grnItems.length > 0) {
+//       results.grns = grnItems;
+//     }
+
+//     // Purchase Order Return Items
+//     const returnItems = await PurchaseOrderReturnItem.findAll({
+//       where: { item_id: itemId },
+//       include: [
+//         {
+//           model: PurchaseOrderReturn,
+//           as: "purchaseOrderReturn", // Ensure correct alias
+//           attributes: ["id", "return_date", "reason"]
+//         }
+//       ]
+//     });
+//     if (returnItems.length > 0) {
+//       results.purchaseReturns = returnItems;
+//     }
+
+//     // If no data found in any table
+//     if (Object.keys(results).length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No related data found for the given item ID.",
+//       });
+//     }
+
+//     // Success response with found data
+//     return res.status(200).json({
+//       success: true,
+//       data: results,
+//       message: "Item-related data fetched successfully.",
+//     });
+
+//   } catch (error) {
+//     console.error("Inventory Item Status Fetch Error:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: `Error fetching item data: ${error.message}`,
+//     });
+//   }
+// });
+
+v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
   try {
+    const itemId = req.params.id;
+    if (!itemId) {
+      return res.status(400).json({
+        success: false,
+        message: "Item ID is required.",
+      });
+    }
+    // Fetch all related data for the given item ID
+    const itemExists = await ItemMaster.findOne({
+      where: { id: itemId}
+    });
+   const item_generate_id = itemExists ? itemExists.item_generate_id : null;
+
+
+    const {
+      PurchaseOrder,
+      PurchaseOrderItem,
+      GRN,
+      GRNItem,
+      PurchaseOrderReturn,
+      PurchaseOrderReturnItem,
+      CreditNote,
+      DebitNote,
+      stockAdjustment,
+      stockAdjustmentItem,
+      User,
+    } = db;
+
+    const results = {
+      purchaseOrders: [],
+      grns: [],
+      purchaseReturns: [],
+      creditNotes: [],
+      debitNotes: [],
+      stockAdjustments: []
+    };
+
+    // Purchase Orders
+    results.purchaseOrders = await PurchaseOrderItem.findAll({
+      where: { item_id: itemId },
+      attributes: [ // 👈 Choose specific fields from GRNItem
+        "id","description","hsn_code","quantity","unit_price",
+        "cgst","sgst","tax_amount","total_amount","status","created_at"
+      ],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: [
+            "id", "purchase_generate_id", "po_date", "supplier_id", "supplier_name",
+            "supplier_contact", "billing_address","shipping_address", "po_status",
+          ],
+          include: [
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "name", "email"]
+            }
+          ]
+        }
+      ]
+    });
+
+    // GRNs
+    results.grns = await GRNItem.findAll({
+      where: { item_id: itemId },
+      attributes: [ // 👈 Choose specific fields from GRNItem
+        "id","description","quantity_ordered","quantity_received","accepted_quantity","rejected_quantity",
+        "status","created_at"
+      ],
+      include: [
+        {
+          model: GRN,
+          as: "grn",
+          attributes: ["id", "grn_generate_id", "grn_date", "invoice_no", "invoice_date", "received_by", 
+            "delivery_note_no", "created_at", "status"],
+          include: [
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "name", "email"]
+            }
+          ]
+        }
+      ]
+    });
+
+    // Purchase Order Returns
+    results.purchaseReturns = await PurchaseOrderReturnItem.findAll({
+      where: { item_id: itemId },
+      attributes: [ // 👈 Choose specific fields from GRNItem
+        "id","return_qty", "reason", "notes", "created_at", "unit_price","cgst","sgst","amount",
+        "tax_amount","total_amount"
+      ],
+      include: [
+        {
+          model: PurchaseOrderReturn,
+          as: "purchaseOrderReturn",
+          attributes: ["id", "purchase_return_generate_id", "return_date", "reason"]
+        }
+      ]
+    });
+
+    // // Credit Notes
+    // results.creditNotes = await CreditNote.findAll({
+    //   where: { item_id: itemId }
+    // });
+
+    // // Debit Notes
+    // results.debitNotes = await DebitNote.findAll({
+    //   where: { item_id: itemId }
+    // });
+
+    // Stock Adjustments
+    results.stockAdjustments = await stockAdjustmentItem.findAll({
+      where: { item_id: itemId },
+      include: [
+        {
+          model: stockAdjustment,
+          as: "adjustment",
+          attributes: ["id", "stock_adjustment_generate_id", "remarks", "created_by", "created_at"]
+        }
+      ]
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Item-related data fetched successfully.",
+      data: results,
+    });
+
+  } catch (error) {
+    console.error("Inventory Item Status Fetch Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching item data: ${error.message}`,
+    });
+  }
+});
+
+
+
+
+
+
+
+v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+  try {   
     const {
       search = "",
       page = "1",
@@ -38,55 +304,146 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const limitNumber = parseInt(limit) || 10;
     const offset = (pageNumber - 1) * limitNumber;
 
-    let whereCondition = {};
+    let whereCondition = {
+      company_id: req.user.company_id
+    };
 
-    // Filter by search (e.g., id or name)
+    // Optional search filters (e.g., inventory ID or generate ID)
     if (search.trim() !== "") {
       whereCondition = {
         ...whereCondition,
         [Op.or]: [
           { id: { [Op.like]: `%${search}%` } },
           { inventory_generate_id: { [Op.like]: `%${search}%` } },
-          // { name: { [Op.like]: `%${search}%` } }, // assuming inventory has name
         ]
       };
     }
 
-    // Filter by categoryId
+    // Optional filters for category or subcategory (if applicable to Inventory or via include)
     if (categoryId) {
       whereCondition.category = categoryId;
     }
 
-    // Filter by subCategoryId
     if (subCategoryId) {
       whereCondition.sub_category = subCategoryId;
     }
 
-    console.log("Where Condition:", whereCondition);
-    
-
+    // Grouped inventory data
     const inventoryData = await Inventory.findAll({
+      attributes: [
+        'item_id',
+        'description',
+        'quantity_available',
+        'location',
+        'status',
+        'created_at',
+        'updated_at',
+        'category',
+        'sub_category',
+        'po_id',
+        'grn_id',
+        'grn_item_id',
+        'po_return_id',
+        'credit_note_id',
+        'debit_note_id',
+        'adjustment_id',
+        'work_order_id',
+        [fn('SUM', col('quantity_available')), 'total_quantity']
+      ],
       where: whereCondition,
+      group: ['item_id'],
       limit: limitNumber,
       offset: offset,
     });
 
-    const totalCount = await Inventory.count({ where: whereCondition });
+    // Get total count of unique item_ids (for pagination)
+    const totalCountResult = await Inventory.findAll({
+      attributes: ['item_id'],
+      where: whereCondition,
+      group: ['item_id']
+    });
+
+    const totalCount = totalCountResult.length;
 
     return res.status(200).json({
       success: true,
-      message: "Inventory data fetched successfully",
+      message: "Grouped Inventory data fetched successfully",
       data: inventoryData,
-      totalCount: totalCount,
+      totalCount: totalCount
     });
   } catch (error) {
     console.error(error.message);
     return res.status(500).json({
       success: false,
-      message: `inventory fetched error: ${error.message}`,
+      message: `Inventory fetch error: ${error.message}`,
     });
   }
 });
+
+// Get Inventory based on search, pagination, categoryId, and subCategoryId
+// v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+//   try {
+//     const {
+//       search = "",
+//       page = "1",
+//       limit = "10",
+//       categoryId,
+//       subCategoryId
+//     } = req.query;
+
+//     const pageNumber = parseInt(page) || 1;
+//     const limitNumber = parseInt(limit) || 10;
+//     const offset = (pageNumber - 1) * limitNumber;
+
+//     let whereCondition = {};
+
+//     // Filter by search (e.g., id or name)
+//     if (search.trim() !== "") {
+//       whereCondition = {
+//         ...whereCondition,
+//         [Op.or]: [
+//           { id: { [Op.like]: `%${search}%` } },
+//           { inventory_generate_id: { [Op.like]: `%${search}%` } },
+//           // { name: { [Op.like]: `%${search}%` } }, // assuming inventory has name
+//         ]
+//       };
+//     }
+
+//     // Filter by categoryId
+//     if (categoryId) {
+//       whereCondition.category = categoryId;
+//     }
+
+//     // Filter by subCategoryId
+//     if (subCategoryId) {
+//       whereCondition.sub_category = subCategoryId;
+//     }
+
+//     console.log("Where Condition:", whereCondition);
+    
+
+//     const inventoryData = await Inventory.findAll({
+//       where: whereCondition,
+//       limit: limitNumber,
+//       offset: offset,
+//     });
+
+//     const totalCount = await Inventory.count({ where: whereCondition });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Inventory data fetched successfully",
+//       data: inventoryData,
+//       totalCount: totalCount,
+//     });
+//   } catch (error) {
+//     console.error(error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: `inventory fetched error: ${error.message}`,
+//     });
+//   }
+// });
 
 
 
@@ -134,74 +491,78 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 
 // Create Inventory 
-v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
-  const transaction = await sequelize.transaction();
-  try{
-    const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
-    const { ...rest } = req.body;
-    rest.inventory_generate_id = inventory_generate_id;
-    rest.created_by = req.user.id;
-    rest.updated_by = req.user.id;
-    rest.company_id = req.user.company_id;
 
-    // Validate Item
-    const itemId = req.body.item_id;
-    const validateItem = await ItemMaster.findOne({
-      where: { id: itemId, status: "active" }
-    });
-    if (!validateItem) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid or inactive Item.`,
-      });
-    }
 
-      let category = validateItem.category;
-      let sub_category = validateItem.sub_category;
 
-    rest.category = category;
-    rest.sub_category = sub_category;
 
-    // Validate GRN
-    const grnId = req.body.grn_id;
-    const validateGrn = await GRN.findOne({
-      where: { id: grnId, status: "active" }
-    });
-    if (!validateGrn) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid or inactive GRN.`,
-      });
-    }
+// v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
+//   const transaction = await sequelize.transaction();
+//   try{
+//     const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
+//     const { ...rest } = req.body;
+//     rest.inventory_generate_id = inventory_generate_id;
+//     rest.created_by = req.user.id;
+//     rest.updated_by = req.user.id;
+//     rest.company_id = req.user.company_id;
 
-    // Validate GRN Item
-    const grnItemId = req.body.grn_item_id;
-    const validateGrnItem = await GRNItem.findOne({
-      where: { id: grnItemId, status: "active" }
-    });
-    if (!validateGrnItem) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid or inactive GrnItem.`,
-      });
-    }
+//     // Validate Item
+//     const itemId = req.body.item_id;
+//     const validateItem = await ItemMaster.findOne({
+//       where: { id: itemId, status: "active" }
+//     });
+//     if (!validateItem) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Invalid or inactive Item.`,
+//       });
+//     }
+
+//       let category = validateItem.category;
+//       let sub_category = validateItem.sub_category;
+
+//     rest.category = category;
+//     rest.sub_category = sub_category;
+
+//     // Validate GRN
+//     const grnId = req.body.grn_id;
+//     const validateGrn = await GRN.findOne({
+//       where: { id: grnId, status: "active" }
+//     });
+//     if (!validateGrn) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Invalid or inactive GRN.`,
+//       });
+//     }
+
+//     // Validate GRN Item
+//     const grnItemId = req.body.grn_item_id;
+//     const validateGrnItem = await GRNItem.findOne({
+//       where: { id: grnItemId, status: "active" }
+//     });
+//     if (!validateGrnItem) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Invalid or inactive GrnItem.`,
+//       });
+//     }
     
-    const inventoryData = await Inventory.create(rest,{ transaction });
-    await transaction.commit();
-    return res.status(200).json({
-      success : true,
-      message : `Inventory Created Successfully`,
-      data : inventoryData
-    });
-  }catch(error){
-    await transaction.rollback();
-    console.error(error.message);
-    return res.status(500).json({
-      success : false,
-      message : `inventory created Error : ${error.message}`
-    });    
-  }
-});
+//     const inventoryData = await Inventory.create(rest,{ transaction });
+//     await transaction.commit();
+//     return res.status(200).json({
+//       success : true,
+//       message : `Inventory Created Successfully`,
+//       data : inventoryData
+//     });
+//   }catch(error){
+//     await transaction.rollback();
+//     console.error(error.message);
+//     return res.status(500).json({
+//       success : false,
+//       message : `inventory created Error : ${error.message}`
+//     });    
+//   }
+// });
 
 
 

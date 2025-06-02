@@ -98,22 +98,45 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
 
       const acceptedQty = parseFloat(accepted_quantity) || 0;
 
-      const existingInventory = await Inventory.findOne({
-        where: {
-          item_id,
-          batch_no: batch_no || null,
-          location: location || null,
-          status: 'active'
-        },
-        transaction
-      });
+      // const existingInventory = await Inventory.findOne({
+      //   where: {
+      //     item_id,
+      //     batch_no: batch_no || null,
+      //     location: location || null,
+      //     status: 'active'
+      //   },
+      //   transaction
+      // });
 
-      if (existingInventory) {
-        existingInventory.quantity_available =
-          (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
-        existingInventory.updated_by = req.user.id;
-        await existingInventory.save({ transaction });
-      } else {
+      // if (existingInventory) {
+       
+      //   // existingInventory.quantity_available =
+      //   //   (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
+      //   // existingInventory.updated_by = req.user.id;
+      //   // await existingInventory.save({ transaction });
+        
+      //   const updatedQuantity = (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
+        
+      //   await Inventory.create({
+      //     company_id: req.user.company_id,
+      //     item_id,
+      //     item_code,
+      //     grn_id: newGRN.id,
+      //     grn_item_id: newGRNItem.id,
+      //     po_id: grnData.po_id,
+      //     category:category,
+      //     sub_category:sub_category,
+      //     // inventory_type: itemType,
+      //     work_order_no,
+      //     description,
+      //     quantity_available: updatedQuantity,
+      //     batch_no,
+      //     location,
+      //     status: 'active',
+      //     created_by: req.user.id,
+      //     updated_by: req.user.id
+      //   }, { transaction });
+      // } else {
         await Inventory.create({
           company_id: req.user.company_id,
           item_id,
@@ -123,6 +146,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           po_id: grnData.po_id,
           category:category,
           sub_category:sub_category,
+          po_item_id:po_item_id,
           // inventory_type: itemType,
           work_order_no,
           description,
@@ -134,7 +158,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           updated_by: req.user.id
         }, { transaction });
       }
-    }
+    // }
 
     const allPoItems = await PurchaseOrderItem.findAll({
       where: { po_id: grnData.po_id },
