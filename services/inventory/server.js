@@ -242,7 +242,14 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         {
           model: PurchaseOrderReturn,
           as: "purchaseOrderReturn",
-          attributes: ["id", "purchase_return_generate_id", "return_date", "reason"]
+          attributes: ["id", "purchase_return_generate_id", "return_date", "reason"],
+          include: [
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "name", "email"]
+            }
+          ]
         }
       ]
     });
@@ -260,11 +267,21 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     // Stock Adjustments
     results.stockAdjustments = await stockAdjustmentItem.findAll({
       where: { item_id: itemId },
+      attributes: [ 
+        "id","previous_quantity", "type", "adjustment_quantity", "difference", "reason"
+      ],
       include: [
         {
           model: stockAdjustment,
           as: "adjustment",
-          attributes: ["id", "stock_adjustment_generate_id", "remarks", "created_by", "created_at"]
+          attributes: ["id", "stock_adjustment_generate_id","adjustment_date", "remarks", "status", "created_by", "created_at"],
+          include: [
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "name", "email"]
+            }
+          ]
         }
       ]
     });
@@ -363,12 +380,22 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       group: ['item_id']
     });
 
+
+    
+
     const totalCount = totalCountResult.length;
+    const totalPages = Math.ceil(totalCount / limitNumber);
 
     return res.status(200).json({
       success: true,
       message: "Grouped Inventory data fetched successfully",
       data: inventoryData,
+       pagination: {
+        currentPage: pageNumber,
+        perPage: limitNumber,
+        totalCount,
+        totalPages
+      },
       totalCount: totalCount
     });
   } catch (error) {

@@ -81,6 +81,7 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
   timestamps: false,
 });
 
+StockAdjustment.belongsTo(User, { as: "creator", foreignKey: "created_by" });
 
 
 export default StockAdjustment;
