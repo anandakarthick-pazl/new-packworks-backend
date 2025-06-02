@@ -215,7 +215,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
   });
 
 
-  v1Router.get("/sub-category/by-category", authenticateJWT, async (req, res) => {
+  v1Router.get("/category/sub-category/id", authenticateJWT, async (req, res) => {
   try {
     const categoryId = req.query.category_id;
 
