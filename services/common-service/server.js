@@ -26,6 +26,7 @@ const Company = db.Company;
 const Die = db.Die;
 const States = db.States;
 const Color = db.Color;
+const WorkOrderStatus = db.WorkOrderStatus;
 const User = db.User;
 
 // Middleware to extract user details from token
@@ -933,6 +934,46 @@ v1Router.get("/colors", authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching colors data:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+v1Router.get("/work-order-status", authenticateJWT, async (req, res) => {
+  try {
+    const workOrderStatus = await WorkOrderStatus.findAll({
+      include: [
+        {
+          model: Company,
+          as: "company",
+          attributes: ["id", "company_name"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "name"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "updater",
+          attributes: ["id", "name"],
+          required: false,
+        },
+      ],
+    });
+
+    res.status(200).json({
+      status: "success",
+      count: workOrderStatus.length,
+      data: workOrderStatus,
+    });
+  } catch (error) {
+    console.error("Error fetching work order status data:", error);
     res.status(500).json({
       status: "error",
       message: "Internal Server Error",
