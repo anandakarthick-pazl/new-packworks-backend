@@ -1766,7 +1766,7 @@ process.on("SIGINT", async () => {
 
 // Use Version 1 Router
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3004;
 app.listen(process.env.PORT_SKU, "0.0.0.0", () => {
   console.log(`SKU Service running on port ${process.env.PORT_SKU}`);

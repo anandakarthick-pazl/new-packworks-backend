@@ -418,7 +418,7 @@ v1Router.post('/inventory/type',authenticateJWT,async(req,res)=>{
 
 
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3025;
 app.listen(process.env.PORT_INVENTORY,'0.0.0.0', () => {
   console.log(`Item Master Service running on port ${process.env.PORT_INVENTORY}`);

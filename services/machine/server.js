@@ -3098,7 +3098,7 @@ process.on("SIGINT", async () => {
 // Use Version 1 Router
 app.use("/api/machines", v1Router);
 
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3007;
 const service = "Machine Service";
 app.listen(process.env.PORT_MACHINE,'0.0.0.0', () => {
