@@ -71,7 +71,7 @@ v1Router.get("/sub-category", authenticateJWT, async (req, res) => {
       },
       offset,
       limit,
-      order: [["created_at", "DESC"]],
+      // order: [["created_at", "DESC"]],
     });
 
     res.json({

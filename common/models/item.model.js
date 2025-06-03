@@ -2,6 +2,8 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
+import Category from "./category/category.model.js";
+import SubCategory from "./category/sub_category.model.js";
 
 const ItemMaster = sequelize.define(
   "ItemMaster",
@@ -131,5 +133,9 @@ const ItemMaster = sequelize.define(
 ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+ItemMaster.belongsTo(Category, { foreignKey: 'category', as: 'category_info' });
+ItemMaster.belongsTo(SubCategory, { foreignKey: 'sub_category', as: 'sub_category_info' });
+
 
 export default ItemMaster;
