@@ -55,7 +55,7 @@ const SalesOrder = sequelize.define(
     },
     freight_paid: {
       type: DataTypes.FLOAT,
-      allowNull: false,
+      allowNull: true,
     },
     confirmation: {
       type: DataTypes.ENUM("Email", "Oral"),
