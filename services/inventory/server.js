@@ -41,10 +41,27 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     }
 
     const inventoryData = await Inventory.findAll({
-      where: whereCondition,
-      limit: limitNumber,
-      offset: offset,
-    });
+  attributes: [
+    'item_id',
+    [fn('SUM', col('quantity_available')), 'total_quantity'],
+    'location',
+    'status',
+    'created_at',
+    'updated_at',
+    
+  ],
+  where: whereCondition,
+  group: ['item_id'],
+  include: [
+    {
+      model: ItemMaster,
+      as: 'item',
+      attributes: ['item_name','description', 'category', 'sub_category','status']
+    }
+  ],
+  limit: limitNumber,
+  offset: offset,
+});
 
     const totalCount = await Inventory.count({ where: whereCondition });
 
