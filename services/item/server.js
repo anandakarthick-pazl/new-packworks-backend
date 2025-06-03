@@ -228,7 +228,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
         category_id: categoryId,
         // is_visible: 1, // optional condition
       },
-      order: [["created_at", "DESC"]],
+      // order: [["created_at", "DESC"]],
     });
 
     res.json({

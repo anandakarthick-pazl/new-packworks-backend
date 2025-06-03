@@ -389,7 +389,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     {
       model: ItemMaster,
       as: 'item',
-      attributes: ['description', 'category', 'sub_category','status']
+      attributes: ['id','item_name','description', 'category', 'sub_category','status']
     }
   ],
   limit: limitNumber,
