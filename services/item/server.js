@@ -184,6 +184,33 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
   });
 
 
+  v1Router.get("/items/sub-category/id", authenticateJWT, async (req, res) => {
+  try {
+    const categoryId = req.query.category_id;
+
+    if (!categoryId) {
+      return res.status(400).json({ error: "category_id is required" });
+    }
+
+    const subCategories = await Sub_categories.findAll({
+      where: {
+        category_id: categoryId,
+        // is_visible: 1, // optional condition
+      },
+      // order: [["created_at", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      data: subCategories,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 app.use("/api", v1Router);
 await db.sequelize.sync();
 const PORT = process.env.PORT_ITEM;

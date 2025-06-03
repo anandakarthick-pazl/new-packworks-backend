@@ -73,10 +73,22 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 //get all po
 v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
   try {
+    const usedPoIds = await GRN.findAll({
+      attributes: ['po_id'],
+      raw: true,
+    });
+
+    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+
+
+
     const orders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
       where: {
         company_id: req.user.company_id,
+        id: {
+          [Op.notIn]: poIdList
+        }
       }
     });
 
