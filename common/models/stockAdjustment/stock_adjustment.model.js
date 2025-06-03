@@ -4,7 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import Inventory from "../inventory/inventory.model.js";
 import GRNItem from "../grn/grn_item.model.js";
-
+import PurchaseOrderItem from "../po/purchase_order_item.model.js";
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -24,22 +24,31 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     },
     onUpdate: "CASCADE",
   },
-   inventory_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  },
-grn_item_id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    references: {
-      model: GRNItem,
-      key: "id",
-    },
-    onUpdate: "CASCADE",
-    onDelete: "SET NULL",
-  },
-   po_id: {
-    type: DataTypes.INTEGER(12),
-  },
+  
+// grn_item_id: {
+//     type: DataTypes.INTEGER.UNSIGNED,
+//     references: {
+//       model: GRNItem,
+//       key: "id",
+//     },
+//     onUpdate: "CASCADE",
+//     onDelete: "SET NULL",
+//   },
+//  po_item_id: {
+//     type: DataTypes.INTEGER.UNSIGNED,
+//     allowNull: true,
+//     references: {
+//       model: PurchaseOrderItem,
+//       key: "id",
+//     },
+//     onUpdate: "CASCADE",
+//     onDelete: "CASCADE",
+//   },
+//  inventory_id: {
+//   type: DataTypes.INTEGER,
+//   allowNull: true
+// },
+
   adjustment_date: {
     type: DataTypes.DATEONLY,
     allowNull: true,
