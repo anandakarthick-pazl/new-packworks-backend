@@ -374,7 +374,7 @@ app.get("/health", (req, res) => {
 
 // Use Version 1 Router
 app.use("/api/production", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3029;
 app.listen(process.env.PORT_PRODUCTION, '0.0.0.0',() => {
   console.log(`Production Service running on port ${process.env.PORT_PRODUCTION}`);

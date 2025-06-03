@@ -94,6 +94,7 @@ grn_item_id: {
   timestamps: false,
 });
 
+StockAdjustment.belongsTo(User, { as: "creator", foreignKey: "created_by" });
 
 
 export default StockAdjustment;

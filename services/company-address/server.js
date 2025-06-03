@@ -530,7 +530,7 @@ v1Router.get("/health", authenticateStaticToken, (req, res) => {
 // Use Version 1 Router
 app.use("/api", v1Router);
 
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3014;
 const service = 'CompanyAddress Service';
 app.listen(process.env.PORT_COMPANY_ADDRESS,'0.0.0.0', async () => {

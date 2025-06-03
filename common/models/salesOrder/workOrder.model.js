@@ -123,16 +123,33 @@ const WorkOrder = sequelize.define(
     progress: {
       type: DataTypes.ENUM(
         "Pending",
-        "Product Planning",
-        "Procurement Sourcing",
-        "Production Planning",
-        "Production",
-        "Quality Control",
-        "Packaging",
-        "Shipping"
+        "Raw Material Allocation",
+        "Production Planned",
+        "Completed",
+        "Invoiced"
       ),
       allowNull: false,
       defaultValue: "Pending",
+    },
+    excess_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    pending_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    manufactured_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    stage:{
+      type: DataTypes.STRING(200),
+      allowNull: true,
+      defaultValue: "Production",
     },
     qr_code_url: {
       type: DataTypes.STRING,

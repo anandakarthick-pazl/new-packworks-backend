@@ -1088,13 +1088,10 @@ v1Router.delete("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
 
 
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = process.env.PORT_STOCK_ADJUSTMENT;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0",() => {
   console.log(`Stock Adjustment running on port ${PORT}`);
 });
 
-// v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
 
-// })

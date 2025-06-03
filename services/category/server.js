@@ -121,7 +121,7 @@ v1Router.delete("/category/:id", authenticateJWT, async (req, res) => {
 
 
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = process.env.PORT_CATEGORY;
 app.listen(process.env.PORT_CATEGORY,'0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_CATEGORY}`);

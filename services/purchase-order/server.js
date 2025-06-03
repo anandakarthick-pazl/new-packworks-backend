@@ -651,7 +651,20 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
     // 7. Save return items
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
-      await PurchaseOrderReturnItem.create(item);
+      await PurchaseOrderReturnItem.create(item); 
+      
+      ///
+      await Inventory.update(
+        { po_return_id: poReturn.id },
+        {
+          where: {
+            item_id: item.item_id,
+            company_id: req.user.company_id
+          }
+        }
+      );
+      ///
+      
     }
 
     // 8. Check if all received items are fully returned
@@ -736,7 +749,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
 
 //connection port
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = process.env.PORT_PURCHASE;
 app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);

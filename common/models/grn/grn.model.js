@@ -89,5 +89,7 @@ GRN.belongsTo(Company, { foreignKey: "company_id" });
 
 GRN.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRN.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
-
+    
+GRN.belongsTo(User, { foreignKey: "created_by", as: "createdBy" });
+GRN.belongsTo(User, { foreignKey: "updated_by", as: "updatedBy" });
 export default GRN;

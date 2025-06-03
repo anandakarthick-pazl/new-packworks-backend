@@ -472,7 +472,7 @@ v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) 
 
 // 🖥 Start the app
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 
 const PORT = process.env.PORT_PURCHASE_RETURN;
 app.listen(process.env.PORT_PURCHASE_RETURN, () => {
