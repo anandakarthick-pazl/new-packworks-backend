@@ -54,23 +54,8 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     const existing = await debit_note.findOne({ where: { debit_note_number } });
     if (existing) throw new Error(`Debit Note ${debit_note_number} already exists`);
 
-    // 🔢 Auto-generate debit_note_generate_id like DN-001
-    const lastNote = await debit_note.findOne({
-      where: {
-        debit_note_generate_id: { [Op.like]: 'DN-%' }
-      },
-      order: [['created_at', 'DESC']],
-      attributes: ['debit_note_generate_id']
-    });
-
-    let debit_note_generate_id = "DN-001";
-    if (lastNote && lastNote.debit_note_generate_id) {
-      const match = lastNote.debit_note_generate_id.match(/DN-(\d+)/);
-      if (match) {
-        const nextNum = parseInt(match[1], 10) + 1;
-        debit_note_generate_id = `DN-${String(nextNum).padStart(3, '0')}`;
-      }
-    }
+    // ✅ Generate debit_note_generate_id using utility function
+    const debit_note_generate_id = await generateId(user.company_id, debit_note, "debit_note");
 
     // Fetch PO Return with items and PO (for supplier)
     const poReturn = await PurchaseOrderReturn.findOne({
@@ -101,7 +86,7 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
 
     const debitNote = await debit_note.create({
       debit_note_number,
-      debit_note_generate_id, // ⬅️ Auto-generated field
+      debit_note_generate_id, // ✅ Auto-generated ID
       po_return_id,
       reference_id,
       company_id: user.company_id,
@@ -134,11 +119,12 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     console.error(error);
     return res.status(500).json({
       success: false,
-      message: `Creation failed: ${error.message}`,
+      message: `Creation failed: ${error.message}`, // ✅ fixed backtick usage
       errors: error.errors ? error.errors.map(e => e.message) : null
     });
   }
 });
+
 
 
 

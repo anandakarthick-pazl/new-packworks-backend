@@ -2,6 +2,8 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Inventory from "../inventory/inventory.model.js";
+import GRNItem from "../grn/grn_item.model.js";
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
@@ -26,7 +28,18 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
-
+grn_item_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    references: {
+      model: GRNItem,
+      key: "id",
+    },
+    onUpdate: "CASCADE",
+    onDelete: "SET NULL",
+  },
+   po_id: {
+    type: DataTypes.INTEGER(12),
+  },
   adjustment_date: {
     type: DataTypes.DATEONLY,
     allowNull: true,

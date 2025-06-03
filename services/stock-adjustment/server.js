@@ -7,6 +7,7 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import db from "../../common/models/index.js";
+import PurchaseOrderItem from "../../common/models/po/purchase_order_item.model.js";
 
 const StockAdjustment = db.stockAdjustment;
 const StockAdjustmentItem = db.stockAdjustmentItem;
@@ -14,6 +15,9 @@ const Inventory = db.Inventory;
 const ItemMaster = db.ItemMaster;
 const User = db.User;
 const Company = db.Company;
+const PurchaseOrder = db.PurchaseOrder;
+const GRN = db.GRN;
+const GRNItem = db.GRNItem;
 
 const app = express();
 app.use(json());
@@ -29,7 +33,7 @@ dotenv.config();
 
 
 
-//get all items based on inventory
+// get all items based on inventory
 v1Router.get("/stock-adjustments/items", authenticateJWT, async (req, res) => {
     try {
         const inventory_data = await Inventory.findAll({
@@ -45,6 +49,62 @@ v1Router.get("/stock-adjustments/items", authenticateJWT, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch items' });
     }
 });
+
+
+
+
+
+
+// v1Router.get("/stock-adjustments/items/:id", authenticateJWT, async (req, res) => {
+//   try {
+//     const item_id = req.params.id;
+
+//     // ✅ Step 1: Get the item info
+//     const item = await ItemMaster.findOne({
+//       where: { id: item_id },
+//       attributes: ['id', 'item_generate_id', 'item_name']
+//     });
+
+//     if (!item) {
+//       return res.status(404).json({ success: false, message: "Item not found" });
+//     }
+
+//     // ✅ Step 2: Get matching Purchase Orders
+//     const poItems = await PurchaseOrderItem.findAll({
+//       where: { item_id },
+//     });
+//     if(!poItems){
+//       return res.status(404).json({ success: false, message: "Purchase Order not found" });
+//     }
+
+
+//     // ✅ Step 3: Get matching GRNs
+//     const grnItems = await GRNItem.findAll({
+//       where: { item_id },
+//     });
+//     if(!grnItems){
+//       return res.status(404).json({ success: false, message: "GRN not found" });
+//     }
+    
+
+//     // ✅ Final response
+//     return res.status(200).json({
+//       success: true,
+//       message: "Item, Purchase Orders, and GRNs fetched successfully",
+//       data: 
+//        "Item, Purchase Orders, and GRNs fetched successfully"
+      
+//     });
+
+//   } catch (error) {
+//     console.error("Error fetching item-related data:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch item-related info"
+//     });
+//   }
+// });
+
 
 // Create stock adjustment
 // v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
@@ -138,6 +198,8 @@ v1Router.get("/stock-adjustments/items", authenticateJWT, async (req, res) => {
 //   }
 // });
 
+
+
 v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -223,6 +285,240 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+// v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const { remarks, items } = req.body;
+//     const stockAdjustmentId = await generateId(req.user.company_id, StockAdjustment, "stock_adjustment");
+//     const company_id = req.user.company_id;
+
+//     const adjustment = await StockAdjustment.create(
+//       {
+//         stock_adjustment_generate_id: stockAdjustmentId,
+//         company_id,
+//         adjustment_date: new Date(),
+//         remarks,
+//         created_by: req.user.id,
+//         updated_by: req.user.id,
+//       },
+//       { transaction }
+//     );
+
+//     const adjustmentItemsCreated = [];
+
+//     for (const item of items) {
+//       const { item_id, type, adjustment_quantity, reason } = item;
+//       const quantity = parseFloat(adjustment_quantity || 0);
+
+//       // ✅ Fetch latest GRNItem for this item
+//       const grnItem = await GRNItem.findOne({
+//         where: { item_id },
+//         include: [
+//           { model: GRN, attributes: ['id'] },
+//           { model: PurchaseOrderItem, attributes: ['id'] }
+//         ],
+//         order: [['created_at', 'DESC']],
+//         transaction
+//       });
+
+//       if (!grnItem || !grnItem.GRN || !grnItem.PurchaseOrderItem) {
+//         throw new Error(`Missing GRN or Purchase Order Item for item_id: ${item_id}`);
+//       }
+
+//       const grn_id = grnItem.GRN.id;
+//       const purchase_order_item_id = grnItem.PurchaseOrderItem.id;
+
+//       // ✅ Find inventory entry based on item, GRN, and PO item
+//       const existingInventory = await Inventory.findOne({
+//         where: {
+//           item_id,
+//           grn_id,
+//           purchase_order_item_id,
+//           company_id
+//         },
+//         transaction
+//       });
+
+//       if (!existingInventory) {
+//         throw new Error(`Inventory not found for item_id: ${item_id}, grn_id: ${grn_id}, po_item_id: ${purchase_order_item_id}`);
+//       }
+
+//       const previous_quantity = parseFloat(existingInventory.quantity_available || 0);
+//       const new_quantity =
+//         type === "increase"
+//           ? previous_quantity + quantity
+//           : previous_quantity - quantity;
+
+//       if (type === "decrease" && quantity > previous_quantity) {
+//         throw new Error(`Cannot decrease more than available quantity for item_id: ${item_id}`);
+//       }
+
+//       const adjustment_item = await StockAdjustmentItem.create(
+//         {
+//           adjustment_id: adjustment.id,
+//           item_id,
+//           inventory_id: existingInventory.id,
+//           grn_id,
+//           purchase_order_item_id,
+//           previous_quantity,
+//           reason,
+//           type,
+//           adjustment_quantity: quantity,
+//           difference: new_quantity,
+//           company_id,
+//           created_by: req.user.id,
+//           updated_by: req.user.id,
+//         },
+//         { transaction }
+//       );
+
+//       adjustmentItemsCreated.push(adjustment_item);
+
+//       await existingInventory.update(
+//         { quantity_available: new_quantity },
+//         { transaction }
+//       );
+//     }
+
+//     await transaction.commit();
+//     return res.status(201).json({
+//       success: true,
+//       message: "Stock adjustment created successfully",
+//       adjustment_id: adjustment.id,
+//       data: {
+//         adjustment,
+//         adjustment_items: adjustmentItemsCreated
+//       }
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     console.error("Stock adjustment error:", error);
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// });
+
+
+// v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const { remarks, items } = req.body;
+//     const stockAdjustmentId = await generateId(req.user.company_id, StockAdjustment, "stock_adjustment");
+//     const company_id = req.user.company_id;
+
+//     const adjustment = await StockAdjustment.create(
+//       {
+//         stock_adjustment_generate_id: stockAdjustmentId,
+//         company_id,
+//         adjustment_date: new Date(),
+//         remarks,
+//         created_by: req.user.id,
+//         updated_by: req.user.id,
+//       },
+//       { transaction }
+//     );
+
+//     const adjustmentItemsCreated = [];
+
+//     for (const item of items) {
+//       const { item_id, type, adjustment_quantity, reason } = item;
+//       const quantity = parseFloat(adjustment_quantity || 0);
+
+//       // ✅ Get latest GRNItem that includes GRN and PurchaseOrderItem
+//       const grnItem = await GRNItem.findOne({
+//         where: { item_id },
+//         include: [
+//           { model: GRN, attributes: ['id'] },
+//           { model: PurchaseOrderItem, attributes: ['id'] }
+//         ],
+//         order: [['created_at', 'DESC']],
+//         transaction
+//       });
+
+//       if (!grnItem || !grnItem.GRN || !grnItem.PurchaseOrderItem) {
+//         throw new Error(`Missing GRN or Purchase Order Item for item_id: ${item_id}`);
+//       }
+
+//       const grn_id = grnItem.GRN.id;
+//       const purchase_order_item_id = grnItem.PurchaseOrderItem.id;
+
+//       // ✅ Strict inventory match
+//       const existingInventory = await Inventory.findOne({
+//         where: {
+//           item_id,
+//           grn_id,
+//           purchase_order_item_id,
+//           company_id
+//         },
+//         transaction
+//       });
+
+//       if (!existingInventory) {
+//         throw new Error(`Inventory not found for item_id: ${item_id}, grn_id: ${grn_id}, po_item_id: ${purchase_order_item_id}`);
+//       }
+
+//       const previous_quantity = parseFloat(existingInventory.quantity_available || 0);
+//       const new_quantity =
+//         type === "increase"
+//           ? previous_quantity + quantity
+//           : previous_quantity - quantity;
+
+//       if (type === "decrease" && quantity > previous_quantity) {
+//         throw new Error(`Cannot decrease more than available quantity (${previous_quantity}) for item_id: ${item_id}`);
+//       }
+
+//       const adjustment_item = await StockAdjustmentItem.create(
+//         {
+//           adjustment_id: adjustment.id,
+//           item_id,
+//           inventory_id: existingInventory.id,
+//           grn_id,
+//           purchase_order_item_id,
+//           previous_quantity,
+//           reason,
+//           type,
+//           adjustment_quantity: quantity,
+//           difference: new_quantity,
+//           company_id,
+//           created_by: req.user.id,
+//           updated_by: req.user.id,
+//         },
+//         { transaction }
+//       );
+
+//       adjustmentItemsCreated.push(adjustment_item);
+
+//       await existingInventory.update(
+//         { quantity_available: new_quantity },
+//         { transaction }
+//       );
+//     }
+
+//     await transaction.commit();
+//     return res.status(201).json({
+//       success: true,
+//       message: "Stock adjustment created successfully",
+//       adjustment_id: adjustment.id,
+//       data: {
+//         adjustment,
+//         adjustment_items: adjustmentItemsCreated
+//       }
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     console.error("Stock adjustment error:", error);
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// });
+
+
 
 
 // GET all adjustments
@@ -345,6 +641,11 @@ v1Router.get("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+
+
+
 
 
 // put

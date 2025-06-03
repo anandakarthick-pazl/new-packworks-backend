@@ -5,6 +5,7 @@ import ItemMaster from "../item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { Sequelize } from "sequelize";
+import GRNItem from "../grn/grn_item.model.js";
 
 const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
   id: {
@@ -25,6 +26,18 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
       model: ItemMaster,
       key: "id",
     },
+  },
+  grn_item_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    references: {
+      model: GRNItem,
+      key: "id",
+    },
+    onUpdate: "CASCADE",
+    onDelete: "SET NULL",
+  },
+   po_id: {
+    type: DataTypes.INTEGER(12),
   },
   reason:{
     type: DataTypes.STRING(255),
