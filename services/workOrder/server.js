@@ -361,7 +361,7 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
         {
           model: SalesOrder,
           as: 'salesOrder',
-          attributes: ['id', 'sales_ui_id', 'sales_generate_id', 'customer_name'],
+          attributes: ['id', 'sales_ui_id', 'sales_generate_id'],
           required: false
         }
       ],
