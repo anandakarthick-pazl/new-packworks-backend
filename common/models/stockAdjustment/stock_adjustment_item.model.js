@@ -92,7 +92,7 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
 });
 
 StockAdjustment.hasMany(StockAdjustmentItem, { foreignKey: "adjustment_id" });
-StockAdjustmentItem.belongsTo(StockAdjustment, { foreignKey: "adjustment_id" });
+StockAdjustmentItem.belongsTo(StockAdjustment, { foreignKey: "adjustment_id", as: "adjustment" });
 
 
 export default StockAdjustmentItem;

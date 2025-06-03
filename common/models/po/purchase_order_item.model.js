@@ -143,4 +143,6 @@ PurchaseOrderItem.belongsTo(Company, { foreignKey: "company_id" });
 PurchaseOrderItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 PurchaseOrderItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
+PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchaseOrder' });
+
 export default PurchaseOrderItem;

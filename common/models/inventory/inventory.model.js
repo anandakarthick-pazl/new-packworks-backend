@@ -66,12 +66,28 @@ const Inventory = sequelize.define("Inventory", {
       type: DataTypes.INTEGER(11),
       allowNull: true,
     },
-  work_order_no: {
+  work_order_id: {
     type: DataTypes.STRING(255),
   },
   po_id: {
     type: DataTypes.INTEGER(12),
   },
+  po_return_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  po_item_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  credit_note_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  debit_note_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  adjustment_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  
   description: {
     type: DataTypes.TEXT,
   },
@@ -128,7 +144,7 @@ const Inventory = sequelize.define("Inventory", {
 });
 
 ItemMaster.hasMany(Inventory, { foreignKey: "item_id" });
-Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" });
+Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" , as: 'item'  });
 
 GRN.hasMany(Inventory, { foreignKey: "grn_id" });
 Inventory.belongsTo(GRN, { foreignKey: "grn_id" });
