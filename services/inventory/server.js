@@ -1,6 +1,6 @@
 import express, { json, Router } from "express";
 import cors from "cors";
-import { fn, col, Op } from "sequelize";
+import { fn, col, Op, Sequelize } from "sequelize";
 import db from "../../common/models/index.js"; 
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
@@ -30,6 +30,8 @@ const CreditNote = db.CreditNote;
 const DebitNote = db.DebitNote;
 const stockAdjustment = db.stockAdjustment;
 const stockAdjustmentItem = db.stockAdjustmentItem;
+const Categories = db.Categories;
+const Sub_categories = db.Sub_categories;
 
 dotenv.config();
 const app = express();
@@ -373,7 +375,30 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     //   offset: offset,
     // });
 
-    const inventoryData = await Inventory.findAll({
+//     const inventoryData = await Inventory.findAll({
+//   attributes: [
+//     'item_id',
+//     [fn('SUM', col('quantity_available')), 'total_quantity'],
+//     'location',
+//     'status',
+//     'created_at',
+//     'updated_at',
+    
+//   ],
+//   where: whereCondition,
+//   group: ['item_id'],
+//   include: [
+//     {
+//       model: ItemMaster,
+//       as: 'item',
+//       attributes: ['id','item_name','description', 'category', 'sub_category','status']
+//     }
+//   ],
+//   limit: limitNumber,
+//   offset: offset,
+// });
+
+const inventoryData = await Inventory.findAll({
   attributes: [
     'item_id',
     [fn('SUM', col('quantity_available')), 'total_quantity'],
@@ -381,20 +406,41 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     'status',
     'created_at',
     'updated_at',
-    
   ],
   where: whereCondition,
-  group: ['item_id'],
+  group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
   include: [
     {
       model: ItemMaster,
       as: 'item',
-      attributes: ['id','item_name','description', 'category', 'sub_category','status']
+      attributes: ['item_name', 'description', 'category', 'sub_category','min_stock_level','standard_cost', 'status'],
+      required: false,
+      include: [
+        {
+          model: Categories,
+          as: 'category_info',
+          attributes: ['category_name'],
+          required: false,
+          on: {
+            col1: Sequelize.where(Sequelize.col('item.category'), '=', Sequelize.col('item->category_info.id'))
+          }
+        },
+        {
+          model: Sub_categories,
+          as: 'sub_category_info',
+          attributes: ['sub_category_name'],
+          required: false,
+          on: {
+            col1: Sequelize.where(Sequelize.col('item.sub_category'), '=', Sequelize.col('item->sub_category_info.id'))
+          }
+        }
+      ]
     }
   ],
   limit: limitNumber,
   offset: offset,
 });
+
 
     // Get total count of unique item_ids (for pagination)
     const totalCountResult = await Inventory.findAll({

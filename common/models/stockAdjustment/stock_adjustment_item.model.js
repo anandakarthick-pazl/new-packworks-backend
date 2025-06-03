@@ -19,6 +19,18 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
       key: "id",
     },
   },
+  po_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  inventory_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  grn_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   item_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
