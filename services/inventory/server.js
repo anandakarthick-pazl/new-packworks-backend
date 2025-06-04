@@ -187,13 +187,14 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     
     //products
     results.products = await ItemMaster.findOne({
-      where: { id: itemId}
+      where: { id: itemId},
     });
      
 
     // Purchase Orders
     results.purchaseOrders = await PurchaseOrderItem.findAll({
       where: { item_id: itemId },
+      order: [['created_at', 'DESC']],
       attributes: [ // 👈 Choose specific fields from GRNItem
         "id","description","hsn_code","quantity","unit_price",
         "cgst","sgst","tax_amount","total_amount","status","created_at"
@@ -220,6 +221,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     // GRNs
     results.grns = await GRNItem.findAll({
       where: { item_id: itemId },
+      order: [['created_at', 'DESC']],
       attributes: [ // 👈 Choose specific fields from GRNItem
         "id","description","quantity_ordered","quantity_received","accepted_quantity","rejected_quantity",
         "status","created_at"
@@ -244,6 +246,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     // Purchase Order Returns
     results.purchaseReturns = await PurchaseOrderReturnItem.findAll({
       where: { item_id: itemId },
+      order: [['created_at', 'DESC']],
       attributes: [ // 👈 Choose specific fields from GRNItem
         "id","return_qty", "reason", "notes", "created_at", "unit_price","cgst","sgst","amount",
         "tax_amount","total_amount"
@@ -277,6 +280,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     // Stock Adjustments
     results.stockAdjustments = await stockAdjustmentItem.findAll({
       where: { item_id: itemId },
+      order: [['created_at', 'DESC']],
       attributes: [ 
         "id","previous_quantity", "type", "adjustment_quantity", "difference", "reason"
       ],
@@ -347,20 +351,49 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
       ];
 
-        // Find items that match the search term
+ // Find items that match the search term
   const matchingItems = await ItemMaster.findAll({
     attributes: ['id'],
     where: {
       item_name: { [Op.like]: `%${search}%` }
     }
   });
-
   if (matchingItems.length > 0) {
     const itemIds = matchingItems.map(item => item.id);
     searchConditions.push({ item_id: { [Op.in]: itemIds } });
   }
 
+  // Category search
+const matchingCategory = await Categories.findAll({
+  attributes: ['id'],
+  where: {
+    category_name: { [Op.like]: `%${search}%` }
+  }
+});
+if (matchingCategory.length > 0) {
+  const categoryIds = matchingCategory.map(item => item.id);
+  searchConditions.push({ category: { [Op.in]: categoryIds } });
+}
+
+// Subcategory search
+const matchingSubCategory = await Sub_categories.findAll({
+  attributes: ['id'],
+  where: {
+    sub_category_name: { [Op.like]: `%${search}%` }
+  }
+});
+if (matchingSubCategory.length > 0) {
+  const subCategoryIds = matchingSubCategory.map(item => item.id);
+  searchConditions.push({ sub_category: { [Op.in]: subCategoryIds } });
+}
+
+if (searchConditions.length > 0) {
   whereCondition[Op.or] = searchConditions;
+}
+
+
+
+  // whereCondition[Op.or] = searchConditions;
     }
 
     if (categoryId) {
@@ -457,6 +490,7 @@ const inventoryData = await Inventory.findAll({
       ]
     }
   ],
+  order: [['created_at', 'DESC']],
   limit: limitNumber,
   offset: offset,
 });
