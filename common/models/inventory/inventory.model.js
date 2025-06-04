@@ -5,6 +5,7 @@ import GRN from "../grn/grn.model.js"
 import GRNItem from "../grn/grn_item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Sub_categories from "../category/sub_category.model.js";
 
 const Inventory = sequelize.define("Inventory", {
   id: {
@@ -156,4 +157,5 @@ Inventory.belongsTo(Company, { foreignKey: "company_id" });
 Inventory.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Inventory.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
+Inventory.belongsTo(Sub_categories, {foreignKey: 'sub_category', as: 'sub_category_info' });
 export default Inventory;
