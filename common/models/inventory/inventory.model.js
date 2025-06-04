@@ -158,4 +158,6 @@ Inventory.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Inventory.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
 Inventory.belongsTo(Sub_categories, {foreignKey: 'sub_category', as: 'sub_category_info' });
+Inventory.belongsTo(ItemMaster, { as: 'item_info', foreignKey: 'item_id' });
+
 export default Inventory;
