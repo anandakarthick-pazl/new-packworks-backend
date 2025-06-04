@@ -337,15 +337,32 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
     // Optional search filters (e.g., inventory ID or generate ID)
     if (search && search.trim() !== "") {
-      whereCondition[Op.or] = [
+      // whereCondition[Op.or] = [
+        const searchConditions = [
+
         { id: { [Op.like]: `%${search}%` } },
         { item_id: { [Op.like]: `%${search}%` } },
         { location: { [Op.like]: `%${search}%` } },
-        // Add more fields here as needed
+        // { '$item_info.item_name$': { [Op.like]: `%${search}%` } }
+
       ];
+
+        // Find items that match the search term
+  const matchingItems = await ItemMaster.findAll({
+    attributes: ['id'],
+    where: {
+      item_name: { [Op.like]: `%${search}%` }
+    }
+  });
+
+  if (matchingItems.length > 0) {
+    const itemIds = matchingItems.map(item => item.id);
+    searchConditions.push({ item_id: { [Op.in]: itemIds } });
+  }
+
+  whereCondition[Op.or] = searchConditions;
     }
 
-    // Optional filters for category or subcategory (if applicable to Inventory or via include)
     if (categoryId) {
       whereCondition.category = categoryId;
     }
@@ -354,56 +371,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       whereCondition.sub_category = subCategoryId;
     }
 
-    // Grouped inventory data
-    // const inventoryData = await Inventory.findAll({
-    //   attributes: [
-    //     'item_id',
-    //     'description',
-    //     'quantity_available',
-    //     'location',
-    //     'status',
-    //     'created_at',
-    //     'updated_at',
-    //     'category',
-    //     'sub_category',
-    //     'po_id',
-    //     'grn_id',
-    //     'grn_item_id',
-    //     'po_return_id',
-    //     'credit_note_id',
-    //     'debit_note_id',
-    //     'adjustment_id',
-    //     'work_order_id',
-    //     [fn('SUM', col('quantity_available')), 'total_quantity']
-    //   ],
-    //   where: whereCondition,
-    //   group: ['item_id'],
-    //   limit: limitNumber,
-    //   offset: offset,
-    // });
-
-//     const inventoryData = await Inventory.findAll({
-//   attributes: [
-//     'item_id',
-//     [fn('SUM', col('quantity_available')), 'total_quantity'],
-//     'location',
-//     'status',
-//     'created_at',
-//     'updated_at',
-    
-//   ],
-//   where: whereCondition,
-//   group: ['item_id'],
-//   include: [
-//     {
-//       model: ItemMaster,
-//       as: 'item',
-//       attributes: ['id','item_name','description', 'category', 'sub_category','status']
-//     }
-//   ],
-//   limit: limitNumber,
-//   offset: offset,
-// });
+   
 
 const subCategoryQuantities  = await Inventory.findAll({
   attributes: [
@@ -416,16 +384,30 @@ const subCategoryQuantities  = await Inventory.findAll({
     {
       model: Sub_categories,
       as: 'sub_category_info',
-      attributes: ['sub_category_name'],
+      attributes: ['id','sub_category_name'],
       required: false,
       on: Sequelize.where(
         Sequelize.col('Inventory.sub_category'),
         '=',
         Sequelize.col('sub_category_info.id')
       )
+    },
+    {
+      model: ItemMaster,
+      as: 'item_info',
+      attributes: ['item_name'],
+      required: false,
+      on: Sequelize.where(
+        Sequelize.col('Inventory.item_id'),
+        '=',
+        Sequelize.col('item_info.id')
+      )
     }
   ]
 });
+
+
+
 
 
 
