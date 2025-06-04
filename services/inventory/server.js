@@ -451,7 +451,7 @@ const inventoryData = await Inventory.findAll({
     {
       model: ItemMaster,
       as: 'item',
-      attributes: ['item_name', 'description', 'category', 'sub_category','min_stock_level','standard_cost', 'status'],
+      attributes: ['item_generate_id','item_name', 'description', 'category', 'sub_category','min_stock_level','standard_cost', 'status'],
       required: false,
       include: [
         {
