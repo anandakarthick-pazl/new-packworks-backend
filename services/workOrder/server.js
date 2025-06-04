@@ -97,6 +97,7 @@ ${
 
     // Generate URL without /api prefix
     const baseUrl = process.env.BASE_URL;
+    // const baseUrl = `http://localhost:${process.env.PORT_WORKORDER}`; 
     const fullUrl = `${baseUrl}/public/qrcodes/${qrFileName}`;
 
     logger.info(`QR code URL generated: ${fullUrl}`);
