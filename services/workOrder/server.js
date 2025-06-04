@@ -97,7 +97,7 @@ ${
 
     // Generate URL without /api prefix
     const baseUrl = process.env.BASE_URL || `https://dev-packwork.pazl.info`;
-    const fullUrl = `${baseUrl}/qrcodes/${qrFileName}`;
+    const fullUrl = `${baseUrl}/public/qrcodes/${qrFileName}`;
 
     logger.info(`QR code URL generated: ${fullUrl}`);
 
