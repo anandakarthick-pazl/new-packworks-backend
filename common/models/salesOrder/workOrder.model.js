@@ -105,6 +105,11 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    production:{
+      type: DataTypes.ENUM('created','in_production','removed_from_production'),
+      allowNull: true,
+      defaultValue: 'created',
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
