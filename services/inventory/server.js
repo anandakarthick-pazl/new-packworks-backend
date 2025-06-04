@@ -157,6 +157,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     const itemExists = await ItemMaster.findOne({
       where: { id: itemId}
     });
+     
    const item_generate_id = itemExists ? itemExists.item_generate_id : null;
 
 
@@ -175,6 +176,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     } = db;
 
     const results = {
+      products:[],
       purchaseOrders: [],
       grns: [],
       purchaseReturns: [],
@@ -182,6 +184,12 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       debitNotes: [],
       stockAdjustments: []
     };
+    
+    //products
+    results.products = await ItemMaster.findOne({
+      where: { id: itemId}
+    });
+     
 
     // Purchase Orders
     results.purchaseOrders = await PurchaseOrderItem.findAll({
@@ -328,14 +336,13 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     };
 
     // Optional search filters (e.g., inventory ID or generate ID)
-    if (search.trim() !== "") {
-      whereCondition = {
-        ...whereCondition,
-        [Op.or]: [
-          { id: { [Op.like]: `%${search}%` } },
-          { inventory_generate_id: { [Op.like]: `%${search}%` } },
-        ]
-      };
+    if (search && search.trim() !== "") {
+      whereCondition[Op.or] = [
+        { id: { [Op.like]: `%${search}%` } },
+        { item_id: { [Op.like]: `%${search}%` } },
+        { location: { [Op.like]: `%${search}%` } },
+        // Add more fields here as needed
+      ];
     }
 
     // Optional filters for category or subcategory (if applicable to Inventory or via include)
@@ -398,10 +405,41 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 //   offset: offset,
 // });
 
+const subCategoryQuantities  = await Inventory.findAll({
+  attributes: [
+    'sub_category',
+    [Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],
+  ],
+  where: whereCondition,
+  group: ['Inventory.sub_category', 'sub_category_info.id'],
+  include: [
+    {
+      model: Sub_categories,
+      as: 'sub_category_info',
+      attributes: ['sub_category_name'],
+      required: false,
+      on: Sequelize.where(
+        Sequelize.col('Inventory.sub_category'),
+        '=',
+        Sequelize.col('sub_category_info.id')
+      )
+    }
+  ]
+});
+
+
+
+
+
+
+
+
+
 const inventoryData = await Inventory.findAll({
   attributes: [
     'item_id',
     [fn('SUM', col('quantity_available')), 'total_quantity'],
+    'sub_category',
     'location',
     'status',
     'created_at',
@@ -458,7 +496,7 @@ const inventoryData = await Inventory.findAll({
     return res.status(200).json({
       success: true,
       message: "Grouped Inventory data fetched successfully",
-      data: inventoryData,
+      data: {inventoryData,subCategoryQuantities},
        pagination: {
         currentPage: pageNumber,
         perPage: limitNumber,
