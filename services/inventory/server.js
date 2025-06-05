@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
-
+import ExcelJS from "exceljs";
 // const ItemMaster = db.ItemMaster;
 // const Company = db.Company;
 // const Inventory = db.Inventory;
@@ -38,6 +38,93 @@ const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+//export excel
+v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
+  try {
+    const whereCondition = {
+      company_id: req.user.company_id,
+    };
+
+    const inventoryData = await Inventory.findAll({
+      attributes: [
+        'item_id',
+        [fn('SUM', col('quantity_available')), 'total_quantity'],
+        'sub_category',
+        'location',
+        'status',
+        'created_at',
+        'updated_at',
+      ],
+      where: whereCondition,
+      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+      include: [
+        {
+          model: ItemMaster,
+          as: 'item',
+          attributes: ['item_generate_id','item_name', 'description', 'category', 'sub_category','min_stock_level','standard_cost', 'status'],
+          required: false,
+          include: [
+            {
+              model: Categories,
+              as: 'category_info',
+              attributes: ['category_name'],
+              required: false,
+            },
+            {
+              model: Sub_categories,
+              as: 'sub_category_info',
+              attributes: ['sub_category_name'],
+              required: false,
+            }
+          ]
+        }
+      ]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Inventory');
+
+    worksheet.columns = [
+      { header: 'Product ID', key: 'item_generate_id', width: 20 },
+      { header: 'Item Name', key: 'item_name', width: 30 },
+      { header: 'Category', key: 'category_name', width: 20 },
+      { header: 'Sub Category', key: 'sub_category_name', width: 20 },
+      { header: 'Location', key: 'location', width: 15 },
+      { header: 'Quantity', key: 'total_quantity', width: 10 },
+      { header: 'Standard Cost', key: 'standard_cost', width: 15 },
+      { header: 'Status', key: 'status', width: 10 },
+      { header: 'Created At', key: 'created_at', width: 20 }
+    ];
+
+    inventoryData.forEach(item => {
+      worksheet.addRow({
+        item_generate_id: item.item?.item_generate_id || '',
+        item_name: item.item?.item_name || '',
+        category_name: item.item?.category_info?.category_name || '',
+        sub_category_name: item.item?.sub_category_info?.sub_category_name || '',
+        location: item.location || '',
+        total_quantity: item.dataValues.total_quantity || 0,
+        standard_cost: item.item?.standard_cost || '',
+        status: item.status || '',
+        created_at: item.created_at?.toISOString().split('T')[0] || '',
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=inventory_export.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("Excel Export Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Inventory Excel export failed: ${error.message}`,
+    });
+  }
+});
+
 
 //////////////////////////////////////////////////////   Inventory   ///////////////////////////////////////////////////////////
 //get inventory status
@@ -320,7 +407,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
 
 
 
-
+//get Inventory
 v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   try {   
     const {
@@ -355,6 +442,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   const matchingItems = await ItemMaster.findAll({
     attributes: ['id'],
     where: {
+      item_generate_id:{ [Op.like]: `%${search}%` },
       item_name: { [Op.like]: `%${search}%` }
     }
   });
@@ -405,7 +493,7 @@ if (searchConditions.length > 0) {
     }
 
    
-
+// get a subcategory data
 const subCategoryQuantities  = await Inventory.findAll({
   attributes: [
     'sub_category',
@@ -428,7 +516,10 @@ const subCategoryQuantities  = await Inventory.findAll({
     {
       model: ItemMaster,
       as: 'item_info',
-      attributes: ['item_name'],
+      attributes: [
+        'item_name',
+        'item_generate_id'
+      ],
       required: false,
       on: Sequelize.where(
         Sequelize.col('Inventory.item_id'),
@@ -440,16 +531,7 @@ const subCategoryQuantities  = await Inventory.findAll({
 });
 
 
-
-
-
-
-
-
-
-
-
-
+// get inventory data
 const inventoryData = await Inventory.findAll({
   attributes: [
     'item_id',
@@ -529,6 +611,10 @@ const inventoryData = await Inventory.findAll({
     });
   }
 });
+
+
+
+
 
 // Get Inventory based on search, pagination, categoryId, and subCategoryId
 // v1Router.get("/inventory", authenticateJWT, async (req, res) => {
