@@ -229,7 +229,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     const offset = (pageNumber - 1) * limitNumber;
 
     const whereCondition = {};
-
+whereCondition.status="active"
     // Enhanced search functionality across all relevant fields
     if (search.trim() !== "") {
       whereCondition[Op.or] = [

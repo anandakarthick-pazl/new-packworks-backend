@@ -49,6 +49,7 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
         ...whereCondition,item_code:{[Op.like]:`%${search}%`},
       }
     } 
+    whereCondition.status="active"
     const item = await ItemMaster.findAll({
       where :whereCondition,
       limit:limitNumber,
