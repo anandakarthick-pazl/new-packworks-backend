@@ -119,6 +119,18 @@ const Machine = sequelize.define(
         this.setDataValue("machine_route", JSON.stringify(value));
       },
     },
+    unit: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    board_length: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    board_width: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
