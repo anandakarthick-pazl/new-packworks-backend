@@ -85,7 +85,6 @@ ${
 
 
 // POST create new sales order - with SalesSkuDetails table
-// POST create new sales order - with SalesSkuDetails table
 v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
 
@@ -140,6 +139,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       company_id: req.user.company_id,
       client_id: salesDetails.client_id,
       sales_order_id: newSalesOrder.id,
+      sku_id: sku.sku_id || null,
       sku: sku.sku,
       quantity_required: sku.quantity_required,
       rate_per_sku: sku.rate_per_sku,
@@ -234,7 +234,6 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
 //   try {
 //     const {
@@ -404,7 +403,6 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
 //       .json({ message: "Internal Server Error", error: error.message });
 //   }
 // });
-
 v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => {
   try {
     const {
@@ -709,8 +707,6 @@ v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => 
     return res.status(500).json({ status: false, message: error.message });
   }
 });
-
-
 v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   try {
     const {
@@ -855,7 +851,6 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // GET single sales order by ID (including associated records)
 v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
@@ -1029,6 +1024,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
           {
             company_id: req.user.company_id,
             client_id: salesDetails.client_id,
+            sku_id: sku.sku_id || null,
             sku: sku.sku,
             quantity_required: sku.quantity_required,
             rate_per_sku: sku.rate_per_sku,
@@ -1055,6 +1051,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             company_id: req.user.company_id,
             client_id: salesDetails.client_id,
             sales_order_id: id,
+            sku_id: sku.sku_id || null,
             sku: sku.sku,
             quantity_required: sku.quantity_required,
             rate_per_sku: sku.rate_per_sku,

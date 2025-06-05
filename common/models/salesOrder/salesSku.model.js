@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import SalesOrder from "./salesOrder.model.js";
 import User from "../user.model.js";
+import Sku from "../skuModel/sku.model.js";
 
 const SalesSkuDetails = sequelize.define(
   "SalesSkuDetails",
@@ -42,6 +43,14 @@ const SalesSkuDetails = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "SET NULL",
+    },
+    sku_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: Sku,
+        key: "id",
+      },
     },
     sku: {
       type: DataTypes.STRING(100),
@@ -130,6 +139,9 @@ SalesSkuDetails.belongsTo(Client, { foreignKey: "client_id" });
 
 SalesOrder.hasMany(SalesSkuDetails, { foreignKey: "sales_order_id" });
 SalesSkuDetails.belongsTo(SalesOrder, { foreignKey: "sales_order_id" });
+
+Sku.hasMany(SalesSkuDetails, { foreignKey: "sku_id" });
+SalesSkuDetails.belongsTo(Sku, { foreignKey: "sku_id" });
 
 SalesSkuDetails.belongsTo(User, {
   foreignKey: "created_by",
