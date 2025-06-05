@@ -121,7 +121,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     if (search.trim()) {
       where.supplier_name = { [Op.like]: `%${search}%` };
     }
-
+    where.status="active";
     const data = await PurchaseOrder.findAll({
       where,
       limit: limitNumber,
