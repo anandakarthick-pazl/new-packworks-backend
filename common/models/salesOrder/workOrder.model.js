@@ -110,16 +110,6 @@ const WorkOrder = sequelize.define(
       allowNull: true,
       defaultValue: 'created',
     },
-    created_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-    updated_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
     priority: {
       type: DataTypes.ENUM("High", "Medium", "Low"),
       allowNull: false,
@@ -161,10 +151,24 @@ const WorkOrder = sequelize.define(
       allowNull: true,
       comment: "URL to access the QR code for this work order",
     },
+    select_plant: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
       defaultValue: "active",
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
