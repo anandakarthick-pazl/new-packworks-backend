@@ -186,6 +186,7 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
           updated_by: req.user.id,
           status: "active",
           work_order_sku_values: work.work_order_sku_values || null,
+          select_plant: work.select_plant || null,
         };
       })
     );
@@ -1126,6 +1127,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             updated_by: req.user.id,
             updated_at: new Date(),
             work_order_sku_values: work.work_order_sku_values || null,
+            select_plant: work.select_plant || null,
           },
           { transaction }
         );
@@ -1160,6 +1162,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
             updated_by: req.user.id,
             status: "active",
             work_order_sku_values: work.work_order_sku_values || null,
+            select_plant: work.select_plant || null,
           },
           { transaction }
         );
