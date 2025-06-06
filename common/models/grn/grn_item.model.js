@@ -127,7 +127,7 @@ PurchaseOrderItem.hasMany(GRNItem, { foreignKey: "po_item_id" });
 GRNItem.belongsTo(PurchaseOrderItem, { foreignKey: "po_item_id" });
 
 ItemMaster.hasMany(GRNItem, { foreignKey: "item_id" });
-GRNItem.belongsTo(ItemMaster, { foreignKey: "item_id" });
+GRNItem.belongsTo(ItemMaster, { foreignKey: "item_id", as: "item_info" });
 
 GRNItem.belongsTo(Company, { foreignKey: "company_id" });
 GRNItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
