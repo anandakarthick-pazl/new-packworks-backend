@@ -713,6 +713,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
         {
           where: {
             item_id: item.item_id,
+            po_id: poReturn.po_id,
             company_id: req.user.company_id
           }
         }
