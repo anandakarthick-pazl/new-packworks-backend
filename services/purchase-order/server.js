@@ -151,7 +151,16 @@ v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
   try {
     const po = await PurchaseOrder.findOne({
       where: { id: req.params.id, status: "active" },
-      include: [{ model: PurchaseOrderItem }],
+      include: [{ 
+        model: PurchaseOrderItem,
+        include: [
+              {
+                model: ItemMaster,
+                as: "item_info", // Alias from GRNItem → ItemMaster association
+                attributes: ["id", "item_generate_id"]
+              }
+            ] 
+        }],
     });
 
     if (!po) return res.status(404).json({ success: false, message: "Not found" });
