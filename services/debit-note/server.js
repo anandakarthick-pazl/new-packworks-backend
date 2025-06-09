@@ -20,13 +20,13 @@ const purchase_order_item = db.PurchaseOrderItem;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const InvoiceSetting = db.InvoiceSetting;
 const debit_note = db.DebitNote;
+const Inventory = db.Inventory;
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
-
 
 
 
@@ -45,39 +45,34 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
 
     const user = req.user;
 
+    // Validate required fields
     if (!debit_note_number) throw new Error("Debit note number is required");
     if (!debit_note_date || isNaN(new Date(debit_note_date))) {
       throw new Error("Valid debit note date is required");
     }
     if (!po_return_id) throw new Error("Purchase Order Return ID (po_return_id) is required");
 
+    // Check for duplicate
     const existing = await debit_note.findOne({ where: { debit_note_number } });
     if (existing) throw new Error(`Debit Note ${debit_note_number} already exists`);
 
-    // 🔢 Auto-generate debit_note_generate_id like DN-001
-    const lastNote = await debit_note.findOne({
-      where: {
-        debit_note_generate_id: { [Op.like]: 'DN-%' }
-      },
-      order: [['created_at', 'DESC']],
-      attributes: ['debit_note_generate_id']
-    });
+    // Generate unique debit_note_generate_id
+    const debit_note_generate_id = await generateId(user.company_id, debit_note, "debit_note");
 
-    let debit_note_generate_id = "DN-001";
-    if (lastNote && lastNote.debit_note_generate_id) {
-      const match = lastNote.debit_note_generate_id.match(/DN-(\d+)/);
-      if (match) {
-        const nextNum = parseInt(match[1], 10) + 1;
-        debit_note_generate_id = `DN-${String(nextNum).padStart(3, '0')}`;
-      }
-    }
-
-    // Fetch PO Return with items and PO (for supplier)
+    // Fetch PO Return and related data
     const poReturn = await PurchaseOrderReturn.findOne({
       where: { id: po_return_id, company_id: user.company_id },
+      attributes: ["id", "grn_id", "po_id", "tax_amount"],
       include: [
-        { model: PurchaseOrderReturnItem, as: "items" },
-        { model: PurchaseOrder, attributes: ["id", "supplier_id"] }
+        {
+          model: PurchaseOrderReturnItem,
+          as: "items",
+          attributes: ["id", "item_id", "return_qty", "unit_price", "amount"]
+        },
+        {
+          model: PurchaseOrder,
+          attributes: ["id", "supplier_id"]
+        }
       ],
       transaction
     });
@@ -90,18 +85,17 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     const items = poReturn.items || [];
     if (!items.length) throw new Error("No Purchase Order Return Items found");
 
-    const matchedItems = items;
-
-    const rate = matchedItems[0]?.unit_price || 0;
-    const amount = matchedItems.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+    const rate = items[0]?.unit_price || 0;
+    const amount = items.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
     const sub_total = amount;
     const adjustment = 0;
     const tax_amount = parseFloat(poReturn.tax_amount || 0);
     const total_amount = sub_total + tax_amount;
 
+    // Create debit note
     const debitNote = await debit_note.create({
       debit_note_number,
-      debit_note_generate_id, // ⬅️ Auto-generated field
+      debit_note_generate_id,
       po_return_id,
       reference_id,
       company_id: user.company_id,
@@ -120,18 +114,57 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
       created_at: new Date()
     }, { transaction });
 
+    // Update inventory per item
+    for (const item of items) {
+      const { item_id, return_qty } = item;
+      const { grn_id, po_id } = poReturn;
+
+      if (!item_id || !grn_id || !po_id) {
+        throw new Error(`Missing identifiers: item_id=${item_id}, grn_id=${grn_id}, po_id=${po_id}`);
+      }
+
+      const quantity = parseFloat(return_qty || 0);
+
+      const inventory = await Inventory.findOne({
+        where: {
+          item_id,
+          grn_id,
+          po_id,
+          company_id: user.company_id
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!inventory) {
+        throw new Error(`Inventory not found for item_id=${item_id}, grn_id=${grn_id}, po_id=${po_id}`);
+      }
+
+      const currentQty = parseFloat(inventory.quantity_available || 0);
+
+      if (quantity > currentQty) {
+        throw new Error(`Return quantity exceeds available: item_id=${item_id}, available=${currentQty}, return=${quantity}`);
+      }
+
+      const newQty = currentQty - quantity;
+
+      await inventory.update({
+        quantity_available: newQty,
+        debit_note_id: debitNote.id
+      }, { transaction });
+    }
+
     await transaction.commit();
 
     return res.status(201).json({
       success: true,
-      message: "Debit Note created successfully",
+      message: "Debit Note created and inventory updated successfully",
       data: debitNote,
-      matched_items: matchedItems
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error(error);
+    console.error("Debit note creation error:", error);
     return res.status(500).json({
       success: false,
       message: `Creation failed: ${error.message}`,
@@ -139,6 +172,7 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 
 
