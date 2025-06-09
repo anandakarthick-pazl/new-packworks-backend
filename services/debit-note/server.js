@@ -421,7 +421,7 @@ v1Router.delete("/debit-note/:id", authenticateJWT, async (req, res) => {
 app.use("/api", v1Router);
 // await db.sequelize.sync();
 
-const PORT = 3031;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`debit note API running on port ${PORT}`);
+const PORT = process.env.PORT_DEBIT_NOTE;
+app.listen(process.env.PORT_DEBIT_NOTE,'0.0.0.0', () => {
+  console.log(`Debit Note running on port ${process.env.PORT_DEBIT_NOTE}`);
 });
