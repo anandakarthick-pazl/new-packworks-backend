@@ -86,6 +86,7 @@ v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
       attributes: ["id", "purchase_generate_id"],
       where: {
         company_id: req.user.company_id,
+        decision:"approve",
         id: {
           [Op.notIn]: poIdList
         }
@@ -126,6 +127,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
       where,
       limit: limitNumber,
       offset,
+      order: [['created_at', 'DESC']],
       include: [{ model: PurchaseOrderItem }]  // Optional: include items
     });
 
