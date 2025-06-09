@@ -93,3 +93,20 @@ MODIFY COLUMN item_type ENUM(
   'pasting-glue'
 ) NOT NULL DEFAULT 'raw-materials';
 -- 
+
+
+-- dummy
+
+
+CREATE TABLE `production_group` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NULL,
+  `client_id` VARCHAR(50) NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
