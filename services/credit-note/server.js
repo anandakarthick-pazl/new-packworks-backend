@@ -341,6 +341,7 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
       credit_note_number,
       sales_order_return_id,
       reference_id,
+      supplier_id,
       rate,
       amount,
       sub_total,
@@ -349,49 +350,37 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
       total_amount,
       reason,
       remark,
-      credit_note_date,
-      supplier_id,
+      credit_note_date
     } = req.body;
 
     const user = req.user;
 
-    if (!credit_note_number || !credit_note_date || !sales_order_return_id) {
-      throw new Error("Required fields missing (credit_note_number, credit_note_date, or sales_order_return_id)");
+    // ✅ Validate required fields
+    if (!credit_note_number) throw new Error("Credit note number is required");
+    if (!credit_note_date || isNaN(new Date(credit_note_date))) {
+      throw new Error("Valid credit note date is required");
     }
 
+    // ✅ Check for duplicate
     const existing = await credit_note.findOne({ where: { credit_note_number } });
     if (existing) throw new Error(`Credit Note ${credit_note_number} already exists`);
 
-    // Auto-generate credit_note_generate_id in format CN-001
-    const lastNote = await credit_note.findOne({
-      where: {
-        credit_note_generate_id: { [Op.like]: 'CN-%' }
-      },
-      order: [['created_at', 'DESC']],
-      attributes: ['credit_note_generate_id']
-    });
+    // ✅ Generate unique credit_note_generate_id
+    const credit_note_generate_id = await generateId(user.company_id, credit_note, "credit_note");
 
-    let credit_note_generate_id = "CN-001";
-    if (lastNote && lastNote.credit_note_generate_id) {
-      const match = lastNote.credit_note_generate_id.match(/CN-(\d+)/);
-      if (match) {
-        const nextNum = parseInt(match[1], 10) + 1;
-        credit_note_generate_id = `CN-${String(nextNum).padStart(3, '0')}`;
-      }
-    }
-
+    // ✅ Create the credit note
     const note = await credit_note.create({
       credit_note_number,
       credit_note_generate_id,
-      sales_order_return_id,
+      sales_order_return_id: sales_order_return_id || null,
       company_id: user.company_id,
       reference_id,
+      supplier_id,
       rate,
       amount,
       sub_total,
       adjustment,
       tax_amount,
-      supplier_id,
       total_amount,
       reason,
       remark,
@@ -409,12 +398,14 @@ v1Router.post("/credit-note", authenticateJWT, async (req, res) => {
       message: "Credit Note created successfully",
       data: note
     });
+
   } catch (error) {
     await transaction.rollback();
-    console.error(error);
+    console.error("Credit Note Error:", error);
     return res.status(500).json({
       success: false,
-      message: `Creation failed: ${error.message}`
+      message: `Creation failed: ${error.message}`,
+      errors: error.errors ? error.errors.map(e => e.message) : null
     });
   }
 });
