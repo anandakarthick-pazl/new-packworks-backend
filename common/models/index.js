@@ -48,6 +48,7 @@ import CreditNote from "./credit/credit_note.model.js";
 import WorkOrderStatus from "./commonModel/workOrderStatus.js";
 import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
+import ProductionGroup from "./Production/productionGroup.model.js";
 
 const db = {
   sequelize,
@@ -99,7 +100,8 @@ const db = {
   DebitNote,
   CreditNote,
   Categories,
-  Sub_categories
+  Sub_categories,
+  ProductionGroup,
 
 };
 
