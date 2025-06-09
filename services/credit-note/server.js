@@ -552,7 +552,7 @@ v1Router.delete("/credit-note/:id", authenticateJWT, async (req, res) => {
 app.use("/api", v1Router);
 // await db.sequelize.sync();
 
-const PORT = 3032;
-app.listen(PORT,"0.0.0.0", () => {
-  console.log(`credit note API running on port ${PORT}`);
+const PORT = process.env.PORT_CREDIT_NOTE;
+app.listen(process.env.PORT_CREDIT_NOTE,'0.0.0.0', () => {
+  console.log(`Credit Note running on port ${process.env.PORT_CREDIT_NOTE}`);
 });
