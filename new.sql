@@ -100,8 +100,10 @@ MODIFY COLUMN item_type ENUM(
 
 CREATE TABLE `production_group` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `company_id` INT UNSIGNED NULL,
-  `client_id` VARCHAR(50) NULL,
+  `company_id` INT UNSIGNED NOT NULL,
+  `group_name` VARCHAR(100) NULL,
+  `group_value` JSON NULL,
+  `group_Qty` INT NULL,  
   `status` ENUM('active', 'inactive') DEFAULT 'active',
   `created_by` INT UNSIGNED DEFAULT NULL,
   `updated_by` INT UNSIGNED DEFAULT NULL,
@@ -110,3 +112,10 @@ CREATE TABLE `production_group` (
   
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+  `client_id` INT UNSIGNED NULL,
+  `sales_order_id` INT UNSIGNED NULL,
+  `client_id` INT UNSIGNED NULL,
+  `work_id` INT UNSIGNED NULL,
