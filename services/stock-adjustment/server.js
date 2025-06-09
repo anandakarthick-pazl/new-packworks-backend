@@ -246,7 +246,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
  
     if (search.trim() !== "") {
       whereCondition[Op.or] = [
-        { remarks: { [Op.like]: `%${search}%` } },
+        { stock_adjustment_generate_id: { [Op.like]: `%${search}%` } },
       ];
  
       if (!isNaN(search)) {

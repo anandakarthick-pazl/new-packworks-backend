@@ -121,7 +121,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     if (search.trim()) {
       where.supplier_name = { [Op.like]: `%${search}%` };
     }
-
+    where.status="active";
     const data = await PurchaseOrder.findAll({
       where,
       limit: limitNumber,
@@ -151,7 +151,16 @@ v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
   try {
     const po = await PurchaseOrder.findOne({
       where: { id: req.params.id, status: "active" },
-      include: [{ model: PurchaseOrderItem }],
+      include: [{ 
+        model: PurchaseOrderItem,
+        include: [
+              {
+                model: ItemMaster,
+                as: "item_info", // Alias from GRNItem → ItemMaster association
+                attributes: ["id", "item_generate_id"]
+              }
+            ] 
+        }],
     });
 
     if (!po) return res.status(404).json({ success: false, message: "Not found" });
@@ -588,8 +597,12 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       }
 
       // Validate Inventory
-      const inventory = await Inventory.findOne({ where: { item_id } });
-      if (!inventory) {
+      const inventories = await Inventory.findAll({
+        where: { item_id, grn_id },
+        order: [['id', 'ASC']], // FIFO
+      });
+
+      if (!inventories || inventories.length === 0) {
         return res.status(404).json({ error: `Inventory not found for item ${item_id}` });
       }
 
@@ -599,13 +612,42 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       const sgst_amount = (amount * sgst) / 100;
       const tax_amount = cgst_amount + sgst_amount;
       const total_amount = amount + tax_amount;
+      
+ // Calculate total available quantity
+let totalAvailable = inventories.reduce(
+  (sum, inv) => sum + parseFloat(inv.quantity_available || 0),
+  0
+);
 
-      // Update inventory stock
-      inventory.quantity_available -= return_qty;
-      if (inventory.quantity_available < 0) {
-        return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
-      }
-      await inventory.save();
+if (totalAvailable < return_qty) {
+  return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
+}
+
+// ✅ Declare this before the loop
+let remainingToDeduct = return_qty;
+
+const deductionLog = [];
+
+for (const inventory of inventories) {
+  let available = parseFloat(inventory.quantity_available);
+
+  if (available >= remainingToDeduct) {
+    inventory.quantity_available = available - remainingToDeduct;
+    await inventory.save();
+    deductionLog.push({ id: inventory.id, deducted: remainingToDeduct });
+    break;
+  } else {
+    inventory.quantity_available = 0;
+    await inventory.save();
+    deductionLog.push({ id: inventory.id, deducted: available });
+    remainingToDeduct -= available;
+  }
+}
+
+console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
+
+
+      // await inventory.save();
 
       // Sum totals
       total_qty += return_qty;
@@ -671,6 +713,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
         {
           where: {
             item_id: item.item_id,
+            po_id: poReturn.po_id,
             company_id: req.user.company_id
           }
         }

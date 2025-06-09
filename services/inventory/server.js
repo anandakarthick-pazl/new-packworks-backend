@@ -422,75 +422,80 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const limitNumber = parseInt(limit) || 10;
     const offset = (pageNumber - 1) * limitNumber;
 
-    let whereCondition = {
-      company_id: req.user.company_id
-    };
+    // let whereCondition = {
+    //   company_id: req.user.company_id
+    // };
 
     // Optional search filters (e.g., inventory ID or generate ID)
-    if (search && search.trim() !== "") {
-      // whereCondition[Op.or] = [
-        const searchConditions = [
 
+    // ✅ Declare andConditions early
+    let andConditions = [
+      { company_id: req.user.company_id }
+    ];
+
+    if (search.trim() !== "") {
+      const searchConditions = [
         { id: { [Op.like]: `%${search}%` } },
         { item_id: { [Op.like]: `%${search}%` } },
         { location: { [Op.like]: `%${search}%` } },
-        // { '$item_info.item_name$': { [Op.like]: `%${search}%` } }
-
       ];
 
- // Find items that match the search term
-  const matchingItems = await ItemMaster.findAll({
-    attributes: ['id'],
-    where: {
-      item_generate_id:{ [Op.like]: `%${search}%` },
-      item_name: { [Op.like]: `%${search}%` }
-    }
-  });
-  if (matchingItems.length > 0) {
-    const itemIds = matchingItems.map(item => item.id);
-    searchConditions.push({ item_id: { [Op.in]: itemIds } });
-  }
+      // 🔍 Item name or generate ID match
+      const matchingItems = await ItemMaster.findAll({
+        attributes: ['id'],
+        where: {
+          [Op.or]: [
+            { item_generate_id: { [Op.like]: `%${search}%` } },
+            { item_name: { [Op.like]: `%${search}%` } }
+          ]
+        }
+      });
+      if (matchingItems.length > 0) {
+        const itemIds = matchingItems.map(item => item.id);
+        searchConditions.push({ item_id: { [Op.in]: itemIds } });
+      }
 
-  // Category search
-const matchingCategory = await Categories.findAll({
-  attributes: ['id'],
-  where: {
-    category_name: { [Op.like]: `%${search}%` }
-  }
-});
-if (matchingCategory.length > 0) {
-  const categoryIds = matchingCategory.map(item => item.id);
-  searchConditions.push({ category: { [Op.in]: categoryIds } });
-}
+      // 🔍 Category name match
+      const matchingCategory = await Categories.findAll({
+        attributes: ['id'],
+        where: {
+          category_name: { [Op.like]: `%${search}%` }
+        }
+      });
+      if (matchingCategory.length > 0) {
+        const categoryIds = matchingCategory.map(category => category.id);
+        searchConditions.push({ category: { [Op.in]: categoryIds } });
+      }
 
-// Subcategory search
-const matchingSubCategory = await Sub_categories.findAll({
-  attributes: ['id'],
-  where: {
-    sub_category_name: { [Op.like]: `%${search}%` }
-  }
-});
-if (matchingSubCategory.length > 0) {
-  const subCategoryIds = matchingSubCategory.map(item => item.id);
-  searchConditions.push({ sub_category: { [Op.in]: subCategoryIds } });
-}
+      // 🔍 Subcategory name match
+      const matchingSubCategory = await Sub_categories.findAll({
+        attributes: ['id'],
+        where: {
+          sub_category_name: { [Op.like]: `%${search}%` }
+        }
+      });
+      if (matchingSubCategory.length > 0) {
+        const subCategoryIds = matchingSubCategory.map(sub => sub.id);
+        searchConditions.push({ sub_category: { [Op.in]: subCategoryIds } });
+      }
 
-if (searchConditions.length > 0) {
-  whereCondition[Op.or] = searchConditions;
-}
-
-
-
-  // whereCondition[Op.or] = searchConditions;
+      if (searchConditions.length > 0) {
+        andConditions.push({ [Op.or]: searchConditions });
+      }
     }
 
+    // 🔍 Filter by selected dropdowns
     if (categoryId) {
-      whereCondition.category = categoryId;
+      andConditions.push({ category: categoryId });
     }
 
     if (subCategoryId) {
-      whereCondition.sub_category = subCategoryId;
+      andConditions.push({ sub_category: subCategoryId });
     }
+
+    // ✅ Final where condition
+    const whereCondition = { [Op.and]: andConditions };
+
 
    
 // get a subcategory data

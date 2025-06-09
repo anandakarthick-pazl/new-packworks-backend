@@ -229,7 +229,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     const offset = (pageNumber - 1) * limitNumber;
 
     const whereCondition = {};
-
+whereCondition.status="active"
     // Enhanced search functionality across all relevant fields
     if (search.trim() !== "") {
       whereCondition[Op.or] = [
@@ -286,7 +286,14 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
         include: [
           {
             model: GRNItem,
-            as: "GRNItems" // Ensure alias matches your association
+            as: "GRNItems", // Ensure alias matches your association
+            include: [
+            {
+              model: ItemMaster,
+              as: "item_info", // Alias from GRNItem → ItemMaster association
+              attributes: ["id", "item_generate_id"]
+            }
+          ]
           }
         ]
       });
