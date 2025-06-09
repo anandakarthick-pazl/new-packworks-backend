@@ -44,6 +44,9 @@ const ItemMaster = sequelize.define(
     uom: {
       type: DataTypes.STRING(10),
     },
+    net_weight: {
+      type: DataTypes.STRING(100),
+    },
     category: {
       type: DataTypes.INTEGER(11),
     },
@@ -92,6 +95,10 @@ const ItemMaster = sequelize.define(
       defaultValue: "active",
     },
     custom_fields: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    default_custom_fields: {
       type: DataTypes.JSON,
       allowNull: true,
     },
