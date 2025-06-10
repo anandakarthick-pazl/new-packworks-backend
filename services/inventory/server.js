@@ -267,8 +267,8 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       purchaseOrders: [],
       grns: [],
       purchaseReturns: [],
-      creditNotes: [],
-      debitNotes: [],
+      // creditNotes: [],
+      // debitNotes: [],
       stockAdjustments: []
     };
     
@@ -354,15 +354,6 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       ]
     });
 
-    // // Credit Notes
-    // results.creditNotes = await CreditNote.findAll({
-    //   where: { item_id: itemId }
-    // });
-
-    // // Debit Notes
-    // results.debitNotes = await DebitNote.findAll({
-    //   where: { item_id: itemId }
-    // });
 
     // Stock Adjustments
     results.stockAdjustments = await stockAdjustmentItem.findAll({
@@ -386,6 +377,16 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         }
       ]
     });
+
+    //  // Credit Notes
+    // results.creditNotes = await CreditNote.findAll({
+    //   where: { item_id: itemId }
+    // });
+
+    // // Debit Notes
+    // results.debitNotes = await DebitNote.findAll({
+    //   where: { item_id: itemId }
+    // });
 
     return res.status(200).json({
       success: true,
