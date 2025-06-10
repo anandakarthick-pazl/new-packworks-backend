@@ -58,7 +58,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       const {
         po_item_id, item_id, item_code, grn_item_name, description,
         quantity_ordered, quantity_received, accepted_quantity,
-        rejected_quantity, notes, cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
+        rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
       } = item;
 
       const poItem = await PurchaseOrderItem.findOne({
@@ -87,6 +87,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         quantity_received,
         accepted_quantity,
         rejected_quantity,
+        unit_price,
         notes,
         work_order_no,
         batch_no,
