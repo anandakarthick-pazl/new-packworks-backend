@@ -78,6 +78,9 @@ const GRNItem = sequelize.define("GRNItem", {
   notes: {
     type: DataTypes.TEXT,
   },
+  unit_price: {
+    type: DataTypes.DECIMAL(15, 2),
+  },
   cgst: {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
