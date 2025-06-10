@@ -299,7 +299,108 @@ v1Router.patch(
     }
   }
 );
+v1Router.get("/work-order/ungrouped-layers", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      manufacture,
+      sku_name,
+      status = "active",
+      production
+    } = req.query;
 
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id,
+    };
+
+    // Status filtering - default to active, but allow override
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+
+    if (manufacture) {
+      whereClause.manufacture = manufacture;
+    }
+    if (sku_name) {
+      whereClause.sku_name = { [Op.like]: `%${sku_name}%` };
+    }
+    
+    // Production filtering - filter by production stage if provided
+    if (production) {
+      whereClause.production = production;
+    }
+
+    // Include sales order information
+    const includeOptions = [
+      {
+        model: SalesOrder,
+        as: "salesOrder",
+        attributes: ["id", "sales_ui_id", "sales_generate_id", "client"],
+        required: false,
+      },
+    ];
+
+    // Fetch all work orders without pagination
+    const workOrders = await WorkOrder.findAll({
+      where: whereClause,
+      include: includeOptions,
+      order: [["updated_at", "DESC"]],
+    });
+
+    // Helper function to parse work_order_sku_values and filter ungrouped layers
+    const parseAndFilterSkuValues = (workOrderData) => {
+      if (workOrderData.work_order_sku_values) {
+        try {
+          let skuValues = workOrderData.work_order_sku_values;
+          
+          // Parse if it's a string
+          if (typeof skuValues === "string") {
+            skuValues = JSON.parse(skuValues);
+          }
+          
+          // Filter only ungrouped layers
+          workOrderData.work_order_sku_values = skuValues.filter(
+            layer => layer.layer_status === "ungrouped"
+          );
+          
+        } catch (error) {
+          logger.warn(
+            `Failed to parse work_order_sku_values for work order ${workOrderData.id}:`,
+            error
+          );
+          workOrderData.work_order_sku_values = [];
+        }
+      } else {
+        workOrderData.work_order_sku_values = [];
+      }
+      return workOrderData;
+    };
+
+    // Process work orders - filter to only ungrouped layers
+    const processedWorkOrders = workOrders.map(workOrder => {
+      const plainWorkOrder = workOrder.get({ plain: true });
+      return parseAndFilterSkuValues(plainWorkOrder);
+    });
+
+    // Filter out work orders that have no ungrouped layers
+    const workOrdersWithUngroupedLayers = processedWorkOrders.filter(
+      workOrder => workOrder.work_order_sku_values.length > 0
+    );
+
+    res.json({
+      workOrders: workOrdersWithUngroupedLayers,
+      total: workOrdersWithUngroupedLayers.length
+    });
+
+  } catch (error) {
+    logger.error("Error fetching work orders with ungrouped layers:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
 v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   const workDetails = req.body;
 
@@ -521,7 +622,6 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // Enhanced GET /work-order/:id endpoint with sales order details
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
@@ -591,6 +691,7 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 v1Router.get(
   "/work-order/download/excel",
