@@ -51,6 +51,30 @@ const GRN = sequelize.define("GRN", {
   notes: {
     type: DataTypes.TEXT,
   },
+  total_qty: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  cgst_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  sgst_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  tax_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
+  total_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
   status: {
     type: DataTypes.ENUM("active", "inactive"),
     allowNull: false,

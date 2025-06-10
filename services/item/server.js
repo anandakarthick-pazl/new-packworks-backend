@@ -50,16 +50,28 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
       }
     } 
     whereCondition.status="active"
-    const item = await ItemMaster.findAll({
+    const items = await ItemMaster.findAll({
       where :whereCondition,
       limit:limitNumber,
       offset
     });
+
+    // Parse custom_fields & default_custom_fields for each item
+    const parsedItems = items.map(item => {
+      const raw = item.toJSON();
+      return {
+        ...raw,
+        custom_fields: raw.custom_fields ? JSON.parse(raw.custom_fields) : {},
+        default_custom_fields: raw.default_custom_fields ? JSON.parse(raw.default_custom_fields) : {},
+      };
+    });
+
+
    const totalItems = await ItemMaster.count({where:whereCondition});
    return res.status(200).json({
     success : true,
     message : "Items fetched Successfully",
-    data : item,
+    data : parsedItems,
     totalItems : totalItems
    });
   }catch(error){
@@ -120,10 +132,18 @@ v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
   try {
     const item_id = req.params.id;
     const itemData = await ItemMaster.findOne({ where: { id: item_id } });
+
+    const parsedItem = {
+      ...itemData.toJSON(),
+      custom_fields: itemData.custom_fields ? JSON.parse(itemData.custom_fields) : {},
+      default_custom_fields: itemData.default_custom_fields ? JSON.parse(itemData.default_custom_fields) : {},
+    };
+
+
     return res.status(200).json({
       success: true,
       message: "Item data fetched successfully",
-      data: itemData,
+      data: parsedItem,
     });
   } catch (error) {s
     console.error(error.message);

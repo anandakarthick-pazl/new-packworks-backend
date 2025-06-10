@@ -16,6 +16,7 @@ app.use(cors());
 
 const v1Router = Router();
 
+const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
 
 // POST create new work order
@@ -389,132 +390,337 @@ v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
       data: workOrder.get({ plain: true }),
     });
   } catch (error) {
-    logger.error("Error soft deleting work order:", error);
+    console.error("Error creating production group:", error);
+    logger.error("Error creating production group:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
-v1Router.get(
-  "/sale-order/:salesOrderId/work-orders",
+// PATCH API to ungroup layers (set layer_status back to "ungrouped")
+v1Router.patch(
+  "/production-group/ungroup",
   authenticateJWT,
   async (req, res) => {
+    const { work_order_layers } = req.body;
+
+    // Validate input
+    if (!work_order_layers || !Array.isArray(work_order_layers)) {
+      return res.status(400).json({
+        message: "work_order_layers array is required",
+      });
+    }
+
     try {
-      const { salesOrderId } = req.params;
-      const { status = "active" } = req.query; // Default to active status
-      const companyId = req.user.company_id;
+      const updateResults = [];
 
-      // Build where clause
-      const where = {
-        sales_order_id: salesOrderId,
-        company_id: companyId,
-      };
+      for (const item of work_order_layers) {
+        const { work_order_id, layer_id } = item;
+        console.log(`Processing ungroup - work_order_id: ${work_order_id}, layer_id: ${layer_id}`);
 
-      // Filter by status unless "all" is specified
-      if (status !== "all") {
-        where.status = status;
+        if (!work_order_id || !layer_id) {
+          updateResults.push({
+            work_order_id,
+            layer_id,
+            status: "failed",
+            message: "work_order_id and layer_id are required",
+          });
+          continue;
+        }
+
+        // Find work order by id
+        const workOrder = await WorkOrder.findByPk(work_order_id);
+        console.log(`Found work order:`, workOrder ? 'Yes' : 'No');
+
+        if (!workOrder || !workOrder.work_order_sku_values) {
+          updateResults.push({
+            work_order_id,
+            layer_id,
+            status: "failed",
+            message: "Work order not found or missing sku_values",
+          });
+          continue;
+        }
+
+        console.log("Original work_order_sku_values:", workOrder.work_order_sku_values);
+        console.log("Type of work_order_sku_values:", typeof workOrder.work_order_sku_values);
+
+        let skuValues = workOrder.work_order_sku_values;
+
+        // Parse if it's a JSON string, otherwise use as-is if it's already an array
+        if (typeof skuValues === "string") {
+          try {
+            skuValues = JSON.parse(skuValues);
+            console.log("Parsed sku values:", skuValues);
+          } catch (parseError) {
+            logger.error(
+              `Error parsing work_order_sku_values for work_order_id ${work_order_id}:`,
+              parseError
+            );
+            updateResults.push({
+              work_order_id,
+              layer_id,
+              status: "failed",
+              message: "Error parsing work order sku values",
+            });
+            continue;
+          }
+        }
+
+        // Update status for matching layer_id
+        if (Array.isArray(skuValues)) {
+          console.log(`Looking for layer_id: ${layer_id} in array of ${skuValues.length} items`);
+          
+          let updated = false;
+          const updatedSkuValues = skuValues.map((layer, index) => {
+            console.log(`Processing layer ${index}:`, {
+              layer_id: layer.layer_id,
+              layer_status: layer.layer_status,
+              matches_target: layer.layer_id === layer_id,
+              is_grouped: layer.layer_status === "grouped"
+            });
+
+            // Important: Make sure layer_id comparison uses correct data types
+            // Convert both to numbers for comparison to avoid type mismatch
+            const layerIdNum = Number(layer.layer_id);
+            const targetLayerIdNum = Number(layer_id);
+
+            if (layerIdNum === targetLayerIdNum && layer.layer_status === "grouped") {
+              updated = true;
+              console.log(`✅ Updating layer_id ${layer_id} from 'grouped' to 'ungrouped'`);
+              return { ...layer, layer_status: "ungrouped" };
+            }
+            return layer;
+          });
+
+          console.log(`Update needed: ${updated}`);
+
+          // Update work order if any changes were made
+          if (updated) {
+            console.log("Updated sku values:", updatedSkuValues);
+            
+            // Store as JavaScript object/array - Sequelize will handle JSON serialization
+            // This matches the POST endpoint approach
+            const finalSkuValues = updatedSkuValues;
+
+            console.log("Final sku values to save:", finalSkuValues);
+
+            const updateResult = await WorkOrder.update(
+              {
+                work_order_sku_values: finalSkuValues,
+                updated_by: req.user.id,
+              },
+              { 
+                where: { id: work_order_id },
+                returning: true
+              }
+            );
+
+            console.log("Update result:", updateResult);
+
+            updateResults.push({
+              work_order_id,
+              layer_id,
+              status: "success",
+              message: "Layer status updated to ungrouped",
+            });
+
+            logger.info(
+              `Successfully updated layer_id ${layer_id} to 'ungrouped' status in work_order_id ${work_order_id}`
+            );
+          } else {
+            console.log(`❌ No update needed for layer_id ${layer_id} in work_order_id ${work_order_id}`);
+            
+            // Let's see what layers we actually have
+            console.log("Available layers:", skuValues.map(l => ({
+              layer_id: l.layer_id,
+              layer_status: l.layer_status,
+              type_of_layer_id: typeof l.layer_id
+            })));
+
+            updateResults.push({
+              work_order_id,
+              layer_id,
+              status: "skipped",
+              message: "Layer not found or already ungrouped",
+            });
+          }
+        } else {
+          console.log("❌ work_order_sku_values is not an array:", typeof skuValues);
+          updateResults.push({
+            work_order_id,
+            layer_id,
+            status: "failed",
+            message: "Invalid sku_values format",
+          });
+        }
       }
 
-      // Fetch from database
-      const workOrders = await WorkOrder.findAll({
-        where,
-        order: [["created_at", "DESC"]],
+      // Check if any updates were successful
+      const successCount = updateResults.filter(
+        (result) => result.status === "success"
+      ).length;
+      const failedCount = updateResults.filter(
+        (result) => result.status === "failed"
+      ).length;
+
+      res.status(200).json({
+        message: `Ungroup operation completed. ${successCount} successful, ${failedCount} failed.`,
+        results: updateResults,
+        summary: {
+          total: updateResults.length,
+          successful: successCount,
+          failed: failedCount,
+          skipped: updateResults.filter((result) => result.status === "skipped")
+            .length,
+        },
       });
-
-      const result = workOrders.map((wo) => wo.get({ plain: true }));
-
-      res.json(result);
     } catch (error) {
-      logger.error("Error fetching work orders by sales order:", error);
-      res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
+      console.error("Error ungrouping layers:", error);
+      logger.error("Error ungrouping layers:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
     }
   }
 );
 
-// PUT update work order status (priority and progress only)
-v1Router.put("/work-order/status/:workOrderId", authenticateJWT, async (req, res) => {
+v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   try {
-    const { workOrderId } = req.params;
-    const { priority, progress } = req.body;
-    
-    // Get user details from authentication
-    const userId = req.user.id;
-    const companyId = req.user.company_id;
+    const { include_work_orders = "false" } = req.query;
 
-    // Validate input
-    if (!priority && !progress) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one field (priority or progress) is required"
-      });
-    }
-
-    // Validate priority value if provided
-    if (priority && !["High", "Medium", "Low"].includes(priority)) {
-      return res.status(400).json({
-        success: false,
-        message: "Priority must be High, Medium, or Low"
-      });
-    }
-
-    // Validate progress value if provided
-    const validProgressValues = [
-      "Pending", "Product Planning", "Procurement Sourcing",
-      "Production Planning", "Production", "Quality Control",
-      "Packaging", "Shipping"
-    ];
-    
-    if (progress && !validProgressValues.includes(progress)) {
-      return res.status(400).json({
-        success: false,
-        message: `Progress must be one of: ${validProgressValues.join(", ")}`
-      });
-    }
-
-    // Find the work order
-    const workOrder = await WorkOrder.findOne({
-      where: { 
-        id: workOrderId,
-        company_id: companyId
-      }
+    // Get all production groups for the company
+    const productionGroups = await ProductionGroup.findAll({
+      where: {
+        company_id: req.user.company_id,
+      },
+      order: [["created_at", "DESC"]],
+      attributes: [
+        "id",
+        "group_name",
+        "group_value",
+        "group_Qty",
+        "status",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+      ],
     });
-    
-    if (!workOrder) {
-      return res.status(404).json({
-        success: false,
-        message: "Work order not found or you don't have access to it"
-      });
-    }
 
-    // Create update object with only the provided fields
-    const updateData = {};
-    if (priority) updateData.priority = priority;
-    if (progress) updateData.progress = progress;
-    
-    // Add audit fields
-    updateData.updated_by = userId;
-    updateData.updated_at = sequelize.literal("CURRENT_TIMESTAMP");
+    // Process each production group to include work order layer details if requested
+    const processedGroups = await Promise.all(
+      productionGroups.map(async (group) => {
+        const groupData = group.toJSON();
 
-    // Update the work order with new status information
-    await workOrder.update(updateData);
+        // Parse group_value if it's a string
+        let groupValue = groupData.group_value;
+        if (typeof groupValue === "string") {
+          try {
+            groupValue = JSON.parse(groupValue);
+          } catch (parseError) {
+            logger.warn(
+              `Error parsing group_value for group ${group.id}:`,
+              parseError
+            );
+            groupValue = [];
+          }
+        }
 
-    return res.status(200).json({
-      success: true,
-      message: "Work order status updated successfully",
-      data: workOrder.get({ plain: true })
+        groupData.group_value = groupValue || [];
+
+        // Include only layer details if requested
+        if (include_work_orders === "true" && Array.isArray(groupValue)) {
+          const layerDetails = await Promise.all(
+            groupValue.map(async (item) => {
+              const { work_order_id, layer_id, sales_order_id } = item;
+
+              try {
+                // Only fetch work_order_sku_values to extract layer details
+                const workOrder = await WorkOrder.findByPk(work_order_id, {
+                  attributes: ["id", "work_order_sku_values"],
+                });
+
+                if (!workOrder) {
+                  return {
+                    work_order_id,
+                    layer_id,
+                    sales_order_id,
+                    layer_found: false,
+                    error: "Work order not found",
+                  };
+                }
+
+                // Parse work_order_sku_values to get layer details
+                let skuValues = workOrder.work_order_sku_values;
+                if (typeof skuValues === "string") {
+                  try {
+                    skuValues = JSON.parse(skuValues);
+                  } catch (parseError) {
+                    skuValues = [];
+                  }
+                }
+
+                // Find the specific layer by layer_id
+                const layerDetail = Array.isArray(skuValues)
+                  ? skuValues.find((layer) => layer.layer_id === layer_id)
+                  : null;
+
+                if (!layerDetail) {
+                  return {
+                    work_order_id,
+                    layer_id,
+                    sales_order_id,
+                    layer_found: false,
+                    error: "Layer not found in work order",
+                  };
+                }
+
+                return {
+                  work_order_id,
+                  layer_id,
+                  sales_order_id,
+                  layer_found: true,
+                  layer_detail: layerDetail,
+                };
+              } catch (error) {
+                logger.error(
+                  `Error fetching layer details for work order ${work_order_id}:`,
+                  error
+                );
+                return {
+                  work_order_id,
+                  layer_id,
+                  sales_order_id,
+                  layer_found: false,
+                  error: "Error fetching layer details",
+                };
+              }
+            })
+          );
+
+          groupData.layer_details = layerDetails;
+        }
+
+        return groupData;
+      })
+    );
+
+    res.status(200).json({
+      message: "Production groups retrieved successfully",
+      data: processedGroups,
+      total: processedGroups.length,
     });
   } catch (error) {
-    logger.error("Error updating work order status:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
+    logger.error("Error fetching production groups:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
     });
   }
 });
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -527,6 +733,8 @@ app.get("/health", (req, res) => {
 app.use("/api/production", v1Router);
 // await db.sequelize.sync();
 const PORT = 3029;
-app.listen(process.env.PORT_PRODUCTION, '0.0.0.0',() => {
-  console.log(`Production Service running on port ${process.env.PORT_PRODUCTION}`);
+app.listen(process.env.PORT_PRODUCTION, "0.0.0.0", () => {
+  console.log(
+    `Production Service running on port ${process.env.PORT_PRODUCTION}`
+  );
 });
