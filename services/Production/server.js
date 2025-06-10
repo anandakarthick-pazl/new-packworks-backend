@@ -19,48 +19,199 @@ const v1Router = Router();
 const WorkOrder = db.WorkOrder;
 
 // POST create new work order
+v1Router.post("/production-group", authenticateJWT, async (req, res) => {
+  const groupDetailsArray = req.body;
 
-v1Router.post("/work-order", authenticateJWT, async (req, res) => {
-  const workDetails = req.body;
-
-  if (!workDetails) {
-    return res.status(400).json({ message: "Invalid input data" });
+  // Validate that we received an array
+  if (!Array.isArray(groupDetailsArray) || groupDetailsArray.length === 0) {
+    return res.status(400).json({ message: "Invalid input data - expected array of group objects" });
   }
 
-  try {
-    
-    const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
-    // Create Work Order
-    const newWorkOrder = await WorkOrder.create({
-      work_generate_id: work_generate_id,
-      company_id: req.user.company_id,
-      client_id: workDetails.client_id,
-      sales_order_id: workDetails.sales_order_id || null,
-      manufacture: workDetails.manufacture,
-      sku_id: workDetails.sku_id || null,
-      sku_name: workDetails.sku_name || null,
-      sku_version: workDetails.sku_version || null,
-      qty: workDetails.qty || null,
-      edd: workDetails.edd || null,
-      description: workDetails.description || null,
-      acceptable_excess_units: workDetails.acceptable_excess_units || null,
-      planned_start_date: workDetails.planned_start_date || null,
-      planned_end_date: workDetails.planned_end_date || null,
-      outsource_name:
-        workDetails.manufacture === "outsource"
-          ? workDetails.outsource_name
-          : null,
-      status: workDetails.status || "active",
-      created_by: req.user.id,
-      updated_by: req.user.id,
-    });
+  const createdGroups = [];
+  const errors = [];
 
-    res.status(201).json({
-      message: "Work Order created successfully",
-      data: newWorkOrder,
-    });
+  try {
+    // Process each group in the array
+    for (let i = 0; i < groupDetailsArray.length; i++) {
+      const groupDetails = groupDetailsArray[i];
+      
+      try {
+        // Validate required fields for this group
+        if (!groupDetails.group_name) {
+          errors.push(`Group at index ${i}: Group name is required`);
+          continue;
+        }
+
+        // Create Production Group
+        const newProductionGroup = await ProductionGroup.create({
+          company_id: req.user.company_id,
+          group_name: groupDetails.group_name,
+          group_value: groupDetails.group_value || null,
+          group_Qty: groupDetails.group_Qty || null,
+          status: groupDetails.status || "active",
+          created_by: req.user.id,
+          updated_by: req.user.id,
+        });
+
+        // Process group_value array to update work_order status
+        if (groupDetails.group_value && Array.isArray(groupDetails.group_value)) {
+          console.log(`Processing group_value array for group ${i}:`, groupDetails.group_value);
+          
+          for (const item of groupDetails.group_value) {
+            const { work_order_id, layer_id } = item;
+            console.log(`Processing item - work_order_id: ${work_order_id}, layer_id: ${layer_id}`);
+
+            if (work_order_id && layer_id) {
+              // Find work order by id
+              const workOrder = await WorkOrder.findByPk(work_order_id);
+              console.log(`Found work order:`, workOrder ? 'Yes' : 'No');
+
+              if (workOrder && workOrder.work_order_sku_values) {
+                console.log("Original work_order_sku_values:", workOrder.work_order_sku_values);
+                console.log("Type of work_order_sku_values:", typeof workOrder.work_order_sku_values);
+                
+                let skuValues = workOrder.work_order_sku_values;
+
+                // Parse if it's a JSON string, otherwise use as-is if it's already an array
+                if (typeof skuValues === "string") {
+                  try {
+                    skuValues = JSON.parse(skuValues);
+                    console.log("Parsed sku values:", skuValues);
+                  } catch (parseError) {
+                    logger.error(
+                      `Error parsing work_order_sku_values for work_order_id ${work_order_id}:`,
+                      parseError
+                    );
+                    continue;
+                  }
+                }
+
+                // Update status for matching layer_id
+                if (Array.isArray(skuValues)) {
+                  console.log(`Looking for layer_id: ${layer_id} in array of ${skuValues.length} items`);
+                  
+                  let updated = false;
+                  const updatedSkuValues = skuValues.map((layer, index) => {
+                    console.log(`Processing layer ${index}:`, {
+                      layer_id: layer.layer_id,
+                      layer_status: layer.layer_status,
+                      matches_target: layer.layer_id === layer_id,
+                      is_ungrouped: layer.layer_status === "ungrouped"
+                    });
+                    
+                    // Important: Make sure layer_id comparison uses correct data types
+                    // Convert both to numbers for comparison to avoid type mismatch
+                    const layerIdNum = Number(layer.layer_id);
+                    const targetLayerIdNum = Number(layer_id);
+                    
+                    if (layerIdNum === targetLayerIdNum && layer.layer_status === "ungrouped") {
+                      updated = true;
+                      console.log(`✅ Updating layer_id ${layer_id} from 'ungrouped' to 'grouped'`);
+                      return { ...layer, layer_status: "grouped" };
+                    }
+                    return layer;
+                  });
+
+                  console.log(`Update needed: ${updated}`);
+                  
+                  // Update work order if any changes were made
+                  if (updated) {
+                    console.log("Updated sku values:", updatedSkuValues);
+                    
+                    // Store as JavaScript object/array - Sequelize will handle JSON serialization
+                    const finalSkuValues = updatedSkuValues;
+
+                    console.log("Final sku values to save:", finalSkuValues);
+
+                    const updateResult = await WorkOrder.update(
+                      {
+                        work_order_sku_values: finalSkuValues,
+                        updated_by: req.user.id,
+                      },
+                      { 
+                        where: { id: work_order_id },
+                        returning: true // This will help us see if the update actually happened
+                      }
+                    );
+                    
+                    console.log("Update result:", updateResult);
+                    
+                    logger.info(
+                      `Successfully updated layer_id ${layer_id} to 'grouped' status in work_order_id ${work_order_id}`
+                    );
+                  } else {
+                    console.log(`❌ No update needed for layer_id ${layer_id} in work_order_id ${work_order_id}`);
+                    
+                    // Let's see what layers we actually have
+                    console.log("Available layers:", skuValues.map(l => ({
+                      layer_id: l.layer_id,
+                      layer_status: l.layer_status,
+                      type_of_layer_id: typeof l.layer_id
+                    })));
+                    
+                    logger.warn(
+                      `No update needed for layer_id ${layer_id} in work_order_id ${work_order_id} - layer not found or already grouped`
+                    );
+                  }
+                } else {
+                  console.log("❌ work_order_sku_values is not an array:", typeof skuValues);
+                  logger.error(
+                    `work_order_sku_values is not an array for work_order_id ${work_order_id}`
+                  );
+                }
+              } else {
+                console.log(`❌ Work order not found or missing work_order_sku_values for work_order_id: ${work_order_id}`);
+                logger.warn(
+                  `Work order not found or missing work_order_sku_values for work_order_id: ${work_order_id}`
+                );
+              }
+            } else {
+              console.log(`❌ Missing work_order_id or layer_id in group_value item:`, item);
+              logger.warn(
+                `Missing work_order_id or layer_id in group_value item:`,
+                item
+              );
+            }
+          }
+        }
+
+        createdGroups.push(newProductionGroup);
+        console.log(`✅ Successfully created group ${i}: ${groupDetails.group_name}`);
+
+      } catch (groupError) {
+        console.error(`Error creating group at index ${i}:`, groupError);
+        logger.error(`Error creating group at index ${i}:`, groupError);
+        errors.push(`Group at index ${i}: ${groupError.message}`);
+      }
+    }
+
+    // Prepare response
+    const response = {
+      message: `Processed ${groupDetailsArray.length} groups`,
+      created_count: createdGroups.length,
+      error_count: errors.length,
+      data: createdGroups
+    };
+
+    if (errors.length > 0) {
+      response.errors = errors;
+    }
+
+    // Return appropriate status code
+    if (createdGroups.length > 0 && errors.length === 0) {
+      // All groups created successfully
+      res.status(201).json(response);
+    } else if (createdGroups.length > 0 && errors.length > 0) {
+      // Some groups created, some failed
+      res.status(207).json(response); // 207 Multi-Status
+    } else {
+      // No groups created (all failed)
+      res.status(400).json(response);
+    }
+
   } catch (error) {
-    logger.error("Error creating work order:", error);
+    console.error("Error processing production groups:", error);
+    logger.error("Error processing production groups:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
