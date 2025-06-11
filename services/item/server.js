@@ -96,6 +96,20 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
     rest.created_at = indiaTime;
+
+    // console.log("custom_fields:", typeof rest.custom_fields);    
+    // console.log("default_custom_fields:", typeof rest.default_custom_fields);    
+
+ // ✅ Convert stringified JSON to objects
+    if (rest.custom_fields && typeof rest.custom_fields === "string") {
+      rest.custom_fields = JSON.parse(rest.custom_fields);
+    }
+
+    if (rest.default_custom_fields && typeof rest.default_custom_fields === "string") {
+      rest.default_custom_fields = JSON.parse(rest.default_custom_fields);
+    }
+
+
     const item = await ItemMaster.create(rest, { transaction });
     // await transaction.commit();
 
@@ -166,27 +180,91 @@ v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
         message: "Invalid item ID",
       });
     }
-    const { ...rest } = req.body;
+    
+    const { custom_fields, default_custom_fields, ...rest } = req.body;
     rest.updated_by = req.user.id;
     rest.updated_at = new Date();
     rest.company_id = req.user.company_id;
+    
     const itemExists = await ItemMaster.findByPk(itemId);
+
+    // Debug: Log what we're receiving
+    console.log('Received custom_fields:', typeof custom_fields, custom_fields);
+    console.log('Received default_custom_fields:', typeof default_custom_fields, default_custom_fields);
+
+    // Handle JSON fields with explicit type checking
+    if (custom_fields !== undefined) {
+      rest.custom_fields = custom_fields;
+    }
+    
+    if (default_custom_fields !== undefined) {
+      rest.default_custom_fields = default_custom_fields;
+    }
+
     if (!itemExists) {
       return res.status(404).json({
         success: false,
         message: "Item not found",
       });
     }
+    
+    // Debug: Log what we're about to save
+    console.log('About to save custom_fields:', typeof rest.custom_fields, rest.custom_fields);
+    console.log('About to save default_custom_fields:', typeof rest.default_custom_fields, rest.default_custom_fields);
+    
     await ItemMaster.update(rest, {
       where: { id: itemId }, 
       transaction,
     });
-    const updatedItem = await ItemMaster.findByPk(itemId, { transaction });
+    
+    // Fetch with different methods to see what works
+    const updatedItem1 = await ItemMaster.findByPk(itemId, { transaction });
+    const updatedItem2 = await ItemMaster.findByPk(itemId, { transaction, raw: true });
+    
+    // Debug: Log what we get back from DB
+    console.log('From findByPk (instance):', typeof updatedItem1.custom_fields, updatedItem1.custom_fields);
+    console.log('From findByPk (raw):', typeof updatedItem2.custom_fields, updatedItem2.custom_fields);
+    
     await transaction.commit();
+    
+    // Try different approaches to get proper JSON
+    let responseData;
+    
+    // Approach 1: Use raw query
+    const [rawResult] = await sequelize.query(
+      `SELECT * FROM ${ItemMaster.tableName} WHERE id = ?`,
+      {
+        replacements: [itemId],
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+    
+    console.log('From raw query:', typeof rawResult.custom_fields, rawResult.custom_fields);
+    
+    // Use the raw result and parse if needed
+    responseData = { ...rawResult };
+    
+    // Force parse if still string
+    if (responseData.custom_fields && typeof responseData.custom_fields === 'string') {
+      try {
+        responseData.custom_fields = JSON.parse(responseData.custom_fields);
+      } catch (e) {
+        console.log('Parse error for custom_fields:', e.message);
+      }
+    }
+    
+    if (responseData.default_custom_fields && typeof responseData.default_custom_fields === 'string') {
+      try {
+        responseData.default_custom_fields = JSON.parse(responseData.default_custom_fields);
+      } catch (e) {
+        console.log('Parse error for default_custom_fields:', e.message);
+      }
+    }
+    
     return res.status(200).json({
       success: true,
       message: "Item updated successfully",
-      data: updatedItem,
+      data: responseData,
     });
   } catch (error) {
     await transaction.rollback(); 
@@ -197,7 +275,6 @@ v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 
 v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
   try{
@@ -266,7 +343,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
 });
 
 //bf
-v1Router.get("/items/default/bf", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/bf", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -298,7 +375,7 @@ v1Router.get("/items/default/bf", authenticateJWT, async (req, res) => {
 
 
 //gsm
-v1Router.get("/items/default/gsm", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/gsm", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -328,7 +405,7 @@ v1Router.get("/items/default/gsm", authenticateJWT, async (req, res) => {
 });
 
 //Deckle size
-v1Router.get("/items/default/deckle", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/deckle", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -350,6 +427,36 @@ v1Router.get("/items/default/deckle", authenticateJWT, async (req, res) => {
       message: "Deckle values fetched successfully",
       data:uniqueDeckleValues,
       count: uniqueDeckleValues.length
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+});
+
+//color
+v1Router.get("/items/reels/color", authenticateJWT, async (req, res) => {
+  try {
+    const items = await ItemMaster.findAll({
+      attributes: ["default_custom_fields"],
+      where: { company_id: req.user.company_id }
+    });
+    const colorValues = items.map(item => {
+      try {
+        const parsed = JSON.parse(item.default_custom_fields || "{}");
+        return parsed.color ?? null;
+      } catch {
+        return null;
+      }
+    }).filter(color => color !== null && color !== "");
+
+    const uniqueColorValues = [...new Set(colorValues)];
+
+    res.json({
+      success: true,
+      message: "Color values fetched successfully",
+      data: uniqueColorValues,
+      count: uniqueColorValues.length
     });
   } catch (err) {
     console.error('Database error:', err);

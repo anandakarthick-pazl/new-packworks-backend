@@ -95,11 +95,11 @@ const ItemMaster = sequelize.define(
       defaultValue: "active",
     },
     custom_fields: {
-      type: DataTypes.JSON,
-      allowNull: true,
+      type: Sequelize.JSON,
+      allowNull: true,      
     },
     default_custom_fields: {
-      type: DataTypes.JSON,
+      type: Sequelize.JSON,
       allowNull: true,
     },
     created_at: {
@@ -141,8 +141,10 @@ ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-ItemMaster.belongsTo(Category, { foreignKey: 'category', as: 'category_info' });
-ItemMaster.belongsTo(SubCategory, { foreignKey: 'sub_category', as: 'sub_category_info' });
-
+ItemMaster.belongsTo(Category, { foreignKey: "category", as: "category_info" });
+ItemMaster.belongsTo(SubCategory, {
+  foreignKey: "sub_category",
+  as: "sub_category_info",
+});
 
 export default ItemMaster;
