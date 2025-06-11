@@ -96,19 +96,11 @@ const ItemMaster = sequelize.define(
     },
     custom_fields: {
       type: Sequelize.JSON,
-      allowNull: true,
-      get() {
-        const value = this.getDataValue("custom_fields");
-        return typeof value === "string" ? JSON.parse(value) : value;
-      },
+      allowNull: true,      
     },
     default_custom_fields: {
       type: Sequelize.JSON,
       allowNull: true,
-      get() {
-        const value = this.getDataValue("default_custom_fields");
-        return typeof value === "string" ? JSON.parse(value) : value;
-      },
     },
     created_at: {
       type: DataTypes.DATE,
