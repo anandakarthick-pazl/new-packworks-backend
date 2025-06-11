@@ -50,16 +50,28 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
       }
     } 
     whereCondition.status="active"
-    const item = await ItemMaster.findAll({
+    const items = await ItemMaster.findAll({
       where :whereCondition,
       limit:limitNumber,
       offset
     });
+
+    // Parse custom_fields & default_custom_fields for each item
+    const parsedItems = items.map(item => {
+      const raw = item.toJSON();
+      return {
+        ...raw,
+        custom_fields: raw.custom_fields ? JSON.parse(raw.custom_fields) : {},
+        default_custom_fields: raw.default_custom_fields ? JSON.parse(raw.default_custom_fields) : {},
+      };
+    });
+
+
    const totalItems = await ItemMaster.count({where:whereCondition});
    return res.status(200).json({
     success : true,
     message : "Items fetched Successfully",
-    data : item,
+    data : parsedItems,
     totalItems : totalItems
    });
   }catch(error){
@@ -120,10 +132,18 @@ v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
   try {
     const item_id = req.params.id;
     const itemData = await ItemMaster.findOne({ where: { id: item_id } });
+
+    const parsedItem = {
+      ...itemData.toJSON(),
+      custom_fields: itemData.custom_fields ? JSON.parse(itemData.custom_fields) : {},
+      default_custom_fields: itemData.default_custom_fields ? JSON.parse(itemData.default_custom_fields) : {},
+    };
+
+
     return res.status(200).json({
       success: true,
       message: "Item data fetched successfully",
-      data: itemData,
+      data: parsedItem,
     });
   } catch (error) {s
     console.error(error.message);
@@ -244,6 +264,101 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
     res.status(500).json({ error: error.message });
   }
 });
+
+//bf
+v1Router.get("/items/default/bf", authenticateJWT, async (req, res) => {
+  try {
+    const items = await ItemMaster.findAll({
+      attributes: ["default_custom_fields"],
+      where: { company_id: req.user.company_id }
+    });
+    const bfValues = items.map(item => {
+      try {
+        const parsed = JSON.parse(item.default_custom_fields || "{}");
+        return parsed.bf ?? null;
+      } catch {
+        return null;
+      }
+    }).filter(bf => bf !== null);
+    const uniqueBfValues = [...new Set(
+        bfValues.map(bf => parseInt(bf, 10)).filter(bf => !isNaN(bf))
+      )];
+    res.json({
+      success: true,
+      message: "BF values fetched successfully",
+      data:uniqueBfValues,
+      count: uniqueBfValues.length
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+});
+
+
+
+//gsm
+v1Router.get("/items/default/gsm", authenticateJWT, async (req, res) => {
+  try {
+    const items = await ItemMaster.findAll({
+      attributes: ["default_custom_fields"],
+      where: { company_id: req.user.company_id }
+    });
+    const gsmValues = items.map(item => {
+      try {
+        const parsed = JSON.parse(item.default_custom_fields || "{}");
+        return parsed.gsm ?? null;
+      } catch {
+        return null;
+      }
+    }).filter(gsm => gsm !== null);
+    const uniqueGsmValues = [...new Set(
+        gsmValues.map(gsm => parseInt(gsm, 10)).filter(gsm => !isNaN(gsm))
+      )];
+    res.json({
+      success: true,
+      message: "GSM values fetched successfully",
+      data:uniqueGsmValues,
+      count: uniqueGsmValues.length
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+});
+
+//Deckle size
+v1Router.get("/items/default/deckle", authenticateJWT, async (req, res) => {
+  try {
+    const items = await ItemMaster.findAll({
+      attributes: ["default_custom_fields"],
+      where: { company_id: req.user.company_id }
+    });
+    const deckleValues = items.map(item => {
+      try {
+        const parsed = JSON.parse(item.default_custom_fields || "{}");
+        return parsed.size ?? null;
+      } catch {
+        return null;
+      }
+    }).filter(size => size !== null);
+    const uniqueDeckleValues = [...new Set(
+        deckleValues.map(size => parseInt(size, 10)).filter(size => !isNaN(size))
+      )];
+    res.json({
+      success: true,
+      message: "Deckle values fetched successfully",
+      data:uniqueDeckleValues,
+      count: uniqueDeckleValues.length
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+});
+
+
+
 
 
 

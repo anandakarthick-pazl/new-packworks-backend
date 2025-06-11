@@ -39,6 +39,76 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
+//share notification
+// v1Router.get("/inventory/low-stock", authenticateJWT, async (req, res) => {
+//   try {
+//     const { sendEmail, recipients } = req.query;
+
+//     // 1. Get all items with their total available quantity
+//     const lowStockItems = await Inventory.findAll({
+//       attributes: [
+//         'item_id',
+//         [fn('SUM', col('quantity_available')), 'total_quantity']
+//       ],
+//       where: { company_id: req.user.company_id },
+//       group: ['Inventory.item_id', 'item.id'],
+//       include: [
+//         {
+//           model: ItemMaster,
+//           as: 'item',
+//           attributes: [
+//             'item_generate_id', 'item_name', 'description', 'category', 'sub_category',
+//             'min_stock_level', 'standard_cost', 'status', 'uom'
+//           ],
+//           required: true
+//         }
+//       ],
+//       having: Sequelize.where(
+//         fn('SUM', col('quantity_available')),
+//         '<',
+//         col('item.min_stock_level')
+//       ),
+//       order: [[fn('SUM', col('quantity_available')), 'ASC']]
+//     });
+
+//     // Calculate additional metrics
+//     const criticalItems = lowStockItems.filter(item => Number(item.dataValues.total_quantity) === 0);
+//     const totalValue = lowStockItems.reduce(
+//       (sum, item) => sum + (Number(item.dataValues.total_quantity) * (item.item?.standard_cost || 0)),
+//       0
+//     );
+
+//     let emailResult = null;
+
+//     // Send email if requested and items found
+//     if (sendEmail === 'true' && lowStockItems.length > 0) {
+//       const emailRecipients = recipients ? recipients.split(',').map(email => email.trim()) : [];
+//       emailResult = await sendLowStockEmail(lowStockItems, emailRecipients);
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       data: lowStockItems,
+//       summary: {
+//         totalLowStockItems: lowStockItems.length,
+//         criticalItems: criticalItems.length,
+//         totalValueAtRisk: totalValue.toFixed(2),
+//         lastChecked: new Date().toISOString()
+//       },
+//       emailSent: emailResult ? emailResult.success : false,
+//       message: lowStockItems.length > 0
+//         ? `Found ${lowStockItems.length} low stock items`
+//         : "All items are adequately stocked"
+//     });
+//   } catch (error) {
+//     console.error("Low stock fetch error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     });
+//   }
+// });
+
 //export excel
 v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
   try {
@@ -447,7 +517,23 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         where: {
           [Op.or]: [
             { item_generate_id: { [Op.like]: `%${search}%` } },
-            { item_name: { [Op.like]: `%${search}%` } }
+            { item_name: { [Op.like]: `%${search}%` } },
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.bf'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.gsm'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.size'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.color'),
+              { [Op.like]: `%${search}%` }
+            )
           ]
         }
       });
@@ -538,7 +624,7 @@ const subCategoryQuantities  = await Inventory.findAll({
 
 
 // get inventory data
-const inventoryData = await Inventory.findAll({
+const inventory = await Inventory.findAll({
   attributes: [
     'item_id',
     [fn('SUM', col('quantity_available')), 'total_quantity'],
@@ -592,7 +678,17 @@ const inventoryData = await Inventory.findAll({
     });
 
 
-    
+    // Parse JSON fields for each item in the result
+    const inventoryData = inventory.map(inv => {
+      const raw = inv.toJSON();
+      if (raw.item) {
+        raw.item.default_custom_fields = raw.item.default_custom_fields
+          ? JSON.parse(raw.item.default_custom_fields) : {};
+        raw.item.custom_fields = raw.item.custom_fields
+          ? JSON.parse(raw.item.custom_fields) : {};
+      }
+      return raw;
+    });
 
     const totalCount = totalCountResult.length;
     const totalPages = Math.ceil(totalCount / limitNumber);
