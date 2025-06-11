@@ -96,6 +96,20 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
     rest.created_at = indiaTime;
+
+    // console.log("custom_fields:", typeof rest.custom_fields);    
+    // console.log("default_custom_fields:", typeof rest.default_custom_fields);    
+
+ // ✅ Convert stringified JSON to objects
+    if (rest.custom_fields && typeof rest.custom_fields === "string") {
+      rest.custom_fields = JSON.parse(rest.custom_fields);
+    }
+
+    if (rest.default_custom_fields && typeof rest.default_custom_fields === "string") {
+      rest.default_custom_fields = JSON.parse(rest.default_custom_fields);
+    }
+
+
     const item = await ItemMaster.create(rest, { transaction });
     // await transaction.commit();
 
