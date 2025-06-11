@@ -266,7 +266,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
 });
 
 //bf
-v1Router.get("/items/default/bf", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/bf", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -298,7 +298,7 @@ v1Router.get("/items/default/bf", authenticateJWT, async (req, res) => {
 
 
 //gsm
-v1Router.get("/items/default/gsm", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/gsm", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -328,7 +328,7 @@ v1Router.get("/items/default/gsm", authenticateJWT, async (req, res) => {
 });
 
 //Deckle size
-v1Router.get("/items/default/deckle", authenticateJWT, async (req, res) => {
+v1Router.get("/items/reels/deckle", authenticateJWT, async (req, res) => {
   try {
     const items = await ItemMaster.findAll({
       attributes: ["default_custom_fields"],
@@ -350,6 +350,36 @@ v1Router.get("/items/default/deckle", authenticateJWT, async (req, res) => {
       message: "Deckle values fetched successfully",
       data:uniqueDeckleValues,
       count: uniqueDeckleValues.length
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+});
+
+//color
+v1Router.get("/items/reels/color", authenticateJWT, async (req, res) => {
+  try {
+    const items = await ItemMaster.findAll({
+      attributes: ["default_custom_fields"],
+      where: { company_id: req.user.company_id }
+    });
+    const colorValues = items.map(item => {
+      try {
+        const parsed = JSON.parse(item.default_custom_fields || "{}");
+        return parsed.color ?? null;
+      } catch {
+        return null;
+      }
+    }).filter(color => color !== null && color !== "");
+
+    const uniqueColorValues = [...new Set(colorValues)];
+
+    res.json({
+      success: true,
+      message: "Color values fetched successfully",
+      data: uniqueColorValues,
+      count: uniqueColorValues.length
     });
   } catch (err) {
     console.error('Database error:', err);
