@@ -7,6 +7,8 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import ExcelJS from "exceljs";
+import nodemailer from "nodemailer";
+// import dotenv from "dotenv";
 // const ItemMaster = db.ItemMaster;
 // const Company = db.Company;
 // const Inventory = db.Inventory;
@@ -998,8 +1000,8 @@ v1Router.post('/inventory/alert', authenticateJWT, async (req, res) => {
         // Create notification message
         const notificationType = currentQuantity === 0 ? 'out_of_stock' : 'low_stock';
         const message = currentQuantity === 0
-          ? `CRITICAL: Item "${validateItem.name}" is completely out of stock! Immediate purchase required.`
-          : `ALERT: Item "${validateItem.name}" is running low (${currentQuantity} units remaining, minimum required: ${minStockLevel}). This item now has low availability and needs to be purchased to maintain adequate stock levels.`;
+          ? `CRITICAL: Item "${validateItem.item_name}" is completely out of stock! Immediate purchase required.`
+          : `ALERT: Item "${validateItem.item_name}" is running low (${currentQuantity} units remaining, minimum required: ${minStockLevel}). This item now has low availability and needs to be purchased to maintain adequate stock levels.`;
 
         // Create notification record
         const notification = await Notification.create({
@@ -1103,7 +1105,7 @@ v1Router.post('/inventory/alert', authenticateJWT, async (req, res) => {
 async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
   try {
     // Configure your email transporter
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT,
       secure: false,
@@ -1141,7 +1143,7 @@ async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
                 <div class="details">
                     <p><strong>Item Name:</strong> ${itemData.name || itemData.item_name}</p>
                     <p><strong>Item Code:</strong> ${itemData.code || itemData.item_code}</p>
-                    <p><strong>Category:</strong> ${itemData.category || 'N/A'}</p>
+                    
                 </div>
                 
                 <h3>Stock Information:</h3>
@@ -1163,7 +1165,7 @@ async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
 
     const mailOptions = {
       from: process.env.FROM_EMAIL,
-      to: process.env.INVENTORY_ALERT_EMAIL, // Configure this in your environment
+      to: process.env.INVENTORY_ALERT_EMAIL || 'ananda.s@pazl.info', // Configure this in your environment
       subject: `🚨 LOW STOCK ALERT - ${itemData.name || itemData.item_name}`,
       html: htmlContent
     };
@@ -1180,11 +1182,6 @@ v1Router.get('/inventory/notifications', authenticateJWT, async (req, res) => {
   try {
     const notifications = await Notification.findAll({
       where: { status: 'active' },
-      include: [{
-        model: ItemMaster,
-        as: 'item',
-        attributes: ['id', 'name', 'code', 'category']
-      }],
       order: [['created_at', 'DESC']]
     });
 
