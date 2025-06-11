@@ -1165,7 +1165,7 @@ async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
 
     const mailOptions = {
       from: process.env.FROM_EMAIL,
-      to: process.env.INVENTORY_ALERT_EMAIL, // Configure this in your environment
+      to: process.env.INVENTORY_ALERT_EMAIL || 'ananda.s@pazl.info', // Configure this in your environment
       subject: `🚨 LOW STOCK ALERT - ${itemData.name || itemData.item_name}`,
       html: htmlContent
     };
