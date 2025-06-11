@@ -332,6 +332,9 @@ v1Router.get("/work-order/ungrouped-layers", authenticateJWT, async (req, res) =
       whereClause.production = production;
     }
 
+    // Filter only production=in_production status
+    whereClause.production = "in_production";
+
     // Include sales order information
     const includeOptions = [
       {
