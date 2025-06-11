@@ -7,6 +7,8 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import ExcelJS from "exceljs";
+import nodemailer from "nodemailer";
+// import dotenv from "dotenv";
 // const ItemMaster = db.ItemMaster;
 // const Company = db.Company;
 // const Inventory = db.Inventory;
@@ -1179,7 +1181,7 @@ async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
 v1Router.get('/inventory/notifications', authenticateJWT, async (req, res) => {
   try {
     const notifications = await Notification.findAll({
-      where: { status: 'active' },    
+      where: { status: 'active' },
       order: [['created_at', 'DESC']]
     });
 
