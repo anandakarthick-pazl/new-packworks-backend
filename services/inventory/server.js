@@ -1143,7 +1143,7 @@ async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
                 <div class="details">
                     <p><strong>Item Name:</strong> ${itemData.name || itemData.item_name}</p>
                     <p><strong>Item Code:</strong> ${itemData.code || itemData.item_code}</p>
-                    <p><strong>Category:</strong> ${itemData.category || 'N/A'}</p>
+                    
                 </div>
                 
                 <h3>Stock Information:</h3>
