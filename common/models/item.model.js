@@ -95,7 +95,7 @@ const ItemMaster = sequelize.define(
       defaultValue: "active",
     },
     custom_fields: {
-      type: DataTypes.JSON,
+      type: Sequelize.JSON,
       allowNull: true,
       get() {
         const value = this.getDataValue("custom_fields");
@@ -103,7 +103,7 @@ const ItemMaster = sequelize.define(
       },
     },
     default_custom_fields: {
-      type: DataTypes.JSON,
+      type: Sequelize.JSON,
       allowNull: true,
       get() {
         const value = this.getDataValue("default_custom_fields");
