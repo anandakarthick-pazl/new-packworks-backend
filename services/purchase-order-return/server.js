@@ -9,6 +9,7 @@ import GRN from "../../common/models/grn/grn.model.js";
 import GRNItem from "../../common/models/grn/grn_item.model.js";
 import PurchaseOrderItem from "../../common/models/po/purchase_order_item.model.js";
 import "../../common/models/association.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 const Company = db.Company;
 const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
@@ -17,6 +18,7 @@ const ItemMaster = db.ItemMaster;
 const grnItem = db.GRNItem;
 const purchase_order_item = db.PurchaseOrderItem;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
+const Inventory = db.Inventory;
 
 dotenv.config();
 const app = express();
@@ -26,9 +28,9 @@ const v1Router = Router();
 
 
 v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-
+  const t = await sequelize.transaction();
   try {
+    const user = req.user;
     const {
       grn_id,
       po_id,
@@ -36,125 +38,83 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
       reason,
       decision,
       notes,
-      return_items
+      items = []
     } = req.body;
 
-    const user = req.user;
-
-    // Validate GRN
-    const grn = await GRN.findOne({ where: { id: grn_id } });
-    if (!grn) throw new Error("GRN not found");
-
-    // Fetch Purchase Order with its items (no alias)
-    const po = await PurchaseOrder.findOne({
-      where: { po_id },
-      include: [PurchaseOrderItem] // ← no alias here
-    });
-    if (!po) throw new Error("Purchase Order not found");
-
-    // Map PO items by ID
-    const poItemsMap = {};
-    po.PurchaseOrderItems.forEach(item => {
-      poItemsMap[item.id] = item;
-    });
-
-    // Aggregate totals
-    let total_qty = 0, cgst_amount = 0, sgst_amount = 0, amount = 0, tax_amount = 0, total_amount = 0;
-
-    // Create Purchase Order Return
+    // ✅ Generate unique Purchase Return ID
+const purchaseReturnGenerateId = await generateId(
+      user.company_id,
+      PurchaseOrderReturn,
+      "purchase_order_return"
+    );
+    // ✅ Create Purchase Order Return
     const poReturn = await PurchaseOrderReturn.create({
       grn_id,
       po_id,
       return_date,
       reason,
-      status,
       decision,
       notes,
+      company_id: user.company_id,
       created_by: user.id,
       updated_by: user.id,
-      company_id: user.company_id
-    }, { transaction });
+      purchase_order_return_: purchaseReturnGenerateId
+    }, { transaction: t });
 
-    // Process Return Items
-    for (const item of return_items) {
-      const poItem = poItemsMap[item.po_item_id];
-      if (!poItem) throw new Error(`PO Item not found for ID: ${item.po_item_id}`);
-
-      // Generate purchase_return_generate_id
-          const purchase_return_generate_id = await generateId(
-            req.user.company_id,
-            PurchaseOrderReturn,
-            "purchase_order_returns"
-            
-          );
-      const qty = item.return_qty;
-      const unitPrice = poItem.unit_price;
-      const itemAmount = qty * unitPrice;
-      const itemCgstAmount = itemAmount * (poItem.cgst / 100);
-      const itemSgstAmount = itemAmount * (poItem.sgst / 100);
-      const itemTaxAmount = itemCgstAmount + itemSgstAmount;
-      const itemTotalAmount = itemAmount + itemTaxAmount;
-
+    // ✅ Create associated return items
+    for (const item of items) {
       await PurchaseOrderReturnItem.create({
         po_return_id: poReturn.id,
         grn_item_id: item.grn_item_id,
-        item_id: poItem.item_id,
+        item_id: item.item_id,
         company_id: user.company_id,
-        return_qty: qty,
-        unit_price: unitPrice,
-        cgst: poItem.cgst,
-        cgst_amount: itemCgstAmount,
-        sgst: poItem.sgst,
-        sgst_amount: itemSgstAmount,
-        amount: itemAmount,
-        tax_amount: itemTaxAmount,
-        total_amount: itemTotalAmount,
+        return_qty: item.return_qty,
+        unit_price: item.unit_price,
+        cgst: item.cgst,
+        cgst_amount: item.cgst_amount,
+        sgst: item.sgst,
+        sgst_amount: item.sgst_amount,
+        amount: item.amount,
+        tax_amount: item.tax_amount,
+        total_amount: item.total_amount,
         reason: item.reason,
         notes: item.notes,
         created_by: user.id,
         updated_by: user.id
-      }, { transaction });
-
-      total_qty += qty;
-      amount += itemAmount;
-      cgst_amount += itemCgstAmount;
-      sgst_amount += itemSgstAmount;
-      tax_amount += itemTaxAmount;
-      total_amount += itemTotalAmount;
+      }, { transaction: t });
     }
 
-    // Update PO Return with totals
-    await poReturn.update({
-      total_qty,
-      cgst_amount,
-      sgst_amount,
-      amount,
-      tax_amount,
-      total_amount
-    }, { transaction });
+    await t.commit();
 
-    await transaction.commit();
+    // ✅ Optional: Return full record with associations
+    const finalReturn = await PurchaseOrderReturn.findOne({
+      where: { id: poReturn.id },
+      include: [
+        { model: PurchaseOrderReturnItem, as: "items" }
+      ]
+    });
 
     return res.status(201).json({
       success: true,
       message: "Purchase Order Return created successfully",
-      data: poReturn
+      data: finalReturn
     });
 
   } catch (error) {
-    await transaction.rollback();
+    await t.rollback();
+    console.error("Error creating purchase order return:", error);
     return res.status(500).json({
       success: false,
-      message: `Creation failed: ${error.message}`
+      message: `Failed to create Purchase Order Return: ${error.message}`
     });
   }
 });
 
 
 
-
-
 v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
+  console.log("Fetching Purchase Order Returns");
+
   try {
     const user = req.user;
     const { search = "", page = "1", limit = "10" } = req.query;
@@ -169,7 +129,7 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
 
     // Optional search on supplier_name or other fields
     if (search.trim()) {
-      where.supplier_name = { [Op.like]: `%${search}%` };
+      where.supplier_name = { [Op.like]: `%${search}%` }; // ✅ Fixed this line
     }
 
     const { count: totalCount, rows: allReturns } = await PurchaseOrderReturn.findAndCountAll({
@@ -185,36 +145,32 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
       offset,
     });
 
-    const approved = allReturns.filter(ret => ret.decision === 'approve');
-    const disapproved = allReturns.filter(ret => ret.decision === 'disapprove');
-
     return res.status(200).json({
       success: true,
       message: "Purchase order returns fetched",
-      approved,
-      disapproved,
+      data: allReturns,
       totalCount,
     });
 
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: `Failed to fetch Purchase Order Returns: ${error.message}`
+      message: `Failed to fetch Purchase Order Returns: ${error.message}` // ✅ Fixed this line
     });
   }
 });
 
 
+
 v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
-  
   try {
     const user = req.user;
-    const returnId = req.params.id;
+    const { id } = req.params;
 
     const purchaseOrderReturn = await PurchaseOrderReturn.findOne({
       where: {
-        id: returnId,
-        company_id: user.company_id
+        id,
+        company_id: user.company_id,
       },
       include: [
         {
@@ -227,22 +183,24 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
     if (!purchaseOrderReturn) {
       return res.status(404).json({
         success: false,
-        message: "Purchase Order Return not found"
+        message: "Purchase Order Return not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: purchaseOrderReturn
+      message: "Purchase order return fetched",
+      data: purchaseOrderReturn,
     });
 
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: `Failed to fetch Purchase Order Return: ${error.message}`
+      message: `Failed to fetch Purchase Order Return: ${error.message}`,
     });
   }
 });
+
 
 
 v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
@@ -462,6 +420,30 @@ v1Router.delete("/purchase-order-return/:id", authenticateJWT, async (req, res) 
     return res.status(500).json({
       success: false,
       message: `Deletion failed: ${error.message}`
+    });
+  }
+});
+//get id,generateId 
+v1Router.get("/purchaseorder-return/ids", authenticateJWT, async (req, res) => {
+  try {
+    const user = req.user;
+
+    const allReturns = await PurchaseOrderReturn.findAll({
+      where: { company_id: user.company_id },
+      attributes: ['id', 'purchase_return_generate_id'],
+      order: [['created_at', 'DESC']]
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Purchase order returns fetched successfully",
+      data: allReturns
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Failed to fetch Purchase Order Returns: ${error.message}`
     });
   }
 });

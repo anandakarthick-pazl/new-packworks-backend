@@ -147,6 +147,10 @@ PurchaseOrderReturnItem.belongsTo(PurchaseOrderReturn, {
   foreignKey: 'po_return_id',
   as: 'purchaseOrderReturnId', // ✅ use this in include
 });
+PurchaseOrderReturnItem.belongsTo(ItemMaster, {
+  foreignKey: 'item_id',
+  targetKey: 'id'
+});
 
  
 export default PurchaseOrderReturnItem;
