@@ -1105,7 +1105,7 @@ v1Router.post('/inventory/alert', authenticateJWT, async (req, res) => {
 async function sendLowStockEmail(itemData, currentQuantity, minStockLevel) {
   try {
     // Configure your email transporter
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT,
       secure: false,
