@@ -39,6 +39,127 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
+//reels 
+v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
+  try {   
+    const {
+      search = "", bf, gsm, size, color
+    } = req.query;
+    // ✅ Declare andConditions early
+    let andConditions = [
+      { company_id: req.user.company_id }
+    ];
+    if (search.trim() !== "") {
+      const searchConditions = [
+        { id: { [Op.like]: `%${search}%` } },
+      ];
+      // 🔍 Item name or generate ID match
+      const matchingItems = await ItemMaster.findAll({
+        attributes: ['id'],
+        where: {
+          [Op.or]: [
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.bf'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.gsm'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.size'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.color'),
+              { [Op.like]: `%${search}%` }
+            )
+          ]
+        }
+      });
+       if (matchingItems.length > 0) {
+        const itemIds = matchingItems.map(item => item.id);
+        searchConditions.push({ item_id: { [Op.in]: itemIds } });
+      }
+      if (searchConditions.length > 0) {
+        andConditions.push({ [Op.or]: searchConditions });
+      }
+    }
+    const whereCondition = { [Op.and]: andConditions };
+  // get inventory data
+  const inventory = await Inventory.findAll({
+    attributes: [
+      'item_id',
+      [fn('SUM', col('quantity_available')), 'total_quantity'],
+      'sub_category',
+      'location',
+      'status',
+      'created_at',
+      'updated_at',
+    ],
+    where: whereCondition,
+    group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+    include: [
+      {
+        model: ItemMaster,
+        as: 'item',
+        attributes: ['item_generate_id','item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category','min_stock_level','standard_cost', 'status','default_custom_fields','custom_fields'],
+        required: true,
+        where: Sequelize.and(
+          ...(bf ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.bf')) = '${bf}'`)] : []),
+          ...(gsm ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.gsm')) = '${gsm}'`)] : []),
+          ...(size ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.size')) = '${size}'`)] : []),
+          ...(color ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.color')) ='${color}'`)] : [])
+        ),
+        include: [
+          {
+            model: Categories,
+            as: 'category_info',
+            attributes: ['category_name'],
+            required: false,
+            on: {
+              col1: Sequelize.where(Sequelize.col('item.category'), '=', Sequelize.col('item->category_info.id'))
+            }
+          },
+          {
+            model: Sub_categories,
+            as: 'sub_category_info',
+            attributes: ['sub_category_name'],
+            required: false,
+            on: {
+              col1: Sequelize.where(Sequelize.col('item.sub_category'), '=', Sequelize.col('item->sub_category_info.id'))
+            }
+          }
+        ]
+      }
+    ],
+    order: [['created_at', 'DESC']],
+  });
+    const inventoryData = inventory.map(inv => {
+      const raw = inv.toJSON();
+      if (raw.item) {
+        raw.item.default_custom_fields = raw.item.default_custom_fields
+          ? JSON.parse(raw.item.default_custom_fields) : {};
+        raw.item.custom_fields = raw.item.custom_fields
+          ? JSON.parse(raw.item.custom_fields) : {};
+      }
+      return raw;
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Grouped Inventory data fetched successfully",
+      data: {inventoryData},
+    });
+  } catch (error) {
+    console.error(error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Inventory fetch error: ${error.message}`,
+    });
+  }
+});
+
+
 //share notification
 // v1Router.get("/inventory/low-stock", authenticateJWT, async (req, res) => {
 //   try {
@@ -197,110 +318,7 @@ v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
 
 
 //////////////////////////////////////////////////////   Inventory   ///////////////////////////////////////////////////////////
-//get inventory status
-// v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
-//   try {
-//     const itemId = req.params.id;
-
-//     const {
-//       PurchaseOrder,
-//       PurchaseOrderItem,
-//       GRN,
-//       GRNItem,
-//       PurchaseOrderReturn,
-//       PurchaseOrderReturnItem,
-//       User,
-//     } = db;
-
-//     // Store results
-//     const results = {};
-
-//     // Purchase Order Items
-//     const poItems = await PurchaseOrderItem.findAll({
-//       where: { item_id: itemId },
-//       include: [
-//         {
-//           model: PurchaseOrder,
-//           as: "purchaseOrder", // Ensure correct association alias
-//           attributes: [
-//             "id", "purchase_generate_id", "po_date", "supplier_id", "supplier_name", "supplier_contact", "billing_address",
-//             "shipping_address", "po_status",
-//           ],
-//           include: [
-//             {
-//               model: User,
-//               as: "creator",
-//               attributes: ["id", "name", "email"]
-//             }
-//           ]
-//         }
-//       ]
-//     });
-//     if (poItems.length > 0) {
-//       results.purchaseOrders = poItems;
-//     }
-
-//     // GRN Items
-//     const grnItems = await GRNItem.findAll({
-//       where: { item_id: itemId },
-//       include: [
-//         {
-//           model: GRN,
-//           as: "grn", // Ensure correct alias
-//           attributes: ["id", "grn_generate_id", "grn_date","invoice_no", "invoice_date", "received_by", "status"],
-//           include: [
-//             {
-//               model: User,
-//               as: "creator",
-//               attributes: ["id", "name", "email"]
-//             }
-//           ]
-//         }
-//       ]
-//     });
-//     if (grnItems.length > 0) {
-//       results.grns = grnItems;
-//     }
-
-//     // Purchase Order Return Items
-//     const returnItems = await PurchaseOrderReturnItem.findAll({
-//       where: { item_id: itemId },
-//       include: [
-//         {
-//           model: PurchaseOrderReturn,
-//           as: "purchaseOrderReturn", // Ensure correct alias
-//           attributes: ["id", "return_date", "reason"]
-//         }
-//       ]
-//     });
-//     if (returnItems.length > 0) {
-//       results.purchaseReturns = returnItems;
-//     }
-
-//     // If no data found in any table
-//     if (Object.keys(results).length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "No related data found for the given item ID.",
-//       });
-//     }
-
-//     // Success response with found data
-//     return res.status(200).json({
-//       success: true,
-//       data: results,
-//       message: "Item-related data fetched successfully.",
-//     });
-
-//   } catch (error) {
-//     console.error("Inventory Item Status Fetch Error:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: `Error fetching item data: ${error.message}`,
-//     });
-//   }
-// });
-
+//product status details
 v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
   try {
     const itemId = req.params.id;
@@ -713,195 +731,6 @@ const inventory = await Inventory.findAll({
     });
   }
 });
-
-
-
-
-
-// Get Inventory based on search, pagination, categoryId, and subCategoryId
-// v1Router.get("/inventory", authenticateJWT, async (req, res) => {
-//   try {
-//     const {
-//       search = "",
-//       page = "1",
-//       limit = "10",
-//       categoryId,
-//       subCategoryId
-//     } = req.query;
-
-//     const pageNumber = parseInt(page) || 1;
-//     const limitNumber = parseInt(limit) || 10;
-//     const offset = (pageNumber - 1) * limitNumber;
-
-//     let whereCondition = {};
-
-//     // Filter by search (e.g., id or name)
-//     if (search.trim() !== "") {
-//       whereCondition = {
-//         ...whereCondition,
-//         [Op.or]: [
-//           { id: { [Op.like]: `%${search}%` } },
-//           { inventory_generate_id: { [Op.like]: `%${search}%` } },
-//           // { name: { [Op.like]: `%${search}%` } }, // assuming inventory has name
-//         ]
-//       };
-//     }
-
-//     // Filter by categoryId
-//     if (categoryId) {
-//       whereCondition.category = categoryId;
-//     }
-
-//     // Filter by subCategoryId
-//     if (subCategoryId) {
-//       whereCondition.sub_category = subCategoryId;
-//     }
-
-//     console.log("Where Condition:", whereCondition);
-    
-
-//     const inventoryData = await Inventory.findAll({
-//       where: whereCondition,
-//       limit: limitNumber,
-//       offset: offset,
-//     });
-
-//     const totalCount = await Inventory.count({ where: whereCondition });
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Inventory data fetched successfully",
-//       data: inventoryData,
-//       totalCount: totalCount,
-//     });
-//   } catch (error) {
-//     console.error(error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: `inventory fetched error: ${error.message}`,
-//     });
-//   }
-// });
-
-
-
-
-// v1Router.get("/inventory", authenticateJWT, async (req, res) => {
-//   try {
-//     const { search = "", page = "1", limit = "10" } = req.query;
-
-//     const pageNumber = parseInt(page) || 1;
-//     const limitNumber = parseInt(limit) || 10;
-//     const offset = (pageNumber - 1) * limitNumber;
-
-//     let whereCondition = {};
-
-//     if (search.trim() !== "") {
-//       whereCondition = {
-//         ...whereCondition,
-//         id: { [Op.like]: `%${search}%` },
-//       };
-//     }
-
-//     const inventoryData = await Inventory.findAll({
-//       where: whereCondition,
-//       limit: limitNumber,
-//       offset: offset,
-//     });
-
-//     const totalCount = await Inventory.count({ where: whereCondition });
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Inventory data fetched successfully",
-//       data: inventoryData,
-//       totalCount: totalCount,
-//     });
-//   } catch (error) {
-//     console.error(error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: `inventory fetched error: ${error.message}`,
-//     });
-//   }
-// });
-
-
-
-// Create Inventory 
-
-
-
-
-// v1Router.post("/inventory",authenticateJWT,async(req,res)=>{
-//   const transaction = await sequelize.transaction();
-//   try{
-//     const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
-//     const { ...rest } = req.body;
-//     rest.inventory_generate_id = inventory_generate_id;
-//     rest.created_by = req.user.id;
-//     rest.updated_by = req.user.id;
-//     rest.company_id = req.user.company_id;
-
-//     // Validate Item
-//     const itemId = req.body.item_id;
-//     const validateItem = await ItemMaster.findOne({
-//       where: { id: itemId, status: "active" }
-//     });
-//     if (!validateItem) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid or inactive Item.`,
-//       });
-//     }
-
-//       let category = validateItem.category;
-//       let sub_category = validateItem.sub_category;
-
-//     rest.category = category;
-//     rest.sub_category = sub_category;
-
-//     // Validate GRN
-//     const grnId = req.body.grn_id;
-//     const validateGrn = await GRN.findOne({
-//       where: { id: grnId, status: "active" }
-//     });
-//     if (!validateGrn) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid or inactive GRN.`,
-//       });
-//     }
-
-//     // Validate GRN Item
-//     const grnItemId = req.body.grn_item_id;
-//     const validateGrnItem = await GRNItem.findOne({
-//       where: { id: grnItemId, status: "active" }
-//     });
-//     if (!validateGrnItem) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid or inactive GrnItem.`,
-//       });
-//     }
-    
-//     const inventoryData = await Inventory.create(rest,{ transaction });
-//     await transaction.commit();
-//     return res.status(200).json({
-//       success : true,
-//       message : `Inventory Created Successfully`,
-//       data : inventoryData
-//     });
-//   }catch(error){
-//     await transaction.rollback();
-//     console.error(error.message);
-//     return res.status(500).json({
-//       success : false,
-//       message : `inventory created Error : ${error.message}`
-//     });    
-//   }
-// });
-
 
 
 // Edit Inventory (Fetch by ID)
