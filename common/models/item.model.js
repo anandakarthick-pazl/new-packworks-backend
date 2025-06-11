@@ -97,18 +97,10 @@ const ItemMaster = sequelize.define(
     custom_fields: {
       type: DataTypes.JSON,
       allowNull: true,
-      get() {
-        const value = this.getDataValue("custom_fields");
-        return typeof value === "string" ? JSON.parse(value) : value;
-      },
     },
     default_custom_fields: {
       type: DataTypes.JSON,
       allowNull: true,
-      get() {
-        const value = this.getDataValue("default_custom_fields");
-        return typeof value === "string" ? JSON.parse(value) : value;
-      },
     },
     created_at: {
       type: DataTypes.DATE,
@@ -149,10 +141,8 @@ ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-ItemMaster.belongsTo(Category, { foreignKey: "category", as: "category_info" });
-ItemMaster.belongsTo(SubCategory, {
-  foreignKey: "sub_category",
-  as: "sub_category_info",
-});
+ItemMaster.belongsTo(Category, { foreignKey: 'category', as: 'category_info' });
+ItemMaster.belongsTo(SubCategory, { foreignKey: 'sub_category', as: 'sub_category_info' });
+
 
 export default ItemMaster;
