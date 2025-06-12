@@ -708,14 +708,14 @@ v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => 
     return res.status(500).json({ status: false, message: error.message });
   }
 });
+
+
 v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
-      client,
-      sku,
-      manufacture,
+      search, // Single search parameter like clients API
       confirmation,
       sales_status,
       status = "active",
@@ -728,14 +728,22 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       company_id: req.user.company_id, // Filter by the company ID from JWT token
     };
 
-    // Add client search if provided
-    if (client) where.client = { [Op.like]: `%${client}%` };
-
     // Add confirmation filter if provided
     if (confirmation !== undefined) where.confirmation = confirmation;
 
     // Add sales_status filter if provided
     if (sales_status) where.sales_status = sales_status;
+
+    // Add unified search if provided - search across multiple fields
+    if (search) {
+      where[Op.or] = [
+        { client: { [Op.like]: `%${search}%` } },
+        { sales_generate_id: { [Op.like]: `%${search}%` } },
+        { sales_ui_id: { [Op.like]: `%${search}%` } },
+        { sku: { [Op.like]: `%${search}%` } },
+        {sales_status: { [Op.like]: `%${search}%` } },
+      ];
+    }
 
     // Include conditions for related models
     const includeConditions = [
@@ -764,22 +772,23 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       },
     ];
 
-    // Add SKU search if provided
-    if (sku) {
+    // Add related model search conditions if search parameter is provided
+    if (search) {
+      // Search in SKU details
       includeConditions[1].where = {
         ...includeConditions[1].where,
-        sku: { [Op.like]: `%${sku}%` },
+        [Op.or]: [
+          { sku: { [Op.like]: `%${search}%` } },
+        ],
       };
-      includeConditions[1].required = true; // Make this association required when filtering
-    }
-
-    // Add manufacture search if provided
-    if (manufacture) {
+      
+      // Search in WorkOrder manufacture field
       includeConditions[0].where = {
         ...includeConditions[0].where,
-        manufacture: { [Op.like]: `%${manufacture}%` },
+        [Op.or]: [
+          { manufacture: { [Op.like]: `%${search}%` } },
+        ],
       };
-      includeConditions[0].required = true; // Make this association required when filtering
     }
 
     // Fetch data from database with all filters applied
@@ -852,6 +861,155 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
+// v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
+//   try {
+//     const {
+//       page = 1,
+//       limit = 10,
+//       client,
+//       sales_generate_id,
+//       sales_ui_id,
+//       sku,
+//       manufacture,
+//       confirmation,
+//       sales_status,
+//       status = "active",
+//     } = req.query;
+//     const offset = (page - 1) * limit;
+
+//     // Build base filter conditions for SalesOrder
+//     const where = {
+//       status: status,
+//       company_id: req.user.company_id, // Filter by the company ID from JWT token
+//     };
+
+//     // Add client search if provided
+//     if (client) where.client = { [Op.like]: `%${client}%` };
+//     if (sales_generate_id) where.sales_generate_id = { [Op.like]: `%${sales_generate_id}%` };
+//     if (sales_ui_id) where.sales_ui_id = { [Op.like]: `%${sales_ui_id}%` };
+
+//     // Add confirmation filter if provided
+//     if (confirmation !== undefined) where.confirmation = confirmation;
+
+//     // Add sales_status filter if provided
+//     if (sales_status) where.sales_status = sales_status;
+
+//     // Include conditions for related models
+//     const includeConditions = [
+//       {
+//         model: WorkOrder,
+//         as: "workOrders",
+//         where: { status: "active" }, // Only include active work orders
+//         required: false, // Don't require work orders by default (LEFT JOIN)
+//         separate: true, // Use separate query to ensure work orders are properly fetched
+//       },
+//       {
+//         model: SalesSkuDetails,
+//         where: { status: "active" }, // Only include active SKU details
+//         required: false, // Don't require SKU details by default (LEFT JOIN)
+//         separate: true, // Use separate query to ensure SKU details are properly fetched
+//       },
+//       {
+//         model: User,
+//         as: "creator_sales",
+//         attributes: ["id", "name", "email"],
+//       },
+//       {
+//         model: User,
+//         as: "updater_sales",
+//         attributes: ["id", "name", "email"],
+//       },
+//     ];
+
+//     // Add SKU search if provided
+//     if (sku) {
+//       includeConditions[1].where = {
+//         ...includeConditions[1].where,
+//         sku: { [Op.like]: `%${sku}%` },
+//       };
+//       includeConditions[1].required = true; // Make this association required when filtering
+//     }
+
+//     // Add manufacture search if provided
+//     if (manufacture) {
+//       includeConditions[0].where = {
+//         ...includeConditions[0].where,
+//         manufacture: { [Op.like]: `%${manufacture}%` },
+//       };
+//       includeConditions[0].required = true; // Make this association required when filtering
+//     }
+
+//     // Fetch data from database with all filters applied
+//     const { count, rows } = await SalesOrder.findAndCountAll({
+//       where,
+//       limit: parseInt(limit),
+//       offset: parseInt(offset),
+//       include: includeConditions,
+//       order: [["created_at", "DESC"]],
+//       distinct: true,
+//     });
+
+//     // Helper function to parse work_order_sku_values
+//     const parseWorkOrderSkuValues = (data) => {
+//       if (data && data.work_order_sku_values) {
+//         try {
+//           // If it's a string, parse it as JSON
+//           if (typeof data.work_order_sku_values === 'string') {
+//             data.work_order_sku_values = JSON.parse(data.work_order_sku_values);
+//           }
+//         } catch (error) {
+//           logger.warn(`Failed to parse work_order_sku_values for record ${data.id}:`, error);
+//           // Keep original value if parsing fails
+//         }
+//       }
+//       return data;
+//     };
+
+//     // Transform data and parse work_order_sku_values
+//     const result = {
+//       total: count,
+//       page: parseInt(page),
+//       limit: parseInt(limit),
+//       totalPages: Math.ceil(count / limit),
+//       data: rows.map((order) => {
+//         const plainOrder = order.get({ plain: true });
+        
+//         // Parse work_order_sku_values in the main order
+//         parseWorkOrderSkuValues(plainOrder);
+        
+//         // Parse work_order_sku_values in work orders if they exist
+//         if (plainOrder.workOrders && Array.isArray(plainOrder.workOrders)) {
+//           plainOrder.workOrders = plainOrder.workOrders.map(parseWorkOrderSkuValues);
+//         }
+        
+//         // Parse work_order_sku_values in SKU details if they exist
+//         if (plainOrder.SalesSkuDetails && Array.isArray(plainOrder.SalesSkuDetails)) {
+//           plainOrder.SalesSkuDetails = plainOrder.SalesSkuDetails.map(parseWorkOrderSkuValues);
+//         }
+        
+//         return plainOrder;
+//       }),
+//     };
+
+//     // Log for debugging - check if work orders are present
+//     if (rows.length > 0) {
+//       logger.info(`First sales order ID: ${rows[0].id}`);
+//       logger.info(
+//         `Work orders count: ${
+//           rows[0].workOrders ? rows[0].workOrders.length : 0
+//         }`
+//       );
+//     }
+
+//     res.json(result);
+//   } catch (error) {
+//     logger.error("Error fetching sales orders:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 // GET single sales order by ID (including associated records)
 v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
