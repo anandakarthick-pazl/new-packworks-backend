@@ -1127,7 +1127,7 @@ v1Router.get("/production-group/:id/allocations", authenticateJWT, async (req, r
       include: [
         {
           model: Inventory,
-          attributes: ["id", "item_name", "item_code"]
+          attributes: ["id", 'quantity_available'],
         }
       ],
       order: [["created_at", "DESC"]],
