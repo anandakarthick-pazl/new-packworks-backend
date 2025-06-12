@@ -328,6 +328,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
     const subCategories = await Sub_categories.findAll({
       where: {
         category_id: categoryId,
+        status:"active"
         // is_visible: 1, // optional condition
       },
       // order: [["created_at", "DESC"]],
