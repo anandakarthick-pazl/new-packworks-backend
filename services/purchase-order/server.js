@@ -688,7 +688,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     }
 
     // 5. Generate purchase return ID
-    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "purchase_return");
 
     // 6. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({
