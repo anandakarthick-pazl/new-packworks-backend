@@ -49,6 +49,8 @@ import WorkOrderStatus from "./commonModel/workOrderStatus.js";
 import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
 import ProductionGroup from "./Production/productionGroup.model.js";
+import Notification from "./notification.model.js";
+import PurchaseOrderTemplate from "./purchaseOrderTemplate.model.js";
 import AllocationHistory from "./Production/allocationHistory.model.js";
 
 const db = {
@@ -103,6 +105,8 @@ const db = {
   Categories,
   Sub_categories,
   ProductionGroup,
+  Notification,
+  PurchaseOrderTemplate,
   AllocationHistory
 
 };

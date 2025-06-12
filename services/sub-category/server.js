@@ -65,6 +65,7 @@ v1Router.get("/sub-category", authenticateJWT, async (req, res) => {
     const { rows, count } = await Sub_categories.findAndCountAll({
       where: {
         // is_visible: 1,
+        status : "active",
         sub_category_name: {
           [Op.like]: `%${search}%`,
         },

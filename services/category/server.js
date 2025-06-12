@@ -49,7 +49,7 @@ v1Router.get("/category", authenticateJWT, async (req, res) => {
 
     const { rows, count } = await Categories.findAndCountAll({
       where: {
-        // is_visible: 1,
+        status : "active",
         category_name: {
           [Op.like]: `%${search}%`,
         },

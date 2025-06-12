@@ -95,11 +95,11 @@ const ItemMaster = sequelize.define(
       defaultValue: "active",
     },
     custom_fields: {
-      type: DataTypes.JSON,
-      allowNull: true,
+      type: Sequelize.JSON,
+      allowNull: true,      
     },
     default_custom_fields: {
-      type: DataTypes.JSON,
+      type: Sequelize.JSON,
       allowNull: true,
     },
     created_at: {
