@@ -154,6 +154,80 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
 
 
 
+// v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
+//   try {
+//     const user = req.user;
+//     const { search = "", page = "1", limit = "10" } = req.query;
+
+//     const pageNumber = Math.max(1, parseInt(page));
+//     const limitNumber = Math.max(1, parseInt(limit));
+//     const offset = (pageNumber - 1) * limitNumber;
+
+//     let where = {
+//       company_id: user.company_id,
+//     };
+
+//     // Optional search on supplier_name or other fields
+//     if (search.trim()) {
+//       where.supplier_name = { [Op.like]: `%${search}%` };
+//     }
+
+//     const { count: totalCount, rows: allReturns } = await PurchaseOrderReturn.findAndCountAll({
+//       where,
+//       include: [
+//         {
+//           model: PurchaseOrderReturnItem,
+//           as: "items",
+//         }
+//       ],
+//       order: [['created_at', 'DESC']],
+//       limit: limitNumber,
+//       offset,
+//     });
+
+//     const userIds = new Set();
+//     allReturns.forEach(ret => {
+//       if (ret.created_by) userIds.add(ret.created_by);
+//       if (ret.updated_by) userIds.add(ret.updated_by);
+//     });
+
+//     // Fetch all users in one query
+//     const users = await User.findAll({
+//       where: { id: Array.from(userIds) },
+//       attributes: ['id', 'name', 'email']
+//     });
+//     const userMap = {};
+//     users.forEach(u => { userMap[u.id] = u; });
+
+//     // Attach user info to each return
+//     const returnsWithUsers = allReturns.map(ret => {
+//       const retJson = ret.toJSON();
+//       retJson.created_by_user = userMap[ret.created_by] || null;
+//       retJson.updated_by_user = userMap[ret.updated_by] || null;
+//       return retJson;
+//     });
+
+//     const approved = allReturns.filter(ret => ret.decision === 'approve');
+//     const disapproved = allReturns.filter(ret => ret.decision === 'disapprove');
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase order returns fetched",
+//       approved,
+//       disapproved,
+//       totalCount,
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({
+//       success: false,
+//       message: `Failed to fetch Purchase Order Returns: ${error.message}`
+//     });
+//   }
+// });
+
+
+
 v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
   try {
     const user = req.user;
@@ -178,6 +252,11 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
         {
           model: PurchaseOrderReturnItem,
           as: "items",
+        },
+        {
+          model: PurchaseOrder,
+          as: "PurchaseOrder", // Use the correct alias if you have one in your association
+          attributes: ['id', 'purchase_generate_id'] // Add any other fields you need
         }
       ],
       order: [['created_at', 'DESC']],
@@ -185,8 +264,31 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
       offset,
     });
 
-    const approved = allReturns.filter(ret => ret.decision === 'approve');
-    const disapproved = allReturns.filter(ret => ret.decision === 'disapprove');
+    // Collect all unique user IDs for batch fetching
+    const userIds = new Set();
+    allReturns.forEach(ret => {
+      if (ret.created_by) userIds.add(ret.created_by);
+      if (ret.updated_by) userIds.add(ret.updated_by);
+    });
+
+    // Fetch all users in one query
+    const users = await User.findAll({
+      where: { id: Array.from(userIds) },
+      attributes: ['id', 'name', 'email']
+    });
+    const userMap = {};
+    users.forEach(u => { userMap[u.id] = u; });
+
+    // Attach user info to each return
+    const returnsWithUsers = allReturns.map(ret => {
+      const retJson = ret.toJSON();
+      retJson.created_by_user = userMap[ret.created_by] || null;
+      retJson.updated_by_user = userMap[ret.updated_by] || null;
+      return retJson;
+    });
+
+    const approved = returnsWithUsers.filter(ret => ret.decision === 'approve');
+    const disapproved = returnsWithUsers.filter(ret => ret.decision === 'disapprove');
 
     return res.status(200).json({
       success: true,
@@ -203,6 +305,7 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 
 v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
