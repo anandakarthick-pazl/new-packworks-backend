@@ -44,39 +44,28 @@ const v1Router = Router();
 
 //reels 
 v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
-  try {
-    const {
-      search = "", bf, gsm, size, color
-    } = req.query;
-    // ✅ Declare andConditions early
+  try {   
+    const { search = "", bf, gsm, size, color } = req.query;
+
+    // Build AND conditions
     let andConditions = [
       { company_id: req.user.company_id }
     ];
+
     if (search.trim() !== "") {
       const searchConditions = [
-        { id: { [Op.like]: `%${search}%` } },
+        { id: { [Op.like]: `%${search}%` } }
       ];
-      // 🔍 Item name or generate ID match
+
+      // Search in ItemMaster JSON fields
       const matchingItems = await ItemMaster.findAll({
         attributes: ['id'],
         where: {
           [Op.or]: [
-            Sequelize.where(
-              Sequelize.json('default_custom_fields.bf'),
-              { [Op.like]: `%${search}%` }
-            ),
-            Sequelize.where(
-              Sequelize.json('default_custom_fields.gsm'),
-              { [Op.like]: `%${search}%` }
-            ),
-            Sequelize.where(
-              Sequelize.json('default_custom_fields.size'),
-              { [Op.like]: `%${search}%` }
-            ),
-            Sequelize.where(
-              Sequelize.json('default_custom_fields.color'),
-              { [Op.like]: `%${search}%` }
-            )
+            Sequelize.where(Sequelize.json('default_custom_fields.bf'), { [Op.like]: `%${search}%` }),
+            Sequelize.where(Sequelize.json('default_custom_fields.gsm'), { [Op.like]: `%${search}%` }),
+            Sequelize.where(Sequelize.json('default_custom_fields.size'), { [Op.like]: `%${search}%` }),
+            Sequelize.where(Sequelize.json('default_custom_fields.color'), { [Op.like]: `%${search}%` })
           ]
         }
       });
@@ -88,70 +77,58 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
         andConditions.push({ [Op.or]: searchConditions });
       }
     }
+
+    andConditions.push({ quantity_available: { [Op.ne]: 0 } });
+
     const whereCondition = { [Op.and]: andConditions };
-    // get inventory data
+
+
+    console.log("where conditio : ",whereCondition);
+    
+    // Get inventory data
     const inventory = await Inventory.findAll({
       attributes: [
-        'item_id',
-        [fn('SUM', col('quantity_available')), 'total_quantity'],
-        'sub_category',
-        'location',
-        'status',
-        'created_at',
-        'updated_at',
+        'id',
+        'quantity_available',
+        
       ],
       where: whereCondition,
-      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
       include: [
         {
           model: ItemMaster,
           as: 'item',
-          attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+          attributes: [
+            'default_custom_fields'
+          ],
           required: true,
           where: Sequelize.and(
             ...(bf ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.bf')) = '${bf}'`)] : []),
             ...(gsm ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.gsm')) = '${gsm}'`)] : []),
             ...(size ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.size')) = '${size}'`)] : []),
-            ...(color ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.color')) ='${color}'`)] : [])
+            ...(color ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.color')) = '${color}'`)] : [])
           ),
-          include: [
-            {
-              model: Categories,
-              as: 'category_info',
-              attributes: ['category_name'],
-              required: false,
-              on: {
-                col1: Sequelize.where(Sequelize.col('item.category'), '=', Sequelize.col('item->category_info.id'))
-              }
-            },
-            {
-              model: Sub_categories,
-              as: 'sub_category_info',
-              attributes: ['sub_category_name'],
-              required: false,
-              on: {
-                col1: Sequelize.where(Sequelize.col('item.sub_category'), '=', Sequelize.col('item->sub_category_info.id'))
-              }
-            }
-          ]
+          
         }
       ],
       order: [['created_at', 'DESC']],
     });
+
+    // Parse JSON fields for each item in the result
     const inventoryData = inventory.map(inv => {
       const raw = inv.toJSON();
       if (raw.item) {
         raw.item.default_custom_fields = raw.item.default_custom_fields
           ? JSON.parse(raw.item.default_custom_fields) : {};
-        raw.item.custom_fields = raw.item.custom_fields
-          ? JSON.parse(raw.item.custom_fields) : {};
+        // raw.item.custom_fields = raw.item.custom_fields
+        //   ? JSON.parse(raw.item.custom_fields) : {};
       }
       return raw;
     });
+
     return res.status(200).json({
       success: true,
       message: "Grouped Inventory data fetched successfully",
-      data: { inventoryData },
+      data: inventoryData,
     });
   } catch (error) {
     console.error(error.message);
