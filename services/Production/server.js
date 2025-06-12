@@ -18,6 +18,8 @@ const v1Router = Router();
 
 const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
+const Inventory = db.Inventory;
+const AllocationHistory = db.AllocationHistory;
 
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
@@ -49,6 +51,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           group_name: groupDetails.group_name,
           group_value: groupDetails.group_value || null,
           group_Qty: groupDetails.group_Qty || null,
+          allocated_Qty: groupDetails.allocated_Qty || null,
           status: groupDetails.status || "active",
           created_by: req.user.id,
           updated_by: req.user.id,
@@ -219,184 +222,6 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.get("/work-order", authenticateJWT, async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      manufacture, 
-      sku_name,
-      status = "active" // Default to 'active' status
-    } = req.query;
-
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const offset = (pageNum - 1) * limitNum;
-
-    // Build where clause for filtering
-    const whereClause = {
-      company_id: req.user.company_id // Add company filter for security
-    };
-    
-    // Status filtering - default to active, but allow override
-    if (status === "all") {
-      // Don't filter by status if 'all' is specified
-    } else {
-      whereClause.status = status;
-    }
-    
-    if (manufacture) {
-      whereClause.manufacture = manufacture;
-    }
-    if (sku_name) {
-      whereClause.sku_name = { [Op.like]: `%${sku_name}%` };
-    }
-
-    // Fetch from database with pagination and filters
-    const { count, rows } = await WorkOrder.findAndCountAll({
-      where: whereClause,
-      limit: limitNum,
-      offset: offset,
-      order: [["updated_at", "DESC"]],
-    });
-
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(count / limitNum);
-
-    res.json({
-      workOrders: rows,
-      pagination: {
-        total: count,
-        page: pageNum,
-        limit: limitNum,
-        totalPages,
-      },
-    });
-  } catch (error) {
-    logger.error("Error fetching work orders:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
-
-v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status = "active" } = req.query; // Add status parameter
-
-    // Fetch from database with company_id for security
-    const whereClause = { 
-      id: id,
-      company_id: req.user.company_id
-    };
-    
-    // Add status filter unless 'all' is specified
-    if (status !== "all") {
-      whereClause.status = status;
-    }
-    
-    const workOrder = await WorkOrder.findOne({
-      where: whereClause
-    });
-
-    if (!workOrder) {
-      return res.status(404).json({ message: "Work order not found" });
-    }
-
-    const result = workOrder.get({ plain: true });
-
-    res.json(result);
-  } catch (error) {
-    logger.error("Error fetching work order:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
-
-// PUT update existing work order
-v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
-  const { id } = req.params;
-  const workDetails = req.body;
-
-  if (!workDetails) {
-    return res.status(400).json({ message: "Invalid input data" });
-  }
-
-  try {
-    // Find the work order
-    const workOrder = await WorkOrder.findByPk(id);
-
-    if (!workOrder) {
-      return res.status(404).json({ message: "Work order not found" });
-    }
-
-    // Update work order
-    await workOrder.update({
-      company_id: req.user.company_id,
-      client_id: workDetails.client_id,
-      sales_order_id: workDetails.sales_order_id || null,
-      manufacture: workDetails.manufacture,
-      sku_id: workDetails.sku_id || null,
-      sku_name: workDetails.sku_name || null,
-      sku_version: workDetails.sku_version || null,
-      qty: workDetails.qty || null,
-      edd: workDetails.edd || null,
-      description: workDetails.description || null,
-      acceptable_excess_units: workDetails.acceptable_excess_units || null,
-      planned_start_date: workDetails.planned_start_date || null,
-      planned_end_date: workDetails.planned_end_date || null,
-      outsource_name: workDetails.outsource_name || null,
-      status: workDetails.status || workOrder.status,
-      created_by: req.user.id,
-      updated_by: req.user.id,
-    });
-
-    res.json({
-      message: "Work Order updated successfully",
-      data: workOrder,
-    });
-  } catch (error) {
-    logger.error("Error updating work order:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
-
-// DELETE work order (soft delete)
-v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
-  const { id } = req.params;
-  const { updated_by } = req.user.id;
-
-  try {
-    // Find the work order
-    const workOrder = await WorkOrder.findByPk(id);
-
-    if (!workOrder) {
-      return res.status(404).json({ message: "Work order not found" });
-    }
-
-    // Soft delete - update status to inactive
-    await workOrder.update({
-      status: "inactive",
-      updated_by: updated_by,
-      updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
-    });
-
-    res.json({
-      message: "Work Order successfully marked as inactive",
-      data: workOrder.get({ plain: true }),
-    });
-  } catch (error) {
-    console.error("Error creating production group:", error);
-    logger.error("Error creating production group:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
 // PATCH API to ungroup layers (set layer_status back to "ungrouped")
 v1Router.patch(
   "/production-group/ungroup",
@@ -601,6 +426,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         "group_name",
         "group_value",
         "group_Qty",
+        "allocated_Qty",
         "status",
         "created_at",
         "updated_at",
@@ -721,6 +547,373 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
+// allocation -------------------------
+
+// PATCH API to allocate raw materials
+v1Router.patch("/production-group/allocate", authenticateJWT, async (req, res) => {
+  const { allocations } = req.body;
+
+  // Validate input
+  if (!allocations || !Array.isArray(allocations) || allocations.length === 0) {
+    return res.status(400).json({
+      message: "allocations array is required and must not be empty",
+    });
+  }
+
+  // Start a database transaction
+  const transaction = await sequelize.transaction();
+
+  try {
+    const allocationResults = [];
+    const errors = [];
+
+    for (let i = 0; i < allocations.length; i++) {
+      const allocation = allocations[i];
+      const { production_group_id, inventory_id, quantity_to_allocate } = allocation;
+
+      try {
+        // Validate required fields for this allocation
+        if (!production_group_id || !inventory_id || !quantity_to_allocate) {
+          errors.push(`Allocation at index ${i}: production_group_id, inventory_id, and quantity_to_allocate are required`);
+          continue;
+        }
+
+        // Validate quantity is positive
+        if (quantity_to_allocate <= 0) {
+          errors.push(`Allocation at index ${i}: quantity_to_allocate must be greater than 0`);
+          continue;
+        }
+
+        // Find the production group
+        const productionGroup = await ProductionGroup.findOne({
+          where: {
+            id: production_group_id,
+            company_id: req.user.company_id
+          },
+          transaction
+        });
+
+        if (!productionGroup) {
+          errors.push(`Allocation at index ${i}: Production group not found or doesn't belong to your company`);
+          continue;
+        }
+
+        // Find the inventory item
+        const inventoryItem = await Inventory.findOne({
+          where: {
+            id: inventory_id,
+            company_id: req.user.company_id
+          },
+          transaction
+        });
+
+        if (!inventoryItem) {
+          errors.push(`Allocation at index ${i}: Inventory item not found or doesn't belong to your company`);
+          continue;
+        }
+
+        // Check if sufficient quantity is available
+        const currentAvailable = inventoryItem.quantity_available || 0;
+        if (currentAvailable < quantity_to_allocate) {
+          errors.push(`Allocation at index ${i}: Insufficient inventory. Available: ${currentAvailable}, Requested: ${quantity_to_allocate}`);
+          continue;
+        }
+
+        // Calculate new quantities
+        const newInventoryQuantity = currentAvailable - quantity_to_allocate;
+        const currentAllocatedQty = productionGroup.allocated_Qty || 0;
+        const newAllocatedQty = currentAllocatedQty + quantity_to_allocate;
+
+        // Update inventory quantity_available
+        await Inventory.update(
+          {
+            quantity_available: newInventoryQuantity,
+            updated_by: req.user.id,
+          },
+          {
+            where: { id: inventory_id },
+            transaction
+          }
+        );
+
+        // Update production group allocated_Qty
+        await ProductionGroup.update(
+          {
+            allocated_Qty: newAllocatedQty,
+            updated_by: req.user.id,
+          },
+          {
+            where: { id: production_group_id },
+            transaction
+          }
+        );
+
+        allocationResults.push({
+          index: i,
+          production_group_id,
+          inventory_id,
+          quantity_allocated: quantity_to_allocate,
+          inventory_remaining: newInventoryQuantity,
+          total_allocated_qty: newAllocatedQty,
+          status: "success",
+          message: "Allocation completed successfully"
+        });
+
+        logger.info(
+          `Successfully allocated ${quantity_to_allocate} units from inventory ${inventory_id} to production group ${production_group_id}`
+        );
+
+      } catch (allocationError) {
+        console.error(`Error processing allocation at index ${i}:`, allocationError);
+        logger.error(`Error processing allocation at index ${i}:`, allocationError);
+        errors.push(`Allocation at index ${i}: ${allocationError.message}`);
+      }
+    }
+
+    // If there are any errors, rollback the transaction
+    if (errors.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "Allocation failed due to errors",
+        errors,
+        successful_allocations: 0,
+        failed_allocations: errors.length
+      });
+    }
+
+    // If all allocations were successful, commit the transaction
+    await transaction.commit();
+
+    res.status(200).json({
+      message: `Successfully processed ${allocationResults.length} allocations`,
+      data: allocationResults,
+      summary: {
+        total_processed: allocationResults.length,
+        successful: allocationResults.length,
+        failed: 0
+      }
+    });
+
+  } catch (error) {
+    // Rollback transaction on any unexpected error
+    await transaction.rollback();
+    console.error("Error processing raw material allocations:", error);
+    logger.error("Error processing raw material allocations:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+// GET API to view allocation details for a production group
+v1Router.get("/production-group/:id/allocations", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the production group with its details
+    const productionGroup = await ProductionGroup.findOne({
+      where: {
+        id: id,
+        company_id: req.user.company_id
+      },
+      attributes: [
+        "id",
+        "group_name",
+        "group_Qty",
+        "allocated_Qty",
+        "status",
+        "created_at",
+        "updated_at"
+      ]
+    });
+
+    if (!productionGroup) {
+      return res.status(404).json({
+        message: "Production group not found or doesn't belong to your company"
+      });
+    }
+
+    res.status(200).json({
+      message: "Production group allocation details retrieved successfully",
+      data: {
+        production_group: productionGroup,
+        allocation_status: {
+          required_qty: productionGroup.group_Qty || 0,
+          allocated_qty: productionGroup.allocated_Qty || 0,
+          remaining_to_allocate: Math.max(0, (productionGroup.group_Qty || 0) - (productionGroup.allocated_Qty || 0)),
+          allocation_percentage: productionGroup.group_Qty > 0 
+            ? Math.round(((productionGroup.allocated_Qty || 0) / productionGroup.group_Qty) * 100)
+            : 0
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error("Error fetching production group allocation details:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+// PATCH API to deallocate raw materials (reverse allocation)
+v1Router.patch("/production-group/deallocate", authenticateJWT, async (req, res) => {
+  const { deallocations } = req.body;
+
+  // Validate input
+  if (!deallocations || !Array.isArray(deallocations) || deallocations.length === 0) {
+    return res.status(400).json({
+      message: "deallocations array is required and must not be empty",
+    });
+  }
+
+  // Start a database transaction
+  const transaction = await sequelize.transaction();
+
+  try {
+    const deallocationResults = [];
+    const errors = [];
+
+    for (let i = 0; i < deallocations.length; i++) {
+      const deallocation = deallocations[i];
+      const { production_group_id, inventory_id, quantity_to_deallocate } = deallocation;
+
+      try {
+        // Validate required fields
+        if (!production_group_id || !inventory_id || !quantity_to_deallocate) {
+          errors.push(`Deallocation at index ${i}: production_group_id, inventory_id, and quantity_to_deallocate are required`);
+          continue;
+        }
+
+        // Validate quantity is positive
+        if (quantity_to_deallocate <= 0) {
+          errors.push(`Deallocation at index ${i}: quantity_to_deallocate must be greater than 0`);
+          continue;
+        }
+
+        // Find the production group
+        const productionGroup = await ProductionGroup.findOne({
+          where: {
+            id: production_group_id,
+            company_id: req.user.company_id
+          },
+          transaction
+        });
+
+        if (!productionGroup) {
+          errors.push(`Deallocation at index ${i}: Production group not found or doesn't belong to your company`);
+          continue;
+        }
+
+        // Find the inventory item
+        const inventoryItem = await Inventory.findOne({
+          where: {
+            id: inventory_id,
+            company_id: req.user.company_id
+          },
+          transaction
+        });
+
+        if (!inventoryItem) {
+          errors.push(`Deallocation at index ${i}: Inventory item not found or doesn't belong to your company`);
+          continue;
+        }
+
+        // Check if sufficient quantity is allocated to deallocate
+        const currentAllocatedQty = productionGroup.allocated_Qty || 0;
+        if (currentAllocatedQty < quantity_to_deallocate) {
+          errors.push(`Deallocation at index ${i}: Insufficient allocated quantity. Currently allocated: ${currentAllocatedQty}, Requested to deallocate: ${quantity_to_deallocate}`);
+          continue;
+        }
+
+        // Calculate new quantities
+        const currentAvailable = inventoryItem.quantity_available || 0;
+        const newInventoryQuantity = currentAvailable + quantity_to_deallocate;
+        const newAllocatedQty = currentAllocatedQty - quantity_to_deallocate;
+
+        // Update inventory quantity_available (add back the deallocated quantity)
+        await Inventory.update(
+          {
+            quantity_available: newInventoryQuantity,
+            updated_by: req.user.id,
+          },
+          {
+            where: { id: inventory_id },
+            transaction
+          }
+        );
+
+        // Update production group allocated_Qty (subtract the deallocated quantity)
+        await ProductionGroup.update(
+          {
+            allocated_Qty: newAllocatedQty,
+            updated_by: req.user.id,
+          },
+          {
+            where: { id: production_group_id },
+            transaction
+          }
+        );
+
+        deallocationResults.push({
+          index: i,
+          production_group_id,
+          inventory_id,
+          quantity_deallocated: quantity_to_deallocate,
+          inventory_available: newInventoryQuantity,
+          remaining_allocated_qty: newAllocatedQty,
+          status: "success",
+          message: "Deallocation completed successfully"
+        });
+
+        logger.info(
+          `Successfully deallocated ${quantity_to_deallocate} units from production group ${production_group_id} back to inventory ${inventory_id}`
+        );
+
+      } catch (deallocationError) {
+        console.error(`Error processing deallocation at index ${i}:`, deallocationError);
+        logger.error(`Error processing deallocation at index ${i}:`, deallocationError);
+        errors.push(`Deallocation at index ${i}: ${deallocationError.message}`);
+      }
+    }
+
+    // If there are any errors, rollback the transaction
+    if (errors.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "Deallocation failed due to errors",
+        errors,
+        successful_deallocations: 0,
+        failed_deallocations: errors.length
+      });
+    }
+
+    // If all deallocations were successful, commit the transaction
+    await transaction.commit();
+
+    res.status(200).json({
+      message: `Successfully processed ${deallocationResults.length} deallocations`,
+      data: deallocationResults,
+      summary: {
+        total_processed: deallocationResults.length,
+        successful: deallocationResults.length,
+        failed: 0
+      }
+    });
+
+  } catch (error) {
+    // Rollback transaction on any unexpected error
+    await transaction.rollback();
+    console.error("Error processing raw material deallocations:", error);
+    logger.error("Error processing raw material deallocations:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 
 
 // ✅ Health Check Endpoint
