@@ -20,6 +20,7 @@ const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
 const Inventory = db.Inventory;
 const AllocationHistory = db.AllocationHistory;
+const User = db.User;
 
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
@@ -1126,7 +1127,7 @@ v1Router.get("/production-group/:id/allocations", authenticateJWT, async (req, r
       include: [
         {
           model: Inventory,
-          attributes: ["id", "item_name", "item_code"]
+          attributes: ["id", 'quantity_available'],
         }
       ],
       order: [["created_at", "DESC"]],
@@ -1329,59 +1330,33 @@ v1Router.patch("/production-group/deallocate", authenticateJWT, async (req, res)
   }
 });
 
-// Optional: GET API to view allocation history for a company
-v1Router.get("/allocation-history", authenticateJWT, async (req, res) => {
+v1Router.get("/allocation-history/inventory/:inventory_id", authenticateJWT, async (req, res) => {
   try {
-    const { page = 1, limit = 20, group_id, inventory_id } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { inventory_id } = req.params;
 
-    // Build where clause
-    const whereClause = {
-      company_id: req.user.company_id
-    };
-
-    if (group_id) {
-      whereClause.group_id = group_id;
-    }
-
-    if (inventory_id) {
-      whereClause.inventory_id = inventory_id;
-    }
-
-    const { count, rows: allocationHistory } = await AllocationHistory.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: ProductionGroup,
-          attributes: ["id", "group_name"]
-        },
-        {
-          model: Inventory,
-          attributes: ["id", "item_name", "item_code"]
-        },
-        {
-          model: User,
-          as: "creator_group",
-          attributes: ["id", "name", "email"]
-        }
-      ],
-      order: [["created_at", "DESC"]],
-      limit: parseInt(limit),
-      offset: offset
+    // Get allocation history for this specific inventory
+    const allocationHistory = await AllocationHistory.findAll({
+      where: {
+        inventory_id: inventory_id,
+        company_id: req.user.company_id
+      },
+      order: [["created_at", "DESC"]]
     });
+
+    if (allocationHistory.length === 0) {
+      return res.status(404).json({
+        message: "No allocation history found for this inventory"
+      });
+    }
 
     res.status(200).json({
       message: "Allocation history retrieved successfully",
       data: allocationHistory,
-      pagination: {
-        current_page: parseInt(page),
-        total_pages: Math.ceil(count / parseInt(limit)),
-        total_records: count,
-        records_per_page: parseInt(limit)
-      }
+      count: allocationHistory.length
     });
 
   } catch (error) {
+    console.error("Error fetching allocation history:", error);
     logger.error("Error fetching allocation history:", error);
     res.status(500).json({
       message: "Internal Server Error",
