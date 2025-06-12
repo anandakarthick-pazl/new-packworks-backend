@@ -79,7 +79,7 @@ const AllocationHistory = sequelize.define(
     },
   },
   {
-    tableName: "production_group",
+    tableName: "allocation_history",
     timestamps: false,
   }
 );
