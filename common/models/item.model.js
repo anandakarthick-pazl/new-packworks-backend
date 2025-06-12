@@ -141,10 +141,8 @@ ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-ItemMaster.belongsTo(Category, { foreignKey: "category", as: "category_info" });
-ItemMaster.belongsTo(SubCategory, {
-  foreignKey: "sub_category",
-  as: "sub_category_info",
-});
+ItemMaster.belongsTo(Category, { foreignKey: 'category', as: 'category_info' });
+ItemMaster.belongsTo(SubCategory, { foreignKey: 'sub_category', as: 'sub_category_info' });
+
 
 export default ItemMaster;

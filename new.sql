@@ -115,7 +115,41 @@ CREATE TABLE `production_group` (
 
 
 
-  `client_id` INT UNSIGNED NULL,
-  `sales_order_id` INT UNSIGNED NULL,
-  `client_id` INT UNSIGNED NULL,
-  `work_id` INT UNSIGNED NULL,
+{
+    "success": true,
+    "message": "Grouped Inventory data fetched successfully",
+    "data": [
+        {
+            "id": 2,
+            "quantity_available": "10.00",
+            "item": {
+                "default_custom_fields": {
+                    "bf": "24",
+                    "gsm": "122",
+                    "color": "black",
+                    "size": "37",
+                    "net_wt(Kgs)": "52.5",
+                    "mill": "ABC Paper Mills Pvt Ltd",
+                    "unit": "CM"
+                }
+            }
+        },
+           {
+            "id": 3,
+            "quantity_available": "10.00",
+            "item": {
+                "default_custom_fields": {
+                    "bf": "24",
+                    "gsm": "122",
+                    "color": "black",
+                    "size": "37",
+                    "net_wt(Kgs)": "55",
+                    "mill": "ABC Paper Mills Pvt Ltd",
+                    "unit": "CM"
+                }
+            }
+        },
+
+    ]
+}
+ 

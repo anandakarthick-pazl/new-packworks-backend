@@ -2,9 +2,11 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Inventory from "../inventory/inventory.model.js";
+import ProductionGroup from "./productionGroup.model.js";
 
-const ProductionGroup = sequelize.define(
-  "ProductionGroup",
+const AllocationHistory = sequelize.define(
+  "AllocationHistory",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -21,17 +23,25 @@ const ProductionGroup = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-    group_name: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
+    inventory_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Inventory,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
     },
-    group_value: {
-      type: DataTypes.JSON,
-      allowNull: true,
-    },
-    group_Qty: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
+    group_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: ProductionGroup,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
     },
     allocated_Qty: {
       type: DataTypes.INTEGER,
@@ -69,22 +79,26 @@ const ProductionGroup = sequelize.define(
     },
   },
   {
-    tableName: "production_group",
+    tableName: "allocation_history",
     timestamps: false,
   }
 );
 
 // Associations
-Company.hasMany(ProductionGroup, { foreignKey: "company_id" });
-ProductionGroup.belongsTo(Company, { foreignKey: "company_id" });
+Company.hasMany(AllocationHistory, { foreignKey: "company_id" });
+AllocationHistory.belongsTo(Company, { foreignKey: "company_id" });
+ProductionGroup.hasMany(AllocationHistory, { foreignKey: "group_id" });
+AllocationHistory.belongsTo(ProductionGroup, { foreignKey: "group_id" });
+Inventory.hasMany(AllocationHistory, { foreignKey: "inventory_id" });
+AllocationHistory.belongsTo(Inventory, { foreignKey: "inventory_id" });
 
-ProductionGroup.belongsTo(User, {
+AllocationHistory.belongsTo(User, {
   foreignKey: "created_by",
   as: "creator_group",
 });
-ProductionGroup.belongsTo(User, {
+AllocationHistory.belongsTo(User, {
   foreignKey: "updated_by",
   as: "updater_group",
 });
 
-export default ProductionGroup;
+export default AllocationHistory;
