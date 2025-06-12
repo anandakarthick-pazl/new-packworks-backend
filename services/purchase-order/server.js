@@ -688,7 +688,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     }
 
     // 5. Generate purchase return ID
-    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "purchase_return");
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
 
     // 6. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({
@@ -811,11 +811,187 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
 
 
 
-//Download Purchase Order as PDF
+//Download Purchase Order as PDF karthi
+// v1Router.get("/purchase-order/:id/download", async (req, res) => {
+//   try {
+//     const poId = req.params.id;
+
+//     const purchaseOrder = await PurchaseOrder.findOne({
+//       where: { id: poId, status: "active" },
+//       include: [
+//         {
+//           model: PurchaseOrderItem,
+//           include: [
+//             {
+//               model: ItemMaster,
+//               as: "item_info",
+//               attributes: ["id", "item_generate_id", "item_name"]
+//             }
+//           ]
+//         },
+//         { model: Company }
+//       ],
+//     });
+
+//     if (!purchaseOrder) {
+//       return res.status(404).json({ success: false, message: "Purchase Order not found" });
+//     }
+
+//     const doc = new PDFDocument({ margin: 40, size: 'A4' });
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename=purchase-order-${purchaseOrder.purchase_generate_id}.pdf`);
+//     doc.pipe(res);
+
+//     // Header
+//     doc.fontSize(18).font('Helvetica-Bold').text('PURCHASE ORDER', { align: 'center' });
+//     doc.moveDown(0.5);
+
+//     // Company & PO Info
+//     const leftX = 40, rightX = 320, colWidth = 250;
+//     let y = doc.y;
+
+//     // Left: PO Info
+//     doc.fontSize(10).font('Helvetica').text(`PO Number: ${purchaseOrder.purchase_generate_id}`, leftX, y);
+//     doc.text(`Date: ${new Date(purchaseOrder.po_date).toLocaleDateString()}`, leftX);
+//     if (purchaseOrder.valid_till) {
+//       doc.text(`Valid Till: ${new Date(purchaseOrder.valid_till).toLocaleDateString()}`, leftX);
+//     }
+
+//     // Right: Company Info
+//     const company = purchaseOrder.Company;
+//     let companyY = y;
+//     if (company) {
+//       doc.fontSize(10).font('Helvetica-Bold').text(company.company_name, rightX, companyY);
+//       companyY = doc.y;
+//       doc.font('Helvetica');
+//       if (company.address) { doc.text(company.address, rightX, companyY, { width: colWidth }); companyY = doc.y; }
+//       if (company.company_phone) { doc.text(`Phone: ${company.company_phone}`, rightX, companyY); companyY = doc.y; }
+//       if (company.company_email) { doc.text(`Email: ${company.company_email}`, rightX, companyY); companyY = doc.y; }
+//       if (company.website) { doc.text(`Website: ${company.website}`, rightX, companyY); }
+//     }
+
+//     doc.moveDown(1);
+
+//     // Supplier & Shipping Info Box
+//     const boxTop = doc.y, boxHeight = 90;
+//     doc.save();
+//     doc.roundedRect(leftX, boxTop, 515, boxHeight, 6).fillAndStroke('#f8f8f8', '#cccccc');
+//     doc.restore();
+
+//     // Supplier Info
+//     let infoY = boxTop + 8;
+//     doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text('Supplier Information', leftX + 10, infoY);
+//     infoY += 15;
+//     doc.font('Helvetica').fontSize(9).fillColor('#333');
+//     doc.text(`Name: ${purchaseOrder.supplier_name}`, leftX + 10, infoY);
+//     infoY += 12;
+//     if (purchaseOrder.supplier_contact) { doc.text(`Contact: ${purchaseOrder.supplier_contact}`, leftX + 10, infoY); infoY += 12; }
+//     if (purchaseOrder.supplier_email) { doc.text(`Email: ${purchaseOrder.supplier_email}`, leftX + 10, infoY); infoY += 12; }
+
+//     // Billing Address
+//     let billY = boxTop + 8;
+//     doc.font('Helvetica-Bold').text('Billing Address:', leftX + 200, billY);
+//     billY += 15;
+//     doc.font('Helvetica').fontSize(9).fillColor('#333');
+//     doc.text(purchaseOrder.billing_address.replace(/,\s*/g, ',\n'), leftX + 200, billY, { width: 120 });
+
+//     // Shipping Address
+//     let shipY = boxTop + 8;
+//     doc.font('Helvetica-Bold').text('Shipping Address:', leftX + 350, shipY);
+//     shipY += 15;
+//     doc.font('Helvetica').fontSize(9).fillColor('#333');
+//     doc.text(purchaseOrder.shipping_address.replace(/,\s*/g, ',\n'), leftX + 350, shipY, { width: 140 });
+
+//     doc.y = boxTop + boxHeight + 15;
+
+//     // Items Table Header
+//     const tableTop = doc.y;
+//     doc.fontSize(10).font('Helvetica-Bold').fillColor('#000');
+//     doc.rect(leftX, tableTop, 515, 20).fillAndStroke('#f0f0f0', '#cccccc');
+//     doc.fillColor('#000').text('No.', leftX + 5, tableTop + 5, { width: 25 });
+//     doc.text('Item', leftX + 35, tableTop + 5, { width: 120 });
+//     doc.text('Qty', leftX + 160, tableTop + 5, { width: 40 });
+//     doc.text('Price', leftX + 205, tableTop + 5, { width: 55 });
+//     doc.text('Tax', leftX + 265, tableTop + 5, { width: 40 });
+//     doc.text('Amount', leftX + 310, tableTop + 5, { width: 60 });
+//     doc.text('UOM', leftX + 375, tableTop + 5, { width: 40 });
+//     doc.text('Item Code', leftX + 420, tableTop + 5, { width: 90 });
+
+//     // Table Rows
+//     let rowY = tableTop + 20;
+//     doc.font('Helvetica').fontSize(9);
+//     const items = purchaseOrder.PurchaseOrderItems;
+//     items.forEach((item, i) => {
+//       if (i % 2 === 1) {
+//         doc.save();
+//         doc.rect(leftX, rowY, 515, 18).fill('#fafafa');
+//         doc.restore();
+//       }
+//       const name = item.item_info?.item_name || item.item_code;
+//       doc.fillColor('#000')
+//         .text(i + 1, leftX + 5, rowY + 4, { width: 25 })
+//         .text(name, leftX + 35, rowY + 4, { width: 120 })
+//         .text(item.quantity, leftX + 160, rowY + 4, { width: 40 })
+//         .text(parseFloat(item.unit_price).toFixed(2), leftX + 205, rowY + 4, { width: 55 })
+//         .text(`${(parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2)}%`, leftX + 265, rowY + 4, { width: 40 })
+//         .text(parseFloat(item.total_amount).toFixed(2), leftX + 310, rowY + 4, { width: 60 })
+//         .text(item.uom || '', leftX + 375, rowY + 4, { width: 40 })
+//         .text(item.item_code || '', leftX + 420, rowY + 4, { width: 90 });
+//       rowY += 18;
+//     });
+
+//     // Table Border
+//     doc.rect(leftX, tableTop, 515, rowY - tableTop).stroke();
+
+//     // Summary Box
+//     const summaryTop = rowY + 10;
+//     doc.rect(leftX, summaryTop, 515, 60).stroke();
+//     doc.font('Helvetica-Bold').fontSize(10).text('Summary:', leftX + 10, summaryTop + 8);
+//     doc.font('Helvetica').fontSize(9)
+//       .text(`Sub Total: ${parseFloat(purchaseOrder.amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 8)
+//       .text(`CGST: ${parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 23)
+//       .text(`SGST: ${parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 38)
+//       .font('Helvetica-Bold').text(`Total: ${parseFloat(purchaseOrder.total_amount || 0).toFixed(2)}`, leftX + 320, summaryTop + 23);
+
+//     // Terms & Conditions
+//     const termsTop = summaryTop + 70;
+//     doc.rect(leftX, termsTop, 515, 40).stroke();
+//     doc.font('Helvetica-Bold').fontSize(10).text('Terms and Conditions:', leftX + 10, termsTop + 8);
+//     doc.font('Helvetica').fontSize(9)
+//       .text(`Payment Terms: ${purchaseOrder.payment_terms || ''}`, leftX + 180, termsTop + 8)
+//       .text(`Freight Terms: ${purchaseOrder.freight_terms || ''}`, leftX + 180, termsTop + 23);
+
+//     // Signatures
+//     const signTop = termsTop + 55;
+//     doc.font('Helvetica').fontSize(9)
+//       .text('Authorized Signature', leftX + 60, signTop, { width: 120, align: 'center' })
+//       .text('Received By', leftX + 320, signTop, { width: 120, align: 'center' });
+//     doc.moveTo(leftX + 60, signTop + 15).lineTo(leftX + 180, signTop + 15).stroke();
+//     doc.moveTo(leftX + 320, signTop + 15).lineTo(leftX + 440, signTop + 15).stroke();
+
+//     doc.end();
+
+//   } catch (error) {
+//     console.error("Error generating PDF:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: `Failed to generate PDF: ${error.message}`
+//     });
+//   }
+// });
+
+
+
+
+
+// Selva
 v1Router.get("/purchase-order/:id/download", async (req, res) => {
+  let browser;
   try {
     const poId = req.params.id;
+    console.log('Processing PO ID:', poId);
 
+    // Fetch purchase order data
     const purchaseOrder = await PurchaseOrder.findOne({
       where: { id: poId, status: "active" },
       include: [
@@ -834,508 +1010,146 @@ v1Router.get("/purchase-order/:id/download", async (req, res) => {
     });
 
     if (!purchaseOrder) {
+      console.log('Purchase order not found');
       return res.status(404).json({ success: false, message: "Purchase Order not found" });
     }
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=purchase-order-${purchaseOrder.purchase_generate_id}.pdf`);
-    doc.pipe(res);
+  //   let poTemplateId = req.query.template_id 
+  // ? parseInt(req.query.template_id, 10) 
+  // : (purchaseOrder.po_template_id || 1);
 
-    // Header
-    doc.fontSize(18).font('Helvetica-Bold').text('PURCHASE ORDER', { align: 'center' });
-    doc.moveDown(0.5);
-
-    // Company & PO Info
-    const leftX = 40, rightX = 320, colWidth = 250;
-    let y = doc.y;
-
-    // Left: PO Info
-    doc.fontSize(10).font('Helvetica').text(`PO Number: ${purchaseOrder.purchase_generate_id}`, leftX, y);
-    doc.text(`Date: ${new Date(purchaseOrder.po_date).toLocaleDateString()}`, leftX);
-    if (purchaseOrder.valid_till) {
-      doc.text(`Valid Till: ${new Date(purchaseOrder.valid_till).toLocaleDateString()}`, leftX);
-    }
-
-    // Right: Company Info
-    const company = purchaseOrder.Company;
-    let companyY = y;
-    if (company) {
-      doc.fontSize(10).font('Helvetica-Bold').text(company.company_name, rightX, companyY);
-      companyY = doc.y;
-      doc.font('Helvetica');
-      if (company.address) { doc.text(company.address, rightX, companyY, { width: colWidth }); companyY = doc.y; }
-      if (company.company_phone) { doc.text(`Phone: ${company.company_phone}`, rightX, companyY); companyY = doc.y; }
-      if (company.company_email) { doc.text(`Email: ${company.company_email}`, rightX, companyY); companyY = doc.y; }
-      if (company.website) { doc.text(`Website: ${company.website}`, rightX, companyY); }
-    }
-
-    doc.moveDown(1);
-
-    // Supplier & Shipping Info Box
-    const boxTop = doc.y, boxHeight = 90;
-    doc.save();
-    doc.roundedRect(leftX, boxTop, 515, boxHeight, 6).fillAndStroke('#f8f8f8', '#cccccc');
-    doc.restore();
-
-    // Supplier Info
-    let infoY = boxTop + 8;
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text('Supplier Information', leftX + 10, infoY);
-    infoY += 15;
-    doc.font('Helvetica').fontSize(9).fillColor('#333');
-    doc.text(`Name: ${purchaseOrder.supplier_name}`, leftX + 10, infoY);
-    infoY += 12;
-    if (purchaseOrder.supplier_contact) { doc.text(`Contact: ${purchaseOrder.supplier_contact}`, leftX + 10, infoY); infoY += 12; }
-    if (purchaseOrder.supplier_email) { doc.text(`Email: ${purchaseOrder.supplier_email}`, leftX + 10, infoY); infoY += 12; }
-
-    // Billing Address
-    let billY = boxTop + 8;
-    doc.font('Helvetica-Bold').text('Billing Address:', leftX + 200, billY);
-    billY += 15;
-    doc.font('Helvetica').fontSize(9).fillColor('#333');
-    doc.text(purchaseOrder.billing_address.replace(/,\s*/g, ',\n'), leftX + 200, billY, { width: 120 });
-
-    // Shipping Address
-    let shipY = boxTop + 8;
-    doc.font('Helvetica-Bold').text('Shipping Address:', leftX + 350, shipY);
-    shipY += 15;
-    doc.font('Helvetica').fontSize(9).fillColor('#333');
-    doc.text(purchaseOrder.shipping_address.replace(/,\s*/g, ',\n'), leftX + 350, shipY, { width: 140 });
-
-    doc.y = boxTop + boxHeight + 15;
-
-    // Items Table Header
-    const tableTop = doc.y;
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('#000');
-    doc.rect(leftX, tableTop, 515, 20).fillAndStroke('#f0f0f0', '#cccccc');
-    doc.fillColor('#000').text('No.', leftX + 5, tableTop + 5, { width: 25 });
-    doc.text('Item', leftX + 35, tableTop + 5, { width: 120 });
-    doc.text('Qty', leftX + 160, tableTop + 5, { width: 40 });
-    doc.text('Price', leftX + 205, tableTop + 5, { width: 55 });
-    doc.text('Tax', leftX + 265, tableTop + 5, { width: 40 });
-    doc.text('Amount', leftX + 310, tableTop + 5, { width: 60 });
-    doc.text('UOM', leftX + 375, tableTop + 5, { width: 40 });
-    doc.text('Item Code', leftX + 420, tableTop + 5, { width: 90 });
-
-    // Table Rows
-    let rowY = tableTop + 20;
-    doc.font('Helvetica').fontSize(9);
-    const items = purchaseOrder.PurchaseOrderItems;
-    items.forEach((item, i) => {
-      if (i % 2 === 1) {
-        doc.save();
-        doc.rect(leftX, rowY, 515, 18).fill('#fafafa');
-        doc.restore();
+    // Try to fetch HTML template, fallback to default if not found
+    let htmlTemplate = await HtmlTemplate.findOne({
+      where: { 
+        company_id: purchaseOrder.company_id,
+        // po_template_id: poTemplateId,
+        status: "active" 
       }
-      const name = item.item_info?.item_name || item.item_code;
-      doc.fillColor('#000')
-        .text(i + 1, leftX + 5, rowY + 4, { width: 25 })
-        .text(name, leftX + 35, rowY + 4, { width: 120 })
-        .text(item.quantity, leftX + 160, rowY + 4, { width: 40 })
-        .text(parseFloat(item.unit_price).toFixed(2), leftX + 205, rowY + 4, { width: 55 })
-        .text(`${(parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2)}%`, leftX + 265, rowY + 4, { width: 40 })
-        .text(parseFloat(item.total_amount).toFixed(2), leftX + 310, rowY + 4, { width: 60 })
-        .text(item.uom || '', leftX + 375, rowY + 4, { width: 40 })
-        .text(item.item_code || '', leftX + 420, rowY + 4, { width: 90 });
-      rowY += 18;
     });
 
-    // Table Border
-    doc.rect(leftX, tableTop, 515, rowY - tableTop).stroke();
+    // If no template found for company, try to get a default template
+    if (!htmlTemplate) {
+      htmlTemplate = await HtmlTemplate.findOne({
+        where: { status: "active" },
+        order: [['id', 'ASC']]
+      });
+    }
 
-    // Summary Box
-    const summaryTop = rowY + 10;
-    doc.rect(leftX, summaryTop, 515, 60).stroke();
-    doc.font('Helvetica-Bold').fontSize(10).text('Summary:', leftX + 10, summaryTop + 8);
-    doc.font('Helvetica').fontSize(9)
-      .text(`Sub Total: ${parseFloat(purchaseOrder.amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 8)
-      .text(`CGST: ${parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 23)
-      .text(`SGST: ${parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2)}`, leftX + 120, summaryTop + 38)
-      .font('Helvetica-Bold').text(`Total: ${parseFloat(purchaseOrder.total_amount || 0).toFixed(2)}`, leftX + 320, summaryTop + 23);
+    // If still no template, use your original PDF generation code
+    if (!htmlTemplate) {
+      console.log('No HTML template found, falling back to original PDF generation');
+      return generateOriginalPDF(req, res, purchaseOrder);
+    }
 
-    // Terms & Conditions
-    const termsTop = summaryTop + 70;
-    doc.rect(leftX, termsTop, 515, 40).stroke();
-    doc.font('Helvetica-Bold').fontSize(10).text('Terms and Conditions:', leftX + 10, termsTop + 8);
-    doc.font('Helvetica').fontSize(9)
-      .text(`Payment Terms: ${purchaseOrder.payment_terms || ''}`, leftX + 180, termsTop + 8)
-      .text(`Freight Terms: ${purchaseOrder.freight_terms || ''}`, leftX + 180, termsTop + 23);
+    // Prepare data for template
+    const templateData = {
+      purchaseOrder: {
+        id: purchaseOrder.id,
+        purchase_generate_id: purchaseOrder.purchase_generate_id,
+        po_date: purchaseOrder.po_date,
+        po_date_formatted: new Date(purchaseOrder.po_date).toLocaleDateString('en-IN'),
+        valid_till: purchaseOrder.valid_till,
+        valid_till_formatted: purchaseOrder.valid_till ? new Date(purchaseOrder.valid_till).toLocaleDateString('en-IN') : '',
+        supplier_name: purchaseOrder.supplier_name || '',
+        supplier_contact: purchaseOrder.supplier_contact || '',
+        supplier_email: purchaseOrder.supplier_email || '',
+        billing_address: purchaseOrder.billing_address || '',
+        shipping_address: purchaseOrder.shipping_address || '',
+        billing_address_formatted: purchaseOrder.billing_address ? purchaseOrder.billing_address.replace(/,\s*/g, ',<br>') : '',
+        shipping_address_formatted: purchaseOrder.shipping_address ? purchaseOrder.shipping_address.replace(/,\s*/g, ',<br>') : '',
+        payment_terms: purchaseOrder.payment_terms || '',
+        freight_terms: purchaseOrder.freight_terms || '',
+        status: purchaseOrder.status,
+        amount: purchaseOrder.amount || 0,
+        cgst_amount: purchaseOrder.cgst_amount || 0,
+        sgst_amount: purchaseOrder.sgst_amount || 0,
+        total_amount: purchaseOrder.total_amount || 0
+      },
+      company: purchaseOrder.Company ? {
+        id: purchaseOrder.Company.id,
+        company_name: purchaseOrder.Company.company_name || '',
+        address: purchaseOrder.Company.address || '',
+        company_phone: purchaseOrder.Company.company_phone || '',
+        company_email: purchaseOrder.Company.company_email || '',
+        website: purchaseOrder.Company.website || ''
+      } : null,
+      items: purchaseOrder.PurchaseOrderItems ? purchaseOrder.PurchaseOrderItems.map((item, index) => ({
+        id: item.id,
+        serial_number: index + 1,
+        item_code: item.item_code || '',
+        item_name: item.item_info?.item_name || item.item_code || '',
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        unit_price_formatted: parseFloat(item.unit_price || 0).toFixed(2),
+        total_amount: item.total_amount || 0,
+        total_amount_formatted: parseFloat(item.total_amount || 0).toFixed(2),
+        cgst: item.cgst || 0,
+        sgst: item.sgst || 0,
+        tax_percentage: (parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2),
+        uom: item.uom || ''
+      })) : [],
+      totals: {
+        sub_total: parseFloat(purchaseOrder.amount || 0).toFixed(2),
+        cgst_amount: parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2),
+        sgst_amount: parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2),
+        total_amount: parseFloat(purchaseOrder.total_amount || 0).toFixed(2)
+      },
+      current_date: new Date().toLocaleDateString('en-IN')
+    };
 
-    // Signatures
-    const signTop = termsTop + 55;
-    doc.font('Helvetica').fontSize(9)
-      .text('Authorized Signature', leftX + 60, signTop, { width: 120, align: 'center' })
-      .text('Received By', leftX + 320, signTop, { width: 120, align: 'center' });
-    doc.moveTo(leftX + 60, signTop + 15).lineTo(leftX + 180, signTop + 15).stroke();
-    doc.moveTo(leftX + 320, signTop + 15).lineTo(leftX + 440, signTop + 15).stroke();
+    // Compile Handlebars template
+    const template = handlebars.compile(htmlTemplate.html_template);
+    const html = template(templateData);
 
-    doc.end();
+    // Generate PDF using Puppeteer
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: {
+        top: '10mm',
+        right: '10mm',
+        bottom: '10mm',
+        left: '10mm'
+      }
+    });
+
+    await browser.close();
+
+    // Send PDF response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=purchase-order-${purchaseOrder.purchase_generate_id}.pdf`);
+    res.setHeader('Content-Length', pdf.length);
+    return res.end(pdf);
 
   } catch (error) {
     console.error("Error generating PDF:", error);
+    if (browser) {
+      try { await browser.close(); } catch (closeError) { /* ignore */ }
+    }
     return res.status(500).json({
       success: false,
-      message: `Failed to generate PDF: ${error.message}`
+      message: `Failed to generate PDF: ${error.message}`,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
-
-
-
-// v1Router.get("/purchase-order/:id/download", async (req, res) => {
-//   try {
-//     const poId = req.params.id;
-
-//     // Fetch purchase order data (same as before)
-//     const purchaseOrder = await PurchaseOrder.findOne({
-//       where: { id: poId, status: "active" },
-//       include: [
-//         {
-//           model: PurchaseOrderItem,
-//           include: [
-//             {
-//               model: ItemMaster,
-//               as: "item_info",
-//               attributes: ["id", "item_generate_id", "item_name"]
-//             }
-//           ]
-//         },
-//         { model: Company }
-//       ],
-//     });
-
-//     if (!purchaseOrder) {
-//       return res.status(404).json({ success: false, message: "Purchase Order not found" });
-//     }
-
-//     // Fetch HTML template based on company_id and po_template_id
-//     const htmlTemplate = await HtmlTemplate.findOne({
-//       where: { 
-//         company_id: purchaseOrder.company_id,
-//         po_template_id: purchaseOrder.po_template_id || 1, // Default template ID
-//         status: "active" 
-//       }
-//     });
-
-//     if (!htmlTemplate) {
-//       return res.status(404).json({ success: false, message: "HTML template not found" });
-//     }
-
-//     // Prepare data for template
-//     const templateData = {
-//       purchaseOrder: {
-//         ...purchaseOrder.toJSON(),
-//         po_date_formatted: new Date(purchaseOrder.po_date).toLocaleDateString(),
-//         valid_till_formatted: purchaseOrder.valid_till ? new Date(purchaseOrder.valid_till).toLocaleDateString() : '',
-//         billing_address_formatted: purchaseOrder.billing_address ? purchaseOrder.billing_address.replace(/,\s*/g, ',<br>') : '',
-//         shipping_address_formatted: purchaseOrder.shipping_address ? purchaseOrder.shipping_address.replace(/,\s*/g, ',<br>') : ''
-//       },
-//       company: purchaseOrder.Company,
-//       items: purchaseOrder.PurchaseOrderItems.map((item, index) => ({
-//         ...item.toJSON(),
-//         serial_number: index + 1,
-//         item_name: item.item_info?.item_name || item.item_code,
-//         unit_price_formatted: parseFloat(item.unit_price).toFixed(2),
-//         total_amount_formatted: parseFloat(item.total_amount).toFixed(2),
-//         tax_percentage: (parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2)
-//       })),
-//       totals: {
-//         sub_total: parseFloat(purchaseOrder.amount || 0).toFixed(2),
-//         cgst_amount: parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2),
-//         sgst_amount: parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2),
-//         total_amount: parseFloat(purchaseOrder.total_amount || 0).toFixed(2)
-//       },
-//       current_date: new Date().toLocaleDateString()
-//     };
-
-//     // Compile Handlebars template
-//     const template = handlebars.compile(htmlTemplate.html_template);
-//     const html = template(templateData);
-
-//     // Generate PDF using Puppeteer
-//     const browser = await puppeteer.launch({
-//       headless: true,
-//       args: ['--no-sandbox', '--disable-setuid-sandbox']
-//     });
-    
-//     const page = await browser.newPage();
-//     await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-//     const pdf = await page.pdf({
-//       format: 'A4',
-//       printBackground: true,
-//       margin: {
-//         top: '20px',
-//         right: '20px',
-//         bottom: '20px',
-//         left: '20px'
-//       }
-//     });
-
-//     await browser.close();
-
-//     // Send PDF response
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', `attachment; filename=purchase-order-${purchaseOrder.purchase_generate_id}.pdf`);
-//     res.send(pdf);
-
-//   } catch (error) {
-//     console.error("Error generating PDF:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to generate PDF: ${error.message}`
-//     });
-//   }
-// });
-
-// // Alternative route for preview (returns HTML instead of PDF)
-// v1Router.get("/purchase-order/:id/preview", async (req, res) => {
-//   try {
-//     const poId = req.params.id;
-
-//     const purchaseOrder = await PurchaseOrder.findOne({
-//       where: { id: poId, status: "active" },
-//       include: [
-//         {
-//           model: PurchaseOrderItem,
-//           include: [
-//             {
-//               model: ItemMaster,
-//               as: "item_info",
-//               attributes: ["id", "item_generate_id", "item_name"]
-//             }
-//           ]
-//         },
-//         { model: Company }
-//       ],
-//     });
-
-//     if (!purchaseOrder) {
-//       return res.status(404).json({ success: false, message: "Purchase Order not found" });
-//     }
-
-//     const htmlTemplate = await HtmlTemplate.findOne({
-//       where: { 
-//         company_id: purchaseOrder.company_id,
-//         po_template_id: purchaseOrder.po_template_id || 1,
-//         status: "active" 
-//       }
-//     });
-
-//     if (!htmlTemplate) {
-//       return res.status(404).json({ success: false, message: "HTML template not found" });
-//     }
-
-//     // Same template data preparation as above
-//     const templateData = {
-//       purchaseOrder: {
-//         ...purchaseOrder.toJSON(),
-//         po_date_formatted: new Date(purchaseOrder.po_date).toLocaleDateString(),
-//         valid_till_formatted: purchaseOrder.valid_till ? new Date(purchaseOrder.valid_till).toLocaleDateString() : '',
-//         billing_address_formatted: purchaseOrder.billing_address ? purchaseOrder.billing_address.replace(/,\s*/g, ',<br>') : '',
-//         shipping_address_formatted: purchaseOrder.shipping_address ? purchaseOrder.shipping_address.replace(/,\s*/g, ',<br>') : ''
-//       },
-//       company: purchaseOrder.Company,
-//       items: purchaseOrder.PurchaseOrderItems.map((item, index) => ({
-//         ...item.toJSON(),
-//         serial_number: index + 1,
-//         item_name: item.item_info?.item_name || item.item_code,
-//         unit_price_formatted: parseFloat(item.unit_price).toFixed(2),
-//         total_amount_formatted: parseFloat(item.total_amount).toFixed(2),
-//         tax_percentage: (parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2)
-//       })),
-//       totals: {
-//         sub_total: parseFloat(purchaseOrder.amount || 0).toFixed(2),
-//         cgst_amount: parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2),
-//         sgst_amount: parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2),
-//         total_amount: parseFloat(purchaseOrder.total_amount || 0).toFixed(2)
-//       },
-//       current_date: new Date().toLocaleDateString()
-//     };
-
-//     const template = handlebars.compile(htmlTemplate.html_template);
-//     const html = template(templateData);
-
-//     res.setHeader('Content-Type', 'text/html');
-//     res.send(html);
-
-//   } catch (error) {
-//     console.error("Error generating HTML preview:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to generate preview: ${error.message}`
-//     });
-//   }
-// });
-
-
-
-
-// v1Router.get("/purchase-order/:id/download", async (req, res) => {
-//   let browser;
-//   try {
-//     const poId = req.params.id;
-//     console.log('Processing PO ID:', poId);
-
-//     // Fetch purchase order data
-//     const purchaseOrder = await PurchaseOrder.findOne({
-//       where: { id: poId, status: "active" },
-//       include: [
-//         {
-//           model: PurchaseOrderItem,
-//           include: [
-//             {
-//               model: ItemMaster,
-//               as: "item_info",
-//               attributes: ["id", "item_generate_id", "item_name"]
-//             }
-//           ]
-//         },
-//         { model: Company }
-//       ],
-//     });
-
-//     if (!purchaseOrder) {
-//       console.log('Purchase order not found');
-//       return res.status(404).json({ success: false, message: "Purchase Order not found" });
-//     }
-
-//     let poTemplateId = req.query.template_id 
-//   ? parseInt(req.query.template_id, 10) 
-//   : (purchaseOrder.po_template_id || 1);
-
-//     // Try to fetch HTML template, fallback to default if not found
-//     let htmlTemplate = await HtmlTemplate.findOne({
-//       where: { 
-//         company_id: purchaseOrder.company_id,
-//         po_template_id: poTemplateId,
-//         status: "active" 
-//       }
-//     });
-
-//     // If no template found for company, try to get a default template
-//     if (!htmlTemplate) {
-//       htmlTemplate = await HtmlTemplate.findOne({
-//         where: { status: "active" },
-//         order: [['id', 'ASC']]
-//       });
-//     }
-
-//     // If still no template, use your original PDF generation code
-//     if (!htmlTemplate) {
-//       console.log('No HTML template found, falling back to original PDF generation');
-//       return generateOriginalPDF(req, res, purchaseOrder);
-//     }
-
-//     // Prepare data for template
-//     const templateData = {
-//       purchaseOrder: {
-//         id: purchaseOrder.id,
-//         purchase_generate_id: purchaseOrder.purchase_generate_id,
-//         po_date: purchaseOrder.po_date,
-//         po_date_formatted: new Date(purchaseOrder.po_date).toLocaleDateString('en-IN'),
-//         valid_till: purchaseOrder.valid_till,
-//         valid_till_formatted: purchaseOrder.valid_till ? new Date(purchaseOrder.valid_till).toLocaleDateString('en-IN') : '',
-//         supplier_name: purchaseOrder.supplier_name || '',
-//         supplier_contact: purchaseOrder.supplier_contact || '',
-//         supplier_email: purchaseOrder.supplier_email || '',
-//         billing_address: purchaseOrder.billing_address || '',
-//         shipping_address: purchaseOrder.shipping_address || '',
-//         billing_address_formatted: purchaseOrder.billing_address ? purchaseOrder.billing_address.replace(/,\s*/g, ',<br>') : '',
-//         shipping_address_formatted: purchaseOrder.shipping_address ? purchaseOrder.shipping_address.replace(/,\s*/g, ',<br>') : '',
-//         payment_terms: purchaseOrder.payment_terms || '',
-//         freight_terms: purchaseOrder.freight_terms || '',
-//         status: purchaseOrder.status,
-//         amount: purchaseOrder.amount || 0,
-//         cgst_amount: purchaseOrder.cgst_amount || 0,
-//         sgst_amount: purchaseOrder.sgst_amount || 0,
-//         total_amount: purchaseOrder.total_amount || 0
-//       },
-//       company: purchaseOrder.Company ? {
-//         id: purchaseOrder.Company.id,
-//         company_name: purchaseOrder.Company.company_name || '',
-//         address: purchaseOrder.Company.address || '',
-//         company_phone: purchaseOrder.Company.company_phone || '',
-//         company_email: purchaseOrder.Company.company_email || '',
-//         website: purchaseOrder.Company.website || ''
-//       } : null,
-//       items: purchaseOrder.PurchaseOrderItems ? purchaseOrder.PurchaseOrderItems.map((item, index) => ({
-//         id: item.id,
-//         serial_number: index + 1,
-//         item_code: item.item_code || '',
-//         item_name: item.item_info?.item_name || item.item_code || '',
-//         quantity: item.quantity || 0,
-//         unit_price: item.unit_price || 0,
-//         unit_price_formatted: parseFloat(item.unit_price || 0).toFixed(2),
-//         total_amount: item.total_amount || 0,
-//         total_amount_formatted: parseFloat(item.total_amount || 0).toFixed(2),
-//         cgst: item.cgst || 0,
-//         sgst: item.sgst || 0,
-//         tax_percentage: (parseFloat(item.cgst || 0) + parseFloat(item.sgst || 0)).toFixed(2),
-//         uom: item.uom || ''
-//       })) : [],
-//       totals: {
-//         sub_total: parseFloat(purchaseOrder.amount || 0).toFixed(2),
-//         cgst_amount: parseFloat(purchaseOrder.cgst_amount || 0).toFixed(2),
-//         sgst_amount: parseFloat(purchaseOrder.sgst_amount || 0).toFixed(2),
-//         total_amount: parseFloat(purchaseOrder.total_amount || 0).toFixed(2)
-//       },
-//       current_date: new Date().toLocaleDateString('en-IN')
-//     };
-
-//     // Compile Handlebars template
-//     const template = handlebars.compile(htmlTemplate.html_template);
-//     const html = template(templateData);
-
-//     // Generate PDF using Puppeteer
-//     browser = await puppeteer.launch({
-//       headless: true,
-//       args: [
-//         '--no-sandbox',
-//         '--disable-setuid-sandbox',
-//         '--disable-dev-shm-usage',
-//         '--disable-accelerated-2d-canvas',
-//         '--no-first-run',
-//         '--no-zygote',
-//         '--disable-gpu'
-//       ]
-//     });
-
-//     const page = await browser.newPage();
-//     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
-
-//     const pdf = await page.pdf({
-//       format: 'A4',
-//       printBackground: true,
-//       preferCSSPageSize: true,
-//       margin: {
-//         top: '10mm',
-//         right: '10mm',
-//         bottom: '10mm',
-//         left: '10mm'
-//       }
-//     });
-
-//     await browser.close();
-
-//     // Send PDF response
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', `attachment; filename=purchase-order-${purchaseOrder.purchase_generate_id}.pdf`);
-//     res.setHeader('Content-Length', pdf.length);
-//     return res.end(pdf);
-
-//   } catch (error) {
-//     console.error("Error generating PDF:", error);
-//     if (browser) {
-//       try { await browser.close(); } catch (closeError) { /* ignore */ }
-//     }
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to generate PDF: ${error.message}`,
-//       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-//     });
-//   }
-// });
 
 // Fallback function using your original PDF generation
 async function generateOriginalPDF(req, res, purchaseOrder) {
@@ -1376,7 +1190,7 @@ async function generateOriginalPDF(req, res, purchaseOrder) {
 
 
 // Preview route (returns HTML)
-v1Router.get("/purchase-orders/:id/view", async (req, res) => {
+v1Router.get("/purchase-order/:id/view", async (req, res) => {
   try {
     const poId = req.params.id;
 
@@ -1401,14 +1215,14 @@ v1Router.get("/purchase-orders/:id/view", async (req, res) => {
       return res.status(404).send('<h1>Purchase Order not found</h1>');
     }
 
-let poTemplateId = req.query.template_id 
-  ? parseInt(req.query.template_id, 10) 
-  : (purchaseOrder.po_template_id || 1);
+// let poTemplateId = req.query.template_id 
+//   ? parseInt(req.query.template_id, 10) 
+//   : (purchaseOrder.po_template_id || 1);
 
     let htmlTemplate = await HtmlTemplate.findOne({
       where: { 
         company_id: purchaseOrder.company_id,
-        po_template_id : poTemplateId,
+        // po_template_id : poTemplateId,
         status: "active" 
       }
     });
@@ -1471,43 +1285,6 @@ let poTemplateId = req.query.template_id
     return res.status(500).send(`<h1>Error: ${error.message}</h1>`);
   }
 });
-
-
-v1Router.get("/purchase-order/:id/debug", async (req, res) => {
-  try {
-    const poId = req.params.id;
-    
-    const purchaseOrder = await PurchaseOrder.findOne({
-      where: { id: poId, status: "active" },
-      include: [
-        {
-          model: PurchaseOrderItem,
-          include: [
-            {
-              model: ItemMaster,
-              as: "item_info",
-              attributes: ["id", "item_generate_id", "item_name"]
-            }
-          ]
-        },
-        { model: Company }
-      ],
-    });
-    
-    res.json({
-      success: true,
-      data: purchaseOrder,
-      hasCompany: !!purchaseOrder.Company,
-      itemsCount: purchaseOrder.PurchaseOrderItems?.length || 0
-    });
-    
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-
 
 
 
@@ -1615,7 +1392,35 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
 
 
+// ACtivate template
+v1Router.get("/purchase-order/activate/:id", async (req, res) => {
+  const templateId = req.params.id;
 
+  try {
+    // 1. Set the selected template to active
+    await HtmlTemplate.update(
+      { status: "active" },
+      { where: { id: templateId } }
+    );
+
+    // 2. Set all other templates to inactive
+    await HtmlTemplate.update(
+      { status: "inactive" },
+      { where: { id: { [Op.ne]: templateId } } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Template ID ${templateId} activated successfully.`,
+    });
+  } catch (error) {
+    console.error("Error activating template:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while activating the template.",
+    });
+  }
+});
 
 
 
