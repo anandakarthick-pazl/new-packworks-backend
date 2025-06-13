@@ -135,7 +135,7 @@ ${workOrder.edd
 
     const uploadResponse = await axios.request(config);
 
-    if (uploadResponse.status !== 200 || !uploadResponse.data?.file_url) {
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
       throw new Error("Failed to upload QR code image.");
     }
 
