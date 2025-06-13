@@ -1444,11 +1444,15 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
       `SELECT 
           e.*, 
           r.role_id,
+          r.role_id,
           u.name AS user_name, 
           u.email AS user_email,
           u.mobile AS mobile,
           u.country_phonecode AS country_phonecode,
           u.country_id AS country_id,
+          dd.name AS designation_name,
+          d.department_name AS department_name,
+          rd.display_name AS role_name,
           u.image AS image,
           CASE
           WHEN u.status='inactive' THEN 'Inactive'
@@ -1456,7 +1460,10 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
           END AS user_status
       FROM employee_details e
       JOIN users u ON e.user_id = u.id
+      JOIN departments d ON e.department_id = d.id
+      JOIN designations dd ON e.designation_id = dd.id
       JOIN role_user r ON u.id = r.user_id
+      JOIN roles rd ON r.role_id = rd.id
       WHERE e.id = :employeeId`,
       {
         replacements: { employeeId },
@@ -1490,7 +1497,7 @@ v1Router.get("/health", (req, res) => {
 // Use Version 1 Router
 app.use("/api/user", v1Router);
 
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3002;
 const service = "User Service";
 app.listen(process.env.PORT_USER, '0.0.0.0', async () => {

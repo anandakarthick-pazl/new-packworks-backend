@@ -405,6 +405,54 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    purchase_return_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_return_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    purchase_return_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+     stock_adjustment_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    stock_adjustment_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    stock_adjustment_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+     category_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    category_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    category_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    sub_category_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sub_category_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: true,
+    },
+    sub_category_digit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "invoice_settings",

@@ -78,6 +78,34 @@ const GRNItem = sequelize.define("GRNItem", {
   notes: {
     type: DataTypes.TEXT,
   },
+  unit_price: {
+    type: DataTypes.DECIMAL(15, 2),
+  },
+  cgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  cgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
+  sgst: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+  sgst_amount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+  },
+  amount: {
+    type: DataTypes.DECIMAL(15, 2),
+  },
+  tax_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+  },
+  total_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+  },
   status: {
     type: DataTypes.ENUM("active", "inactive"),
     allowNull: false,
@@ -127,10 +155,11 @@ PurchaseOrderItem.hasMany(GRNItem, { foreignKey: "po_item_id" });
 GRNItem.belongsTo(PurchaseOrderItem, { foreignKey: "po_item_id" });
 
 ItemMaster.hasMany(GRNItem, { foreignKey: "item_id" });
-GRNItem.belongsTo(ItemMaster, { foreignKey: "item_id" });
+GRNItem.belongsTo(ItemMaster, { foreignKey: "item_id", as: "item_info" });
 
 GRNItem.belongsTo(Company, { foreignKey: "company_id" });
 GRNItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRNItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+GRNItem.belongsTo(GRN, { foreignKey: 'grn_id', as: 'grn' });
 
 export default GRNItem;

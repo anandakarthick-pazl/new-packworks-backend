@@ -87,6 +87,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         allowNull: false,
         defaultValue: "active",
       },
+      po_status: {
+        type: DataTypes.ENUM('created', 'partialy-recieved', 'received', 'amended', 'returned'),
+        defaultValue: 'created',
+      },
       decision: {
         type: DataTypes.ENUM('approve', 'disapprove'),
         allowNull: false,

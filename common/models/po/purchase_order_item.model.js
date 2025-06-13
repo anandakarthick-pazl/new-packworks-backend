@@ -137,10 +137,12 @@ PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: "po_id" });
 PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: "po_id" });
 
 ItemMaster.hasMany(PurchaseOrderItem, { foreignKey: "item_id" });
-PurchaseOrderItem.belongsTo(ItemMaster, { foreignKey: "item_id" });
+PurchaseOrderItem.belongsTo(ItemMaster, { foreignKey: "item_id",as: 'item_info' });
 
 PurchaseOrderItem.belongsTo(Company, { foreignKey: "company_id" });
 PurchaseOrderItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 PurchaseOrderItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchaseOrder' });
 
 export default PurchaseOrderItem;

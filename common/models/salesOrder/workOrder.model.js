@@ -105,15 +105,10 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    created_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-    updated_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
+    production:{
+      type: DataTypes.ENUM('created','in_production','removed_from_production'),
+      allowNull: true,
+      defaultValue: 'created',
     },
     priority: {
       type: DataTypes.ENUM("High", "Medium", "Low"),
@@ -123,26 +118,57 @@ const WorkOrder = sequelize.define(
     progress: {
       type: DataTypes.ENUM(
         "Pending",
-        "Product Planning",
-        "Procurement Sourcing",
-        "Production Planning",
-        "Production",
-        "Quality Control",
-        "Packaging",
-        "Shipping"
+        "Raw Material Allocation",
+        "Production Planned",
+        "Completed",
+        "Invoiced"
       ),
       allowNull: false,
       defaultValue: "Pending",
+    },
+    excess_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    pending_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    manufactured_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    stage:{
+      type: DataTypes.STRING(200),
+      allowNull: true,
+      defaultValue: "Production",
     },
     qr_code_url: {
       type: DataTypes.STRING,
       allowNull: true,
       comment: "URL to access the QR code for this work order",
     },
+    select_plant: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
       defaultValue: "active",
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,

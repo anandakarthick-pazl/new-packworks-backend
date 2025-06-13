@@ -3,11 +3,15 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 
-const StockAdjustment = sequelize.define("StockAdjustment", {
+const Category = sequelize.define("Category", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
     primaryKey: true,
+  },
+  category_generate_id: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
   },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -18,33 +22,27 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     },
     onUpdate: "CASCADE",
   },
-  inventory_id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    references: {
-      model: "Inventory",
-      key: "id",
-    },
-    onUpdate: "CASCADE",
-  },
-
-  adjustment_date: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-    defaultValue: DataTypes.NOW,
-
-  },
-  reason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  remarks: {
-    type: DataTypes.TEXT,
+  category_name: {
+    type: DataTypes.STRING(100),
     allowNull: false,
   },
   status: {
     type: DataTypes.ENUM("active", "inactive"),
+    allowNull: false,
     defaultValue: "active",
+  },
+  is_visible: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+  updated_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
   },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -62,11 +60,9 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
       key: "id",
     },
   },
- 
 }, {
-  tableName: "stock_adjustments",
-  timestamps: true,
-  underscored: true,
+  tableName: "product_categories",
+  timestamps: false,
 });
 
-export default StockAdjustment;
+export default Category;

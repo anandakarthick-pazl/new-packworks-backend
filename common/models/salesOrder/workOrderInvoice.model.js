@@ -6,6 +6,7 @@ import Client from "../client.model.js";
 import User from "../user.model.js";
 import Sku from "../skuModel/sku.model.js";
 import WorkOrder from "./workOrder.model.js";
+import SkuVersion from "../skuModel/skuVersion.js";
 
 const WorkOrderInvoice = sequelize.define(
   "WorkOrderInvoice",
@@ -40,6 +41,14 @@ const WorkOrderInvoice = sequelize.define(
       allowNull: true,
       references: {
         model: Sku,
+        key: "id",
+      },
+    },
+     sku_version_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: SkuVersion,
         key: "id",
       },
     },
@@ -159,6 +168,9 @@ WorkOrderInvoice.belongsTo(Client, { foreignKey: "client_id" });
 
 Sku.hasMany(WorkOrderInvoice, { foreignKey: "sku_id" });
 WorkOrderInvoice.belongsTo(Sku, { foreignKey: "sku_id" });
+
+SkuVersion.hasMany(WorkOrderInvoice, { foreignKey: "sku_version_id" });
+WorkOrderInvoice.belongsTo(SkuVersion, { foreignKey: "sku_version_id" }); 
 
 SalesOrder.hasMany(WorkOrderInvoice, {
   foreignKey: "sale_id",

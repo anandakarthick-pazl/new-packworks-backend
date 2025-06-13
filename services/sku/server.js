@@ -30,6 +30,7 @@ const User = db.User;
 const SkuType = db.SkuType;
 const Client = db.Client;
 const SkuOptions = db.SkuOptions;
+const SalesSkuDetails = db.SalesSkuDetails;
 
 // 🔹 Create a SKU (POST)
 
@@ -421,6 +422,20 @@ v1Router.put("/sku-details/:id", authenticateJWT, async (req, res) => {
 v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
+    // Check if SKU exists in SalesSkuDetails table
+    const salesReference = await SalesSkuDetails.findOne({
+      where: { sku_id: req.params.id },
+      transaction: t,
+    });
+
+    if (salesReference) {
+      await t.rollback();
+      return res.status(400).json({ 
+        message: "Cannot delete SKU. It is referenced in sales records.",
+        error: "SKU has associated sales data"
+      });
+    }
+
     // Update status to inactive instead of deleting
     const updatedSku = await Sku.update(
       {
@@ -434,8 +449,10 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
       }
     );
 
-    if (!updatedSku[0])
+    if (!updatedSku[0]) {
+      await t.rollback();
       return res.status(404).json({ message: "SKU not found" });
+    }
 
     await t.commit();
     await publishToQueue({
@@ -444,6 +461,7 @@ v1Router.delete("/sku-details/:id", authenticateJWT, async (req, res) => {
       timestamp: new Date(),
       data: { status: "inactive" },
     });
+    
     res.status(200).json({ message: "SKU marked as inactive successfully" });
   } catch (error) {
     await t.rollback();
@@ -1766,7 +1784,7 @@ process.on("SIGINT", async () => {
 
 // Use Version 1 Router
 app.use("/api", v1Router);
-await db.sequelize.sync();
+// await db.sequelize.sync();
 const PORT = 3004;
 app.listen(process.env.PORT_SKU, "0.0.0.0", () => {
   console.log(`SKU Service running on port ${process.env.PORT_SKU}`);

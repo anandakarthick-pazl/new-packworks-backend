@@ -12,7 +12,10 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
     autoIncrement: true,
     primaryKey: true
   },
- 
+  purchase_return_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
   grn_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,

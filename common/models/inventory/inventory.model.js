@@ -5,6 +5,7 @@ import GRN from "../grn/grn.model.js"
 import GRNItem from "../grn/grn_item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import Sub_categories from "../category/sub_category.model.js";
 
 const Inventory = sequelize.define("Inventory", {
   id: {
@@ -56,15 +57,38 @@ const Inventory = sequelize.define("Inventory", {
     onUpdate: "CASCADE",
     onDelete: "SET NULL",
   },
-  inventory_type: {
-    type: DataTypes.STRING(255),
-  },
-  work_order_no: {
+  // inventory_type: {
+  //   type: DataTypes.STRING(255),
+  // },
+  category: {
+      type: DataTypes.INTEGER(11),
+    },
+    sub_category: {
+      type: DataTypes.INTEGER(11),
+      allowNull: true,
+    },
+  work_order_id: {
     type: DataTypes.STRING(255),
   },
   po_id: {
     type: DataTypes.INTEGER(12),
   },
+  po_return_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  po_item_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  credit_note_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  debit_note_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  adjustment_id: {
+    type: DataTypes.INTEGER(12),
+  },
+  
   description: {
     type: DataTypes.TEXT,
   },
@@ -121,7 +145,7 @@ const Inventory = sequelize.define("Inventory", {
 });
 
 ItemMaster.hasMany(Inventory, { foreignKey: "item_id" });
-Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" });
+Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" , as: 'item'  });
 
 GRN.hasMany(Inventory, { foreignKey: "grn_id" });
 Inventory.belongsTo(GRN, { foreignKey: "grn_id" });
@@ -132,5 +156,8 @@ Inventory.belongsTo(GRNItem, { foreignKey: "grn_item_id" });
 Inventory.belongsTo(Company, { foreignKey: "company_id" });
 Inventory.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Inventory.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+Inventory.belongsTo(Sub_categories, {foreignKey: 'sub_category', as: 'sub_category_info' });
+Inventory.belongsTo(ItemMaster, { as: 'item_info', foreignKey: 'item_id' });
 
 export default Inventory;

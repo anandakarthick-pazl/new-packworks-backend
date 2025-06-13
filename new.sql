@@ -1,7 +1,36 @@
+--28/05/25
+ALTER TABLE purchase_order_returns_items
+CHANGE por_id po_return_id INT(10) UNSIGNED NOT NULL;
+
+ALTER TABLE debit_notes
+CHANGE purchase_order_return_id po_return_id INT(10) UNSIGNED NOT NULL;
+
+
+
 -- 23/05/2025
 ALTER TABLE item_master 
 DROP INDEX item_code,
 MODIFY COLUMN item_code VARCHAR(50) NULL;
+
+-- 21/05/2025
+
+--purchase_order_return
+ALTER TABLE invoice_settings
+ADD COLUMN purchase_return_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN purchase_return_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN purchase_return_digit INT NOT NULL;
+
+ALTER TABLE purchase_order_returns
+ADD COLUMN purchase_return_generate_id VARCHAR(255) NULL AFTER id;
+
+--stock_adjustment
+ALTER TABLE invoice_settings
+ADD COLUMN stock_adjustment_prefix VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN stock_adjustment_number_separator VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+ADD COLUMN stock_adjustment_digit INT NOT NULL;
+
+ALTER TABLE stock_adjustments
+ADD COLUMN stock_adjustment_generate_id VARCHAR(255) NULL AFTER id;
 
 -- 20/05/2025
 ALTER TABLE purchase_orders
@@ -64,3 +93,63 @@ MODIFY COLUMN item_type ENUM(
   'pasting-glue'
 ) NOT NULL DEFAULT 'raw-materials';
 -- 
+
+
+-- dummy
+
+
+CREATE TABLE `production_group` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NOT NULL,
+  `group_name` VARCHAR(100) NULL,
+  `group_value` JSON NULL,
+  `group_Qty` INT NULL,  
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+{
+    "success": true,
+    "message": "Grouped Inventory data fetched successfully",
+    "data": [
+        {
+            "id": 2,
+            "quantity_available": "10.00",
+            "item": {
+                "default_custom_fields": {
+                    "bf": "24",
+                    "gsm": "122",
+                    "color": "black",
+                    "size": "37",
+                    "net_wt(Kgs)": "52.5",
+                    "mill": "ABC Paper Mills Pvt Ltd",
+                    "unit": "CM"
+                }
+            }
+        },
+           {
+            "id": 3,
+            "quantity_available": "10.00",
+            "item": {
+                "default_custom_fields": {
+                    "bf": "24",
+                    "gsm": "122",
+                    "color": "black",
+                    "size": "37",
+                    "net_wt(Kgs)": "55",
+                    "mill": "ABC Paper Mills Pvt Ltd",
+                    "unit": "CM"
+                }
+            }
+        },
+
+    ]
+}
+ 

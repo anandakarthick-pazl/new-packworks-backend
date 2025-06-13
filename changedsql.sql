@@ -1,3 +1,21 @@
+CREATE TABLE `allocation_history` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NOT NULL,
+  `inventory_id` INT UNSIGNED NOT NULL,
+  `group_id` INT UNSIGNED NOT NULL,
+  `allocated_qty` INT NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
 -- 26/05/2025
 ALTER TABLE machine_process_values
 ADD COLUMN machine_id INT UNSIGNED NOT NULL;

@@ -12,6 +12,11 @@ const ItemMaster = db.ItemMaster;
 const PurchaseOrder = db.PurchaseOrder;
 const GRN = db.GRN;
 const Inventory = db.Inventory;
+const PurchaseOrderReturn = db.PurchaseOrderReturn;
+const stockAdjustment = db.stockAdjustment;
+const debit_note = db.DebitNote;
+const Categories = db.Categories;
+const Sub_categories = db.Sub_categories;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");

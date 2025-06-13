@@ -3,7 +3,9 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.sequelize.query(`ALTER TABLE addresses ADD company_id INT(11) NULL DEFAULT NULL AFTER updated_at;`);
+    await queryInterface.sequelize.query(`ALTER TABLE item_master
+      DROP COLUMN category,
+      ADD COLUMN category INT(11)`);
   },
 
   async down(queryInterface, Sequelize) {
@@ -15,3 +17,4 @@ module.exports = {
      */
   }
 };
+

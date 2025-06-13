@@ -2,6 +2,8 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
+import Category from "./category/category.model.js";
+import SubCategory from "./category/sub_category.model.js";
 
 const ItemMaster = sequelize.define(
   "ItemMaster",
@@ -42,21 +44,28 @@ const ItemMaster = sequelize.define(
     uom: {
       type: DataTypes.STRING(10),
     },
+    net_weight: {
+      type: DataTypes.STRING(100),
+    },
     category: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.INTEGER(11),
     },
-    item_type: {
-      type: DataTypes.ENUM(
-        "reels",
-        "glues",
-        "pins",
-        "finished-goods",
-        "semi-finished-goods",
-        "raw-materials"
-      ),
-      allowNull: false,
-      defaultValue: "raw-materials",
+    sub_category: {
+      type: DataTypes.INTEGER(11),
+      allowNull: true,
     },
+    // item_type: {
+    //   type: DataTypes.ENUM(
+    //     "reels",
+    //     "glues",
+    //     "pins",
+    //     "finished-goods",
+    //     "semi-finished-goods",
+    //     "raw-materials"
+    //   ),
+    //   allowNull: false,
+    //   defaultValue: "raw-materials",
+    // },
     specifications: {
       type: DataTypes.TEXT,
     },
@@ -86,7 +95,11 @@ const ItemMaster = sequelize.define(
       defaultValue: "active",
     },
     custom_fields: {
-      type: DataTypes.JSON,
+      type: Sequelize.JSON,
+      allowNull: true,      
+    },
+    default_custom_fields: {
+      type: Sequelize.JSON,
       allowNull: true,
     },
     created_at: {
@@ -127,5 +140,9 @@ const ItemMaster = sequelize.define(
 ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+ItemMaster.belongsTo(Category, { foreignKey: 'category', as: 'category_info' });
+ItemMaster.belongsTo(SubCategory, { foreignKey: 'sub_category', as: 'sub_category_info' });
+
 
 export default ItemMaster;
