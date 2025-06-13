@@ -56,10 +56,12 @@ const upload = multer({
       cb(new Error("Error validating file"), false);
     }
   },
-  limits: { fileSize: async (req, file, cb) => {
-    const { maxSize } = await getStorageType();
-    cb(null, maxSize * 1024 * 1024); // Convert MB to bytes
-  }},
+  limits: {
+    fileSize: async (req, file, cb) => {
+      const { maxSize } = await getStorageType();
+      cb(null, maxSize * 1024 * 1024); // Convert MB to bytes
+    }
+  },
 });
 const checkFileCount = async (req, res, next) => {
   try {
@@ -390,7 +392,15 @@ v1Router.post("/upload", authenticateJWT, checkFileCount, upload.single("file"),
 });
 
 
+v1Router.get("/download-qr", async (req, res) => {
+  const fileUrl = req.query.url; // validate it!
+  const fileName = "qr_code.png";
 
+  const response = await axios.get(fileUrl, { responseType: "stream" });
+
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  response.data.pipe(res);
+});
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
