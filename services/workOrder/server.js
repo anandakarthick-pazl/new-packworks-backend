@@ -166,7 +166,7 @@ ${workOrder.edd
       throw new Error("Failed to upload QR code image.");
     }
 
-    const uploadedImageUrl = uploadResponse.data.url;
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || "";
 
     // Optional: delete local QR file after uploading
     fs.unlinkSync(qrFilePath);
