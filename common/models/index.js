@@ -44,8 +44,8 @@ import MachineRouteProcess from "./route/machineRouteProcess.model.js";
 import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
 import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
 import DebitNote from "./debit/debit_note.model.js";
-import CreditNote from "./credit/credit_note.model.js"; 
 import WorkOrderStatus from "./commonModel/workOrderStatus.js";
+import CreditNote from "./credit/creditNote.model.js"; 
 import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
 import ProductionGroup from "./Production/productionGroup.model.js";
@@ -101,8 +101,8 @@ const db = {
   stockAdjustment,
   stockAdjustmentItem,
   DebitNote,
-  CreditNote,
   Categories,
+  CreditNote,
   Sub_categories,
   ProductionGroup,
   Notification,
