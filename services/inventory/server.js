@@ -624,10 +624,12 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     // get inventory data
     const inventory = await Inventory.findAll({
       attributes: [
+        // 'id',
         'item_id',
         [fn('SUM', col('quantity_available')), 'total_quantity'],
         'sub_category',
         'location',
+         'rate',
         'status',
         'created_at',
         'updated_at',
