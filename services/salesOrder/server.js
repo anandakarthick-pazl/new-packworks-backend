@@ -802,14 +802,14 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
     // Add sales_status filter if provided
     if (sales_status) where.sales_status = sales_status;
 
-    // Add unified search if provided - search across multiple fields
+    // Add unified search if provided - search across multiple fields in SalesOrder only
     if (search) {
       where[Op.or] = [
         { client: { [Op.like]: `%${search}%` } },
         { sales_generate_id: { [Op.like]: `%${search}%` } },
         { sales_ui_id: { [Op.like]: `%${search}%` } },
-        { sku: { [Op.like]: `%${search}%` } },
         { sales_status: { [Op.like]: `%${search}%` } }
+        // Removed 'sku' from here as it doesn't exist in SalesOrder table
       ];
     }
 
@@ -842,7 +842,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
 
     // Add related model search conditions if search parameter is provided
     if (search) {
-      // Search in SKU details
+      // Search in SKU details - this will search for sku in the related model
       includeConditions[1].where = {
         ...includeConditions[1].where,
         [Op.or]: [
@@ -857,6 +857,11 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
           { manufacture: { [Op.like]: `%${search}%` } },
         ],
       };
+
+      // If you want to include records where related models match the search,
+      // you might need to set required: true for those includes, but this will
+      // change the behavior to INNER JOIN instead of LEFT JOIN
+      // Alternatively, consider using a different approach for searching across related models
     }
 
     // Fetch data from database with all filters applied
