@@ -13,6 +13,8 @@ import { Readable } from "stream";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import axios from 'axios';
+import FormData from "form-data";
 
 dotenv.config();
 
@@ -45,7 +47,71 @@ app.use("/public", express.static(publicDir));
 // Also serve qrcodes directly for backward compatibility
 app.use("/qrcodes", express.static(qrCodeDir));
 
-async function generateQRCode(workOrder) {
+// async function generateQRCode(workOrder) {
+//   try {
+//     const textContent = `
+// Work Order: ${workOrder.work_generate_id}
+// SKU: ${workOrder.sku_name || "N/A"}
+// Quantity: ${workOrder.qty || "N/A"}
+// Manufacture: ${workOrder.manufacture || "N/A"}
+// Status: ${workOrder.status || "N/A"}
+// ${workOrder.description ? `Description: ${workOrder.description}` : ""}
+// ${
+//   workOrder.edd
+//     ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+//     : ""
+// }
+// `.trim();
+
+//     const sanitizedId = workOrder.work_generate_id.replace(
+//       /[^a-zA-Z0-9]/g,
+//       "_"
+//     );
+//     const timestamp = Date.now();
+//     const qrFileName = `wo_${sanitizedId}_${timestamp}.png`;
+//     const qrFilePath = path.join(qrCodeDir, qrFileName);
+
+//     // Debug logging
+//     logger.info(
+//       `Generating QR code for work order: ${workOrder.work_generate_id}`
+//     );
+//     logger.info(`QR code file path: ${qrFilePath}`);
+//     logger.info(`QR code directory exists: ${fs.existsSync(qrCodeDir)}`);
+
+//     await QRCode.toFile(qrFilePath, textContent, {
+//       errorCorrectionLevel: "H",
+//       margin: 1,
+//       width: 300,
+//     });
+
+//     // Verify file creation
+//     const fileExists = fs.existsSync(qrFilePath);
+//     const fileStats = fileExists ? fs.statSync(qrFilePath) : null;
+
+//     logger.info(`QR code file created: ${fileExists}`);
+//     if (fileStats) {
+//       logger.info(`QR code file size: ${fileStats.size} bytes`);
+//     }
+
+//     if (!fileExists) {
+//       throw new Error("QR code file was not created successfully");
+//     }
+
+//     // Generate URL without /api prefix
+//     const baseUrl = process.env.BASE_URL;
+//     // const baseUrl = `http://localhost:${process.env.PORT_WORKORDER}`;
+//     const fullUrl = `${baseUrl}/public/qrcodes/${qrFileName}`;
+
+//     logger.info(`QR code URL generated: ${fullUrl}`);
+
+//     return fullUrl;
+//   } catch (error) {
+//     logger.error("Error generating QR code:", error);
+//     throw error;
+//   }
+// }
+
+async function generateQRCode(workOrder, token) {
   try {
     const textContent = `
 Work Order: ${workOrder.work_generate_id}
@@ -54,27 +120,19 @@ Quantity: ${workOrder.qty || "N/A"}
 Manufacture: ${workOrder.manufacture || "N/A"}
 Status: ${workOrder.status || "N/A"}
 ${workOrder.description ? `Description: ${workOrder.description}` : ""}
-${
-  workOrder.edd
-    ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
-    : ""
-}
-`.trim();
+${workOrder.edd
+        ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+        : ""
+      }`.trim();
 
-    const sanitizedId = workOrder.work_generate_id.replace(
-      /[^a-zA-Z0-9]/g,
-      "_"
-    );
+    const sanitizedId = workOrder.work_generate_id.replace(/[^a-zA-Z0-9]/g, "_");
     const timestamp = Date.now();
     const qrFileName = `wo_${sanitizedId}_${timestamp}.png`;
-    const qrFilePath = path.join(qrCodeDir, qrFileName);
+    const qrFilePath = path.join(__dirname, "qrcodes", qrFileName);
 
-    // Debug logging
-    logger.info(
-      `Generating QR code for work order: ${workOrder.work_generate_id}`
-    );
-    logger.info(`QR code file path: ${qrFilePath}`);
-    logger.info(`QR code directory exists: ${fs.existsSync(qrCodeDir)}`);
+    if (!fs.existsSync(path.dirname(qrFilePath))) {
+      fs.mkdirSync(path.dirname(qrFilePath), { recursive: true });
+    }
 
     await QRCode.toFile(qrFilePath, textContent, {
       errorCorrectionLevel: "H",
@@ -82,29 +140,41 @@ ${
       width: 300,
     });
 
-    // Verify file creation
-    const fileExists = fs.existsSync(qrFilePath);
-    const fileStats = fileExists ? fs.statSync(qrFilePath) : null;
-
-    logger.info(`QR code file created: ${fileExists}`);
-    if (fileStats) {
-      logger.info(`QR code file size: ${fileStats.size} bytes`);
-    }
-
-    if (!fileExists) {
+    if (!fs.existsSync(qrFilePath)) {
       throw new Error("QR code file was not created successfully");
     }
 
-    // Generate URL without /api prefix
-    const baseUrl = process.env.BASE_URL;
-    // const baseUrl = `http://localhost:${process.env.PORT_WORKORDER}`;
-    const fullUrl = `${baseUrl}/public/qrcodes/${qrFileName}`;
+    // Prepare form data for upload
+    const form = new FormData();
+    form.append("file", fs.createReadStream(qrFilePath));
 
-    logger.info(`QR code URL generated: ${fullUrl}`);
+    const config = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${process.env.BASE_URL}/file/upload`,
+      headers: {
+        // "x-api-key": "4b3e77f648e5b9055a45f0812b3a4c3b88b08ff10b2f34ec21d11b6f678b6876a4014c88ff2a3c7e8e934c4f4790a94d3acb28d2f78a9b90f18960feaf3e4f99",
+        Authorization: `Bearer ${token}`, // Replace with real token
+        ...form.getHeaders(),
+      },
+      data: form,
+    };
 
-    return fullUrl;
+    const uploadResponse = await axios.request(config);
+    console.log("Upload response:", uploadResponse);
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
+      throw new Error("Failed to upload QR code image.");
+    }
+
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || "";
+
+    // Optional: delete local QR file after uploading
+    fs.unlinkSync(qrFilePath);
+
+    return uploadedImageUrl;
+
   } catch (error) {
-    logger.error("Error generating QR code:", error);
+    logger.error("Error generating and uploading QR code:", error);
     throw error;
   }
 }
@@ -424,6 +494,7 @@ v1Router.get(
 );
 v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   const workDetails = req.body;
+  const authHeader = req.headers.authorization;
 
   if (!workDetails) {
     return res.status(400).json({ message: "Invalid input data" });
@@ -471,7 +542,9 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 
     // Generate QR code for this work order
     // Option 1: Generate and store QR code as a file (with URL to access it)
-    const qrCodeUrl = await generateQRCode(newWorkOrder);
+    const authHeader = req.headers.authorization;
+    const token = authHeader.split(" ")[1];
+    const qrCodeUrl = await generateQRCode(newWorkOrder, token);
 
     // Option 2: Generate QR code as data URL (no file storage)
     // const qrCodeDataUrl = await generateQRCodeDataURL(newWorkOrder);
@@ -786,7 +859,9 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
         // If QR code URL is missing and update flag is true, generate and update
         if (updateMissingQrCodes === "true" && !parsedWorkOrder.qr_code_url) {
           try {
-            const qrCodeUrl = await generateQRCode(workOrder);
+            const authHeader = req.headers.authorization;
+            const token = authHeader.split(" ")[1];
+            const qrCodeUrl = await generateQRCode(workOrder, token);
             await workOrder.update({ qr_code_url: qrCodeUrl });
             parsedWorkOrder.qr_code_url = qrCodeUrl;
           } catch (qrError) {
@@ -852,7 +927,9 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
 
     // If QR code URL doesn't exist, generate it now
     if (!workOrder.qr_code_url) {
-      const qrCodeUrl = await generateQRCode(workOrder);
+      const authHeader = req.headers.authorization;
+      const token = authHeader.split(" ")[1];
+      const qrCodeUrl = await generateQRCode(workOrder, token);
       await workOrder.update({ qr_code_url: qrCodeUrl });
     }
 
@@ -934,7 +1011,9 @@ v1Router.get(
           // If QR code URL is missing and update flag is true, generate and update
           if (updateMissingQrCodes === "true" && !plainWorkOrder.qr_code_url) {
             try {
-              const qrCodeUrl = await generateQRCode(workOrder);
+              const authHeader = req.headers.authorization;
+              const token = authHeader.split(" ")[1];
+              const qrCodeUrl = await generateQRCode(workOrder, token);
               await workOrder.update({ qr_code_url: qrCodeUrl });
               plainWorkOrder.qr_code_url = qrCodeUrl;
             } catch (qrError) {
@@ -1053,8 +1132,7 @@ v1Router.get(
 
       // Log the download
       logger.info(
-        `Work Orders Excel download initiated by user ${
-          req.user.id
+        `Work Orders Excel download initiated by user ${req.user.id
         } with filters: ${JSON.stringify({
           manufacture,
           sku_name,
@@ -1134,7 +1212,9 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
     // Generate new QR code if needed
     if (needsNewQrCode || !workOrder.qr_code_url) {
       try {
-        const qrCodeUrl = await generateQRCode(workOrder);
+        const authHeader = req.headers.authorization;
+        const token = authHeader.split(" ")[1];
+        const qrCodeUrl = await generateQRCode(workOrder, token);
         await workOrder.update({ qr_code_url: qrCodeUrl });
       } catch (qrError) {
         logger.error(`Error generating QR code for work order ${id}:`, qrError);
