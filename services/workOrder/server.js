@@ -757,7 +757,6 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
         { manufacture: { [Op.like]: `%${search}%` } },
         { sku_name: { [Op.like]: `%${search}%` } },
         { work_generate_id: { [Op.like]: `%${search}%` } },
-        { manufacture: { [Op.like]: `%${search}%` } },
         { planned_start_date: { [Op.like]: `%${search}%` } },
         { planned_end_date: { [Op.like]: `%${search}%` } },
         { outsource_name: { [Op.like]: `%${search}%` } },
