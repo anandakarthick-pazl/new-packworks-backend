@@ -21,6 +21,7 @@ import multer from "multer";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
+import axios from 'axios';
 
 dotenv.config();
 
