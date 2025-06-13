@@ -36,6 +36,9 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
+    const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
+    console.log("inventory_generate_id :", inventory_generate_id);
+    
     const { items, ...grnData } = req.body;
 
     grnData.created_by = req.user.id;
@@ -146,6 +149,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       //   }, { transaction });
       // } else {
         await Inventory.create({
+          inventory_generate_id :inventory_generate_id,
           company_id: req.user.company_id,
           item_id,
           item_code,
@@ -159,6 +163,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           work_order_no,
           description,
           quantity_available: acceptedQty,
+          rate :newGRNItem.amount,
           batch_no,
           location,
           status: 'active',
