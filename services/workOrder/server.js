@@ -161,12 +161,12 @@ ${workOrder.edd
     };
 
     const uploadResponse = await axios.request(config);
-
-    if (uploadResponse.status !== 200 || !uploadResponse.data?.url) {
+    console.log("Upload response:", uploadResponse);
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
       throw new Error("Failed to upload QR code image.");
     }
 
-    const uploadedImageUrl = uploadResponse.data.url;
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || "";
 
     // Optional: delete local QR file after uploading
     fs.unlinkSync(qrFilePath);
