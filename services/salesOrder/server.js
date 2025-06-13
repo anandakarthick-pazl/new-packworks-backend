@@ -740,7 +740,6 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
         { client: { [Op.like]: `%${search}%` } },
         { sales_generate_id: { [Op.like]: `%${search}%` } },
         { sales_ui_id: { [Op.like]: `%${search}%` } },
-        { sku: { [Op.like]: `%${search}%` } },
         {sales_status: { [Op.like]: `%${search}%` } },
       ];
     }
