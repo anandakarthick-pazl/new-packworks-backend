@@ -13,7 +13,7 @@ import { Readable } from "stream";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { axios } from "axios";
+import axios from 'axios';
 import FormData from "form-data";
 
 dotenv.config();

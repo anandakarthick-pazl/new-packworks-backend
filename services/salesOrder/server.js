@@ -10,6 +10,8 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
+import axios from 'axios';
+import FormData from "form-data";
 
 dotenv.config();
 
