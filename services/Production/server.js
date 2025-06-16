@@ -518,6 +518,9 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
 
         groupData.group_value = groupValue || [];
 
+        // Calculate balance_Qty = group_Qty - allocated_Qty
+        groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+
         // Include only layer details if requested
         if (include_work_orders === "true" && Array.isArray(groupValue)) {
           const layerDetails = await Promise.all(
@@ -527,7 +530,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
               try {
                 // Only fetch work_order_sku_values to extract layer details
                 const workOrder = await WorkOrder.findByPk(work_order_id, {
-                  attributes: ["id", "work_order_sku_values"],
+                  attributes: ["id", "work_generate_id", "work_order_sku_values"],
                 });
 
                 if (!workOrder) {
@@ -558,6 +561,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
                 if (!layerDetail) {
                   return {
                     work_order_id,
+                    work_generate_id: workOrder.work_generate_id,
                     layer_id,
                     sales_order_id,
                     layer_found: false,
@@ -567,6 +571,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
 
                 return {
                   work_order_id,
+                  work_generate_id: workOrder.work_generate_id,
                   layer_id,
                   sales_order_id,
                   layer_found: true,
