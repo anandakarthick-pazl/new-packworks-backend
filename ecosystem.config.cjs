@@ -229,5 +229,12 @@ module.exports = {
         PORT: 3040,
       },
     },
+    {
+      name: "credit-note",
+      script: "./services/credit-note/server.js",
+      env: {
+        PORT: 3041,
+      },
+    },
   ],
 };
