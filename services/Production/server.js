@@ -1683,25 +1683,127 @@ v1Router.get(
     try {
       const { inventory_id } = req.params;
 
+      // First, get the inventory data
+      const inventoryItem = await Inventory.findOne({
+        where: {
+          id: inventory_id,
+          company_id: req.user.company_id,
+        },
+        attributes: [
+          "id",
+          "item_code",
+          "quantity_available",
+          "quantity_blocked",
+          "created_at",
+          "updated_at"
+        ]
+      });
+
+      if (!inventoryItem) {
+        return res.status(404).json({
+          message: "Inventory item not found or doesn't belong to your company"
+        });
+      }
+
       // Get allocation history for this specific inventory
       const allocationHistory = await AllocationHistory.findAll({
         where: {
           inventory_id: inventory_id,
           company_id: req.user.company_id,
         },
+        include: [
+          {
+            model: ProductionGroup,
+            attributes: ["id", "group_name", "group_Qty", "status"],
+            required: false
+          }
+        ],
         order: [["created_at", "DESC"]],
       });
 
       if (allocationHistory.length === 0) {
-        return res.status(404).json({
+        return res.status(200).json({
           message: "No allocation history found for this inventory",
+          data: {
+            inventory: inventoryItem,
+            group_allocations: [],
+            total_allocated: 0
+          },
+          count: 0
         });
       }
 
+      // Group by group_id and sum allocated_Qty
+      const groupedAllocations = {};
+      let totalAllocated = 0;
+
+      allocationHistory.forEach(record => {
+        const groupId = record.group_id;
+        const allocatedQty = parseFloat(record.allocated_Qty) || 0;
+        
+        if (!groupedAllocations[groupId]) {
+          groupedAllocations[groupId] = {
+            group_id: groupId,
+            group_name: record.ProductionGroup ? record.ProductionGroup.group_name : null,
+            group_qty: record.ProductionGroup ? parseFloat(record.ProductionGroup.group_Qty) || 0 : 0,
+            group_status: record.ProductionGroup ? record.ProductionGroup.status : null,
+            net_allocated_qty: 0,
+            allocation_records: [],
+            last_allocation_date: record.created_at
+          };
+        }
+
+        // Sum up the allocated quantities (positive for allocations, negative for deallocations)
+        groupedAllocations[groupId].net_allocated_qty += allocatedQty;
+        
+        // Add individual record to allocation_records array
+        groupedAllocations[groupId].allocation_records.push({
+          id: record.id,
+          allocated_qty: allocatedQty,
+          status: record.status,
+          created_at: record.created_at,
+          created_by: record.created_by
+        });
+
+        // Update last allocation date if this record is more recent
+        if (new Date(record.created_at) > new Date(groupedAllocations[groupId].last_allocation_date)) {
+          groupedAllocations[groupId].last_allocation_date = record.created_at;
+        }
+      });
+
+      // Convert to array and calculate total allocated
+      const groupAllocations = Object.values(groupedAllocations).map(group => {
+        // Only count positive net allocations for total
+        if (group.net_allocated_qty > 0) {
+          totalAllocated += group.net_allocated_qty;
+        }
+        
+        return {
+          ...group,
+          net_allocated_qty: parseFloat(group.net_allocated_qty.toFixed(2)) // Round to 2 decimal places
+        };
+      });
+
+      // Sort by net_allocated_qty descending (most allocated first)
+      groupAllocations.sort((a, b) => b.net_allocated_qty - a.net_allocated_qty);
+
       res.status(200).json({
         message: "Allocation history retrieved successfully",
-        data: allocationHistory,
-        count: allocationHistory.length,
+        data: {
+          inventory: {
+            ...inventoryItem.toJSON(),
+            quantity_available: parseFloat(inventoryItem.quantity_available) || 0,
+            quantity_blocked: parseFloat(inventoryItem.quantity_blocked) || 0,
+            // total_quantity: parseFloat(inventoryItem.total_quantity) || 0
+          },
+          group_allocations: groupAllocations,
+          summary: {
+            total_groups: groupAllocations.length,
+            total_allocated: parseFloat(totalAllocated.toFixed(2)),
+            total_records: allocationHistory.length
+          }
+        },
+        count: allocationHistory.length
       });
     } catch (error) {
       console.error("Error fetching allocation history:", error);
