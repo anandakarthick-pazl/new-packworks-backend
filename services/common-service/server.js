@@ -1212,8 +1212,12 @@ v1Router.post("/forgot-password", async (req, res) => {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${email}`;
       const forgotPasswordTemplate = ForgotPasswordTemplate({
         userName: user.name,
+        email,
         resetUrl,
-        expiryTime: "1 hour"
+        expiryTime: "1 hour",
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        requestTime: new Date().toISOString()
+
       });
 
       await sendEmail(
