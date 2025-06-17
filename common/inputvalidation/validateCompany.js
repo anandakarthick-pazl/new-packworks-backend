@@ -12,13 +12,14 @@ export const validateCompany = async (req, res, next) => {
             phone: Joi.string().pattern(/^\d+$/).min(8).max(15).optional(),
             website: Joi.string().uri().optional(),
             currency: Joi.number().integer().positive().required(),
-            company_state_id: Joi.number().integer().positive().required(),
-            timezone: Joi.string().required(),
-            language: Joi.string().required(),
+            company_state_id: Joi.number().integer().positive().optional(),
+            timezone: Joi.string().optional(),
+            language: Joi.string().optional(),
             status: Joi.string().valid("active", "inactive").default("active"),
             address: Joi.string().optional(),
             logo: Joi.string().uri().optional(),
             package_name: Joi.string().min(3).max(100).optional(),
+            password: Joi.string().min(3).max(100).optional(),
 
             companyAccountDetails: Joi.array().items(
                 Joi.object({

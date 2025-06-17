@@ -21,6 +21,7 @@ const transporter = nodemailer.createTransport({
  * @param {string} htmlBody - HTML email content
  */
 export const sendEmail = async (to, subject, htmlBody) => {
+    console.log(`📩 First Email sent to ${to}`);
     try {
         const mailOptions = {
              from: {
@@ -34,7 +35,7 @@ export const sendEmail = async (to, subject, htmlBody) => {
         };
 
         // Send email
-        const info = await transporter.sendMail(mailOptions);
+        const info = transporter.sendMail(mailOptions);
         console.log(`📩 Email sent to ${to}: ${info.messageId}`);
         return { success: true, message: "Email sent successfully" };
     } catch (error) {
