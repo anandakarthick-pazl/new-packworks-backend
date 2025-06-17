@@ -587,7 +587,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         'category'
         // [Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],
       ],
-      where: whereCondition,
+      // where: whereCondition,
       group: ['Inventory.sub_category', 'sub_category_info.id'],
       include: [
         {
@@ -832,7 +832,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         'sub_category',
         'category'
       ],
-      where: whereCondition,
+      // where: whereCondition,
       group: ['Inventory.sub_category', 'sub_category_info.id'],
       include: [
         {
