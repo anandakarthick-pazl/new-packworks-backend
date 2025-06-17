@@ -1081,7 +1081,7 @@ v1Router.post("/demo-request", async (req, res) => {
     // Send demo request customer email (async, non-blocking)
     try {
       const customerEmailTemplate = DemoRequestCustomerTemplate({
-        full_name,
+        fullName,
         companyName: company_name,
         email,
         phone,
