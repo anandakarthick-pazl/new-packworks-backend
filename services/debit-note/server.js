@@ -10,7 +10,7 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 
 const Company = db.Company;
 const User = db.User;
-const CreditNote = db.CreditNote;
+const DebitNote = db.DebitNote;
 const Client = db.Client;
 const WorkOrderInvoice = db.WorkOrderInvoice;
 
@@ -20,7 +20,7 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
-// CREATE Credit Note
+// CREATE Debit Note
 v1Router.post("/create", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -30,10 +30,11 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       client_name,
       work_order_invoice_id,
       work_order_invoice_number,
-      credit_reference_id,
+      debit_reference_id,
       subject,
-      invoice_total_amout,
-      credit_total_amount
+      invoice_total_amount,
+      debit_total_amount,
+      reason
     } = req.body;
 
     const user = req.user;
@@ -56,21 +57,22 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
     const workOrderInvoice = await WorkOrderInvoice.findByPk(work_order_invoice_id);
     if (!workOrderInvoice) throw new Error("Work Order Invoice not found");
 
-    // ✅ Generate unique credit_generate_id
-    const credit_generate_id = await generateId(user.company_id, CreditNote, "credit_note");
+    // ✅ Generate unique debit_generate_id
+    const debit_generate_id = await generateId(user.company_id, DebitNote, "debit_note");
 
-    // ✅ Create the credit note
-    const creditNote = await CreditNote.create({
+    // ✅ Create the debit note
+    const debitNote = await DebitNote.create({
       company_id: user.company_id,
       client_id,
       client_name: client_name || client.name,
       work_order_invoice_id,
       work_order_invoice_number,
-      credit_generate_id,
-      credit_reference_id,
+      debit_generate_id,
+      debit_reference_id,
       subject,
-      invoice_total_amout,
-      credit_total_amount,
+      invoice_total_amount,
+      debit_total_amount,
+      reason,
       status: "active",
       created_by: user.id,
       updated_by: user.id,
@@ -81,13 +83,13 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Credit Note created successfully",
-      data: creditNote
+      message: "Debit Note created successfully",
+      data: debitNote
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error("Credit Note Creation Error:", error);
+    console.error("Debit Note Creation Error:", error);
     return res.status(500).json({
       success: false,
       message: `Creation failed: ${error.message}`,
@@ -96,7 +98,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET All Credit Notes
+// GET All Debit Notes
 v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, status, client_id, search } = req.query;
@@ -118,12 +120,13 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
     if (search) {
       whereClause[Op.or] = [
         { subject: { [Op.like]: `%${search}%` } },
-        { credit_generate_id: { [Op.like]: `%${search}%` } },
-        { credit_reference_id: { [Op.like]: `%${search}%` } }
+        { debit_generate_id: { [Op.like]: `%${search}%` } },
+        { debit_reference_id: { [Op.like]: `%${search}%` } },
+        { reason: { [Op.like]: `%${search}%` } }
       ];
     }
 
-    const { count, rows: creditNotes } = await CreditNote.findAndCountAll({
+    const { count, rows: debitNotes } = await DebitNote.findAndCountAll({
       where: whereClause,
       include: [
         {
@@ -149,7 +152,7 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: creditNotes,
+      data: debitNotes,
       pagination: {
         current_page: parseInt(page),
         per_page: parseInt(limit),
@@ -158,7 +161,7 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Get Credit Notes Error:", error);
+    console.error("Get Debit Notes Error:", error);
     return res.status(500).json({
       success: false,
       message: `Fetch failed: ${error.message}`,
@@ -166,10 +169,10 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET Credit Note by ID
+// GET Debit Note by ID
 v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
   try {
-    const creditNote = await CreditNote.findOne({
+    const debitNote = await DebitNote.findOne({
       where: { 
         id: req.params.id,
         company_id: req.user.company_id 
@@ -198,16 +201,16 @@ v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
       ]
     });
 
-    if (!creditNote) {
-      throw new Error("Credit Note not found or access denied");
+    if (!debitNote) {
+      throw new Error("Debit Note not found or access denied");
     }
 
     return res.status(200).json({
       success: true,
-      data: creditNote
+      data: debitNote
     });
   } catch (error) {
-    console.error("Get Credit Note Error:", error);
+    console.error("Get Debit Note Error:", error);
     return res.status(404).json({
       success: false,
       message: `Fetch failed: ${error.message}`
@@ -215,11 +218,12 @@ v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+// UPDATE Debit Note
 v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const creditNoteId = req.params.id;
+    const debitNoteId = req.params.id;
     const user = req.user;
 
     const {
@@ -227,28 +231,29 @@ v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
       client_name,
       work_order_invoice_id,
       work_order_invoice_number,
-      credit_reference_id,
+      debit_reference_id,
       subject,
-      invoice_total_amout,
-      credit_total_amount,
+      invoice_total_amount,
+      debit_total_amount,
+      reason,
       status
     } = req.body;
 
-    // Find the credit note
-    const creditNote = await CreditNote.findOne({
+    // Find the debit note
+    const debitNote = await DebitNote.findOne({
       where: { 
-        id: creditNoteId, 
+        id: debitNoteId, 
         company_id: user.company_id 
       },
       transaction // Add transaction to the query
     });
 
-    if (!creditNote) {
-      throw new Error("Credit Note not found or access denied");
+    if (!debitNote) {
+      throw new Error("Debit Note not found or access denied");
     }
 
     // Validate client if client_id is being updated
-    if (client_id && client_id !== creditNote.client_id) {
+    if (client_id && client_id !== debitNote.client_id) {
       const client = await Client.findOne({
         where: { 
           client_id: client_id,
@@ -260,31 +265,32 @@ v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
     }
 
     // Validate work order invoice if being updated
-    if (work_order_invoice_id && work_order_invoice_id !== creditNote.work_order_invoice_id) {
+    if (work_order_invoice_id && work_order_invoice_id !== debitNote.work_order_invoice_id) {
       const workOrderInvoice = await WorkOrderInvoice.findByPk(work_order_invoice_id, {
         transaction // Add transaction to the query
       });
       if (!workOrderInvoice) throw new Error("Work Order Invoice not found");
     }
 
-    // Update the credit note
-    await creditNote.update({
-      client_id: client_id || creditNote.client_id,
-      client_name: client_name || creditNote.client_name,
-      work_order_invoice_id: work_order_invoice_id || creditNote.work_order_invoice_id,
-      work_order_invoice_number: work_order_invoice_number || creditNote.work_order_invoice_number,
-      credit_reference_id: credit_reference_id || creditNote.credit_reference_id,
-      subject: subject || creditNote.subject,
-      invoice_total_amout: invoice_total_amout || creditNote.invoice_total_amout,
-      credit_total_amount: credit_total_amount || creditNote.credit_total_amount,
-      status: status || creditNote.status,
+    // Update the debit note
+    await debitNote.update({
+      client_id: client_id || debitNote.client_id,
+      client_name: client_name || debitNote.client_name,
+      work_order_invoice_id: work_order_invoice_id || debitNote.work_order_invoice_id,
+      work_order_invoice_number: work_order_invoice_number || debitNote.work_order_invoice_number,
+      debit_reference_id: debit_reference_id || debitNote.debit_reference_id,
+      subject: subject || debitNote.subject,
+      invoice_total_amount: invoice_total_amount || debitNote.invoice_total_amount,
+      debit_total_amount: debit_total_amount || debitNote.debit_total_amount,
+      reason: reason || debitNote.reason,
+      status: status || debitNote.status,
       updated_by: user.id,
       updated_at: new Date()
     }, { transaction });
 
-    // Fetch updated credit note with associations WITHIN the transaction
-    const updatedCreditNote = await CreditNote.findOne({
-      where: { id: creditNoteId },
+    // Fetch updated debit note with associations WITHIN the transaction
+    const updatedDebitNote = await DebitNote.findOne({
+      where: { id: debitNoteId },
       include: [
         {
           model: Client,
@@ -306,8 +312,8 @@ v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
     // Return the response after successful commit
     return res.status(200).json({
       success: true,
-      message: "Credit Note updated successfully",
-      data: updatedCreditNote
+      message: "Debit Note updated successfully",
+      data: updatedDebitNote
     });
 
   } catch (error) {
@@ -315,7 +321,7 @@ v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
     if (!transaction.finished) {
       await transaction.rollback();
     }
-    console.error("Update Credit Note Error:", error);
+    console.error("Update Debit Note Error:", error);
     return res.status(500).json({
       success: false,
       message: `Update failed: ${error.message}`
@@ -323,24 +329,24 @@ v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// DELETE Credit Note (Soft Delete)
+// DELETE Debit Note (Soft Delete)
 v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const creditNote = await CreditNote.findOne({
+    const debitNote = await DebitNote.findOne({
       where: { 
         id: req.params.id,
         company_id: req.user.company_id 
       }
     });
 
-    if (!creditNote) {
-      throw new Error("Credit Note not found or access denied");
+    if (!debitNote) {
+      throw new Error("Debit Note not found or access denied");
     }
 
     // Soft delete by updating status
-    await creditNote.update({
+    await debitNote.update({
       status: "inactive",
       updated_by: req.user.id,
       updated_at: new Date()
@@ -350,12 +356,12 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Credit Note deleted successfully",
-      data: creditNote
+      message: "Debit Note deleted successfully",
+      data: debitNote
     });
   } catch (error) {
     await transaction.rollback();
-    console.error("Delete Credit Note Error:", error);
+    console.error("Delete Debit Note Error:", error);
     return res.status(500).json({
       success: false,
       message: `Deletion failed: ${error.message}`
@@ -363,12 +369,12 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// RESTORE Credit Note
+// RESTORE Debit Note
 v1Router.patch("/:id/restore", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const creditNote = await CreditNote.findOne({
+    const debitNote = await DebitNote.findOne({
       where: { 
         id: req.params.id,
         company_id: req.user.company_id,
@@ -376,11 +382,11 @@ v1Router.patch("/:id/restore", authenticateJWT, async (req, res) => {
       }
     });
 
-    if (!creditNote) {
-      throw new Error("Inactive Credit Note not found or access denied");
+    if (!debitNote) {
+      throw new Error("Inactive Debit Note not found or access denied");
     }
 
-    await creditNote.update({
+    await debitNote.update({
       status: "active",
       updated_by: req.user.id,
       updated_at: new Date()
@@ -390,12 +396,12 @@ v1Router.patch("/:id/restore", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Credit Note restored successfully",
-      data: creditNote
+      message: "Debit Note restored successfully",
+      data: debitNote
     });
   } catch (error) {
     await transaction.rollback();
-    console.error("Restore Credit Note Error:", error);
+    console.error("Restore Debit Note Error:", error);
     return res.status(500).json({
       success: false,
       message: `Restore failed: ${error.message}`
@@ -403,13 +409,12 @@ v1Router.patch("/:id/restore", authenticateJWT, async (req, res) => {
   }
 });
 
-// GET Credit Notes by Client
 v1Router.get("/client/:client_id", authenticateJWT, async (req, res) => {
   try {
     const { client_id } = req.params;
     const { status = "active" } = req.query;
 
-    const creditNotes = await CreditNote.findAll({
+    const debitNotes = await DebitNote.findAll({
       where: { 
         client_id,
         company_id: req.user.company_id,
@@ -427,11 +432,11 @@ v1Router.get("/client/:client_id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: creditNotes,
-      count: creditNotes.length
+      data: debitNotes,
+      count: debitNotes.length
     });
   } catch (error) {
-    console.error("Get Client Credit Notes Error:", error);
+    console.error("Get Client Debit Notes Error:", error);
     return res.status(500).json({
       success: false,
       message: `Fetch failed: ${error.message}`
@@ -439,10 +444,11 @@ v1Router.get("/client/:client_id", authenticateJWT, async (req, res) => {
   }
 });
 
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
-    status: "Credit Note Service is running",
+    status: "Debit Note Service is running",
     timestamp: new Date(),
   });
 });
@@ -456,3 +462,4 @@ app.listen(process.env.PORT_DEBIT_NOTE, "0.0.0.0", () => {
     `Debit Note Service running on port ${process.env.PORT_DEBIT_NOTE} 🚀`
   );
 });
+
