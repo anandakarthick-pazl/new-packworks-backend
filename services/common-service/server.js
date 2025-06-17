@@ -1081,10 +1081,14 @@ v1Router.post("/demo-request", async (req, res) => {
     // Send demo request customer email (async, non-blocking)
     try {
       const customerEmailTemplate = DemoRequestCustomerTemplate({
-        customerName: full_name,
+        full_name,
         companyName: company_name,
-        preferredTime: preferred_demo_time,
-        needs: needs_description
+        email,
+        phone,
+        role,
+        preferredDemoTime: preferred_demo_time,
+        needsDescription: needs_description,
+        requestId: demoRequest.id
       });
 
       await sendEmail(
@@ -1104,14 +1108,17 @@ v1Router.post("/demo-request", async (req, res) => {
     // Send demo request admin notification email (async, non-blocking)
     try {
       const adminEmailTemplate = DemoRequestAdminTemplate({
-        customerName: full_name,
+        fullName: full_name,
         companyName: company_name,
         email,
         phone,
         role,
-        preferredTime: preferred_demo_time,
-        needs: needs_description,
-        submittedAt: new Date()
+        preferredDemoTime: preferred_demo_time,
+        needsDescription: needs_description,
+        requestId: demoRequest.id,
+        userAgent: req.headers['user-agent'] || 'unknown',
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        requestDate: new Date().toISOString()
       });
 
       const adminEmail = process.env.ADMIN_EMAIL || "admin@packworkx.com";
