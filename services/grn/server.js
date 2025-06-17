@@ -164,6 +164,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
           description,
           quantity_available: acceptedQty,
           rate :newGRNItem.amount,
+          total_amount: acceptedQty * newGRNItem.amount,
           batch_no,
           location,
           status: 'active',
@@ -261,10 +262,17 @@ whereCondition.status="active"
       where: whereCondition,
       limit: limitNumber,
       offset,
-      include: [{ model: GRNItem }],
+      include: [
+        { model: GRNItem },
+        {
+        model: PurchaseOrder,
+        as: 'purchase_order',
+        attributes: ['id', 'purchase_generate_id'], // fetch only what's needed
+        required: false
+        }
+      ],
       order: [['updated_at', 'DESC']] 
     });
-    console.log("grns",grns);
     
 
     const totalCount = await GRN.count({ where: whereCondition });

@@ -107,7 +107,7 @@ const GRN = sequelize.define("GRN", {
 });
 
 PurchaseOrder.hasMany(GRN, { foreignKey: "po_id" });
-GRN.belongsTo(PurchaseOrder, { foreignKey: "po_id" });
+GRN.belongsTo(PurchaseOrder, { foreignKey: "po_id", as: 'purchase_order'});
 
 GRN.belongsTo(Company, { foreignKey: "company_id" });
 

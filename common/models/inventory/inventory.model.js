@@ -104,6 +104,10 @@ const Inventory = sequelize.define("Inventory", {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0,
   },
+  total_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+  },
   batch_no: {
     type: DataTypes.STRING(50),
   },

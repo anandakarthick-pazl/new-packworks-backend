@@ -52,6 +52,9 @@ import ProductionGroup from "./Production/productionGroup.model.js";
 import Notification from "./notification.model.js";
 import PurchaseOrderTemplate from "./purchaseOrderTemplate.model.js";
 import AllocationHistory from "./Production/allocationHistory.model.js";
+import DemoRequest from "./demoRequest.model.js";
+import PasswordReset from "./passwordReset.model.js";
+import ContactMessage from "./contactMessage.model.js";
 
 const db = {
   sequelize,
@@ -107,7 +110,10 @@ const db = {
   ProductionGroup,
   Notification,
   PurchaseOrderTemplate,
-  AllocationHistory
+  AllocationHistory,
+  DemoRequest,
+  PasswordReset,
+  ContactMessage
 
 };
 
