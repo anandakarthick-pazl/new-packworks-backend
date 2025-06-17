@@ -79,7 +79,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
                     companyData.logo,
                     companyAccountDetails[0].accountName, // Assuming at least one account
                     companyAccountDetails[0].accountEmail,
-                    await bcrypt.hash('123456', 10), // defaultPassword
+                    await bcrypt.hash(companyData.password, 10), // defaultPassword
                     packageId // package_id
                 ],
                 type: sequelize.QueryTypes.RAW,
