@@ -23,7 +23,11 @@ const transporter = nodemailer.createTransport({
 export const sendEmail = async (to, subject, htmlBody) => {
     try {
         const mailOptions = {
-            from: process.env.FROM_EMAIL, // Sender email
+             from: {
+                    name: process.env.FROM_NAME || 'PackWorkX',
+                    address: process.env.FROM_EMAIL || process.env.SMTP_USER
+                },
+            // from: process.env.FROM_EMAIL, // Sender email
             to, // Recipient
             subject, // Email subject
             html: htmlBody // Email content in HTML format

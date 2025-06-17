@@ -90,7 +90,7 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
       attributes: [
         'id',
         'quantity_available',
-        
+        'quantity_blocked',
       ],
       where: whereCondition,
       include: [
