@@ -1014,7 +1014,7 @@ v1Router.get("/packages", async (req, res) => {
       include: [
         {
           model: Currency,
-          as: "currency", // 👈 Add this
+          as: "currency",
           attributes: ["currency_symbol"],
           required: false
         }
@@ -1022,10 +1022,18 @@ v1Router.get("/packages", async (req, res) => {
       order: [["created_at", "DESC"]]
     });
 
+    // ✅ Parse `module_in_package` string to array
+    const parsedPackages = packages.map(pkg => {
+      return {
+        ...pkg.toJSON(),
+        module_in_package: JSON.parse(pkg.module_in_package)
+      };
+    });
+
     return res.status(200).json({
       status: true,
       message: "Packages fetched successfully",
-      data: packages
+      data: parsedPackages
     });
   } catch (error) {
     logger.error("Error fetching packages:", error);
@@ -1212,8 +1220,12 @@ v1Router.post("/forgot-password", async (req, res) => {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${email}`;
       const forgotPasswordTemplate = ForgotPasswordTemplate({
         userName: user.name,
+        email,
         resetUrl,
-        expiryTime: "1 hour"
+        expiryTime: "1 hour",
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        requestTime: new Date().toISOString()
+
       });
 
       await sendEmail(
