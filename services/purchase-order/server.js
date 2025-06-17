@@ -94,6 +94,7 @@ v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
       where: {
         company_id: req.user.company_id,
         decision:"approve",
+        status:"active",
         id: {
           [Op.notIn]: poIdList
         }
@@ -1447,6 +1448,36 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
     res.status(200).json({
       success: true,
       data: purchaseOrders
+    });
+  } catch (error) {
+    console.error("Error fetching purchase order IDs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase order IDs"
+    });
+  }
+});
+
+
+
+//po_id based grn_id
+v1Router.get("/purchase-order/grn/:id", async (req, res) => {
+  try {
+
+      const poId = req.params.id;
+
+    const grnData = await GRN.findAll({
+      attributes: ["id", "grn_generate_id"],
+       where: {
+          po_id:poId,
+          status: "active",
+        },
+      order: [["id", "DESC"]]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: grnData
     });
   } catch (error) {
     console.error("Error fetching purchase order IDs:", error);
