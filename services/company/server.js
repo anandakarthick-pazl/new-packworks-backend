@@ -79,7 +79,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
                     companyData.logo,
                     companyAccountDetails[0].accountName, // Assuming at least one account
                     companyAccountDetails[0].accountEmail,
-                    await bcrypt.hash(companyData.password, 10), // defaultPassword
+                    await bcrypt.hash(companyData.password || '123456', 10), // defaultPassword
                     packageId // package_id
                 ],
                 type: sequelize.QueryTypes.RAW,
@@ -111,7 +111,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
                 name: companyAccountDetails[0].accountName,
                 email: companyAccountDetails[0].accountEmail,
                 username: companyAccountDetails[0].accountEmail, // Username is the email
-                password: "123456" // Default password
+                password: companyData.password || "123456" // Default password
             }
         ).then(() => {
             logger.info(`📧 Registration emails sent successfully for company: ${companyData.name}`);
