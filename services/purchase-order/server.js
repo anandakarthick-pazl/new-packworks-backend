@@ -10,7 +10,7 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import HtmlTemplate  from "../../common/models/purchaseOrderTemplate.model.js";
+import HtmlTemplate  from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
 
@@ -1399,19 +1399,19 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
 // ACtivate template
 v1Router.get("/purchase-order/activate/:id", async (req, res) => {
-  const templateId = req.params.id;
+  const templateId = parseInt(req.params.id);
 
   try {
     // 1. Set the selected template to active
     await HtmlTemplate.update(
       { status: "active" },
-      { where: { id: templateId } }
+      { where: { id: templateId,template:"purchase_order" } }
     );
 
     // 2. Set all other templates to inactive
     await HtmlTemplate.update(
       { status: "inactive" },
-      { where: { id: { [Op.ne]: templateId } } }
+      { where: { id: { [Op.ne]: templateId },template:"purchase_order" } }
     );
 
     return res.status(200).json({

@@ -50,7 +50,7 @@ import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
 import ProductionGroup from "./Production/productionGroup.model.js";
 import Notification from "./notification.model.js";
-import PurchaseOrderTemplate from "./purchaseOrderTemplate.model.js";
+import HtmlTemplate from "./htmlTemplate.model.js";
 import AllocationHistory from "./Production/allocationHistory.model.js";
 import DemoRequest from "./demoRequest.model.js";
 import PasswordReset from "./passwordReset.model.js";
@@ -109,7 +109,7 @@ const db = {
   Sub_categories,
   ProductionGroup,
   Notification,
-  PurchaseOrderTemplate,
+  HtmlTemplate,
   AllocationHistory,
   DemoRequest,
   PasswordReset,
