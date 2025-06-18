@@ -54,9 +54,6 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
     if (!validatePo) {
       throw new Error("Invalid or inactive Purchase Order.");
     }
-
-
-
     let newGRN = null;
 
     for (const item of items) {
@@ -66,24 +63,21 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
       } = item;
 
-      let grnStatus = null;
-    console.log();
-    
-     if (accepted_quantity === quantity_ordered) {
-        grnStatus = "fully_received";
-      } else if (accepted_quantity < quantity_ordered) {
-        grnStatus = "partially_received";
-      } else {
+      // Quantity validation
+      if (accepted_quantity > quantity_ordered) {
         throw new Error("Accepted quantity cannot exceed ordered quantity");
       }
-
       if (rejected_quantity > quantity_ordered) {
         throw new Error("Rejected quantity cannot exceed ordered quantity");
       }
 
-      // Add grn_status to grnData object
-      grnData.grn_status = grnStatus;
+      const grnStatus = (accepted_quantity === quantity_ordered)
+        ? "fully_received"
+        : "partially_received";
+
+
       if (!newGRN) {
+        grnData.grn_status = grnStatus;
         newGRN = await GRN.create(grnData, { transaction });
       }
 
@@ -130,6 +124,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         created_by: req.user.id,
         updated_by: req.user.id,
         company_id: req.user.company_id,
+        grn_item_status: grnStatus,
       }, { transaction });
 
       const acceptedQty = parseFloat(accepted_quantity) || 0;
@@ -429,6 +424,11 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
       await PurchaseOrder.update(
         { po_status: allReceived ? "received" : "partialy-recieved" },
         { where: { id: poId }, transaction }
+      );
+
+      await GRNItem.update(
+        { grn_item_status: allReceived ? "received" : "partialy-recieved" },
+        { where: { grn_id: grnId }, transaction }
       );
 
       console.log("allReceived", allReceived);

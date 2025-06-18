@@ -4,7 +4,7 @@ import Company from "./company.model.js";
 import User from "./user.model.js";
 
 
-const PurchaseOrderTemplate = sequelize.define('PurchaseOrderTemplate', {
+const HtmlTemplate = sequelize.define('HtmlTemplate', {
     id: {
     type: DataTypes.INTEGER.UNSIGNED,
     autoIncrement: true,
@@ -19,14 +19,14 @@ const PurchaseOrderTemplate = sequelize.define('PurchaseOrderTemplate', {
     },
     onUpdate: "CASCADE",
     },
-    po_template_id:{
-        type: DataTypes.INTEGER,
-        allowNull:true
+    template:{
+        type: DataTypes.STRING(191),
+        allowNull: true
     },
     html_template: {
-    type: DataTypes.TEXT('long'), // For large HTML content
-    allowNull: false
-  },
+        type: DataTypes.TEXT('long'), // For large HTML content
+        allowNull: false
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
@@ -41,12 +41,12 @@ const PurchaseOrderTemplate = sequelize.define('PurchaseOrderTemplate', {
     defaultValue: DataTypes.NOW,
     }
     }, {
-      tableName: 'purchaseordertemplate',
+      tableName: 'html_templates',
       timestamps: false, 
     });
   
-    PurchaseOrderTemplate.belongsTo(Company, { foreignKey: "company_id" });
+    HtmlTemplate.belongsTo(Company, { foreignKey: "company_id" });
 
-    export default PurchaseOrderTemplate;
+    export default HtmlTemplate;
 
   
