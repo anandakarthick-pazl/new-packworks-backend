@@ -3,7 +3,7 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.sequelize.query(`
-      RENAME TABLE purchaseordertemplates TO pdf_templates;
+      RENAME TABLE purchaseordertemplate TO pdf_templates;
     `);
 
     await queryInterface.sequelize.query(`
