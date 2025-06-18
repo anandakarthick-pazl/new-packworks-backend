@@ -35,12 +35,25 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       "work_invoice"
     );
 
+    let skuDetails = null;
+
+    try {
+      if (typeof invoiceDetails.sku_details === 'string') {
+        skuDetails = JSON.parse(invoiceDetails.sku_details);
+      } else if (typeof invoiceDetails.sku_details === 'object') {
+        skuDetails = invoiceDetails.sku_details;
+      }
+    } catch (err) {
+      console.error("Invalid JSON in sku_details:", err);
+      skuDetails = null;
+    }
+
     // Create Work Order Invoice
     const newInvoice = await WorkOrderInvoice.create({
       invoice_number: invoice_number,
       company_id: req.user.company_id,
       client_id: invoiceDetails.client_id,
-      sku_id: invoiceDetails.sku_id || null,
+      // sku_id: invoiceDetails.sku_id || null,
       sku_version_id: invoiceDetails.sku_version_id || null,
       status: invoiceDetails.status || "active",
       sale_id: invoiceDetails.sale_id || null,
@@ -57,6 +70,11 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       payment_status: invoiceDetails.payment_status || null,
       created_by: req.user.id,
       updated_by: req.user.id,
+      quantity: invoiceDetails.quantity || null,
+      sku_details: skuDetails || null,
+      client_name: invoiceDetails.client_name || null
+
+
     });
 
     res.status(201).json({
@@ -160,7 +178,20 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
     const totalPages = Math.ceil(count / limitNum);
 
     res.json({
-      invoices: rows.map((invoice) => invoice.get({ plain: true })),
+      // invoices: rows.map((invoice) => invoice.get({ plain: true })),
+
+      invoices: rows.map((invoice) => {
+          const plain = invoice.get({ plain: true });
+          if (plain.sku_details && typeof plain.sku_details === "string") {
+            try {
+              plain.sku_details = JSON.parse(plain.sku_details);
+            } catch (err) {
+              plain.sku_details = null; // fallback if JSON invalid
+            }
+          }
+          return plain;
+        }),
+
       pagination: {
         total: count,
         page: pageNum,
@@ -212,6 +243,14 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
 
     const result = invoice.get({ plain: true });
 
+    if (typeof result.sku_details === "string") {
+      try {
+        result.sku_details = JSON.parse(result.sku_details);
+      } catch (e) {
+        result.sku_details = null; // fallback if parsing fails
+      }
+    }
+
     res.json(result);
   } catch (error) {
     logger.error("Error fetching work order invoice:", error);
@@ -223,53 +262,53 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
 
 
 // GET work order invoices by SKU ID
-v1Router.get("/get-by-sku/:sku_id", authenticateJWT, async (req, res) => {
-  try {
-    const { sku_id } = req.params;
-    const { status = "active" } = req.query;
+// v1Router.get("/get-by-sku/:sku_id", authenticateJWT, async (req, res) => {
+//   try {
+//     const { sku_id } = req.params;
+//     const { status = "active" } = req.query;
 
-    // Build where clause for filtering
-    const whereClause = {
-      company_id: req.user.company_id,
-      sku_id: sku_id, // Filter by SKU ID
-    };
+//     // Build where clause for filtering
+//     const whereClause = {
+//       company_id: req.user.company_id,
+//       sku_id: sku_id, // Filter by SKU ID
+//     };
 
-    // Status filtering - default to active, but allow override
-    if (status !== "all") {
-      whereClause.status = status;
-    }
+//     // Status filtering - default to active, but allow override
+//     if (status !== "all") {
+//       whereClause.status = status;
+//     }
 
-    // Fetch from database
-    const invoices = await WorkOrderInvoice.findAll({
-      where: whereClause,
-      order: [["updated_at", "DESC"]],
-      include: [
-        {
-          model: WorkOrder,
-          as: "workOrder",
-          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-        },
-        {
-          model: SalesOrder,
-          as: "salesOrder",
-          attributes: ["id", "sales_generate_id", "status"],
-        },
-      ],
-    });
+//     // Fetch from database
+//     const invoices = await WorkOrderInvoice.findAll({
+//       where: whereClause,
+//       order: [["updated_at", "DESC"]],
+//       include: [
+//         {
+//           model: WorkOrder,
+//           as: "workOrder",
+//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+//         },
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_generate_id", "status"],
+//         },
+//       ],
+//     });
 
-    res.json({
-      message: `Work order invoices for SKU ID: ${sku_id}`,
-      sku_id: sku_id,
-      invoices: invoices.map((invoice) => invoice.get({ plain: true })),
-      total: invoices.length,
-    });
-  } catch (error) {
-    logger.error("Error fetching work order invoices by SKU ID:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-});
+//     res.json({
+//       message: `Work order invoices for SKU ID: ${sku_id}`,
+//       sku_id: sku_id,
+//       invoices: invoices.map((invoice) => invoice.get({ plain: true })),
+//       total: invoices.length,
+//     });
+//   } catch (error) {
+//     logger.error("Error fetching work order invoices by SKU ID:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {

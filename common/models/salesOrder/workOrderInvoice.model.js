@@ -36,14 +36,14 @@ const WorkOrderInvoice = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-    sku_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
-      references: {
-        model: Sku,
-        key: "id",
-      },
-    },
+    // sku_id: {
+    //   type: DataTypes.INTEGER.UNSIGNED,
+    //   allowNull: true,
+    //   references: {
+    //     model: Sku,
+    //     key: "id",
+    //   },
+    // },
      sku_version_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
@@ -152,6 +152,18 @@ const WorkOrderInvoice = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true,
     },
+    quantity: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    sku_details: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
+    client_name: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    }
   },
   {
     tableName: "work_order_invoice",
@@ -166,8 +178,8 @@ WorkOrderInvoice.belongsTo(Company, { foreignKey: "company_id" });
 Client.hasMany(WorkOrderInvoice, { foreignKey: "client_id" });
 WorkOrderInvoice.belongsTo(Client, { foreignKey: "client_id" });
 
-Sku.hasMany(WorkOrderInvoice, { foreignKey: "sku_id" });
-WorkOrderInvoice.belongsTo(Sku, { foreignKey: "sku_id" });
+// Sku.hasMany(WorkOrderInvoice, { foreignKey: "sku_id" });
+// WorkOrderInvoice.belongsTo(Sku, { foreignKey: "sku_id" });
 
 SkuVersion.hasMany(WorkOrderInvoice, { foreignKey: "sku_version_id" });
 WorkOrderInvoice.belongsTo(SkuVersion, { foreignKey: "sku_version_id" }); 

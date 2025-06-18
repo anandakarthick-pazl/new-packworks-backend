@@ -55,7 +55,9 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       throw new Error("Invalid or inactive Purchase Order.");
     }
 
-    const newGRN = await GRN.create(grnData, { transaction });
+
+
+    let newGRN = null;
 
     for (const item of items) {
       const {
@@ -63,6 +65,29 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         quantity_ordered, quantity_received, accepted_quantity,
         rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
       } = item;
+
+      let grnStatus = null;
+    console.log();
+    
+     if (accepted_quantity === quantity_ordered) {
+        grnStatus = "fully_received";
+      } else if (accepted_quantity < quantity_ordered) {
+        grnStatus = "partially_received";
+      } else {
+        throw new Error("Accepted quantity cannot exceed ordered quantity");
+      }
+
+      if (rejected_quantity > quantity_ordered) {
+        throw new Error("Rejected quantity cannot exceed ordered quantity");
+      }
+
+      // Add grn_status to grnData object
+      grnData.grn_status = grnStatus;
+      if (!newGRN) {
+        newGRN = await GRN.create(grnData, { transaction });
+      }
+
+      // const newGRN = await GRN.create(grnData, { transaction });
 
       const poItem = await PurchaseOrderItem.findOne({
         where: { id: po_item_id },
@@ -104,7 +129,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         total_amount,
         created_by: req.user.id,
         updated_by: req.user.id,
-        company_id: req.user.company_id
+        company_id: req.user.company_id,
       }, { transaction });
 
       const acceptedQty = parseFloat(accepted_quantity) || 0;
