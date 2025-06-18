@@ -43,7 +43,7 @@ import WorkOrderInvoice from "./salesOrder/workOrderInvoice.model.js";
 import MachineRouteProcess from "./route/machineRouteProcess.model.js";
 import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
 import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
-import DebitNote from "./debit/debit_note.model.js";
+import DebitNote from "./debit/debitNote.model.js";
 import WorkOrderStatus from "./commonModel/workOrderStatus.js";
 import CreditNote from "./credit/creditNote.model.js"; 
 import Categories from "./category/category.model.js";
