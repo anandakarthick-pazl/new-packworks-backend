@@ -1,127 +1,160 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
-import User from "../user.model.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
-import WorkOrderInvoice from "../salesOrder/workOrderInvoice.model.js";
-
-const DebitNote = sequelize.define(
-  "DebitNote",
-  {
-    id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    company_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      references: {
-        model: Company,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
-    },
-    client_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      references: {
-        model: Client,
-        key: "client_id",
-      },
-      onUpdate: "CASCADE",
-    },
-    client_name: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    work_order_invoice_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      references: {
-        model: WorkOrderInvoice,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
-    },
-    work_order_invoice_number: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    debit_generate_id: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    debit_reference_id: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    subject: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
-    invoice_total_amount: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    debit_total_amount: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    reason: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      defaultValue: "active",
-    },
-    created_by: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
-      references: {
-        model: User,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
-    },
-    updated_by: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
-      references: {
-        model: User,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
-    },
-    created_at: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
-    updated_at: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
+import User from "../user.model.js";
+import PurchaseOrderReturn from "../purchase_order_return/purchase_order_return.model.js"; 
+import PurchaseOrderReturnItem from "../purchase_order_return/purchase_order_return_item.model.js";
+import PurchaseOrder from "../po/purchase_order.model.js";
+import InvoiceSetting from "../invoiceSetting.model.js";
+const DebitNote = sequelize.define('DebitNote', {
+  id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    autoIncrement: true,
+    primaryKey: true
   },
-  {
-    tableName: "debit_notes",
-    timestamps: false,
+
+  debit_note_number: {
+    type: DataTypes.STRING(200),
+    allowNull: false,
+    unique: true
+  },
+  debit_note_generate_id:{
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
+  po_return_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: false,
+    references: {
+      model: PurchaseOrderReturn,
+      key: 'id'
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE'
+  },
+
+  company_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: false,
+    references: {
+      model: Company,
+      key: 'id'
+    },
+    onUpdate: 'CASCADE'
+  },
+
+ 
+
+  reference_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+
+
+ 
+  // rate: {
+  //   type: DataTypes.DECIMAL(10, 2),
+  //   allowNull: true
+  // },
+
+ 
+  amount: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true
+  },
+
+  // sub_total: {
+  //   type: DataTypes.DECIMAL(15, 2),
+  //   allowNull: true
+  // },
+
+  // adjustment: {
+  //   type: DataTypes.DECIMAL(15, 2),
+  //   allowNull: true
+  // },
+   supplier_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+      },
+
+  tax_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true
+  },
+
+  total_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true
+  },
+
+  reason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+
+  remark: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+
+  debit_note_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
+
+   status: {
+        type: DataTypes.ENUM("active", "inactive"),
+        allowNull: false,
+        defaultValue: "active",
+      },
+
+  created_by: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: true,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+
+  updated_by: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: true,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+
+  updated_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
+  },
+
+  deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
   }
-);
+}, {
+  tableName: 'debit_notes',
+  timestamps: false
+});
+DebitNote.belongsTo(Company, { foreignKey: 'company_id' });
+DebitNote.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+DebitNote.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+DebitNote.belongsTo(PurchaseOrderReturn, { foreignKey: 'po_return_id' });
 
-// Associations
-Company.hasMany(DebitNote, { foreignKey: "company_id", as: "debitNotes" });
-DebitNote.belongsTo(Company, { foreignKey: "company_id", as: "company" });
 
-Client.hasMany(DebitNote, { foreignKey: "client_id", as: "debitNotes" });
-DebitNote.belongsTo(Client, { foreignKey: "client_id", as: "client" });
 
-WorkOrderInvoice.hasMany(DebitNote, { foreignKey: "work_order_invoice_id", as: "debitNotes" });
-DebitNote.belongsTo(WorkOrderInvoice, { foreignKey: "work_order_invoice_id", as: "workOrderInvoice" });
 
-User.hasMany(DebitNote, { foreignKey: "created_by", as: "createdDebitNotes" });
-User.hasMany(DebitNote, { foreignKey: "updated_by", as: "updatedDebitNotes" });
-DebitNote.belongsTo(User, { foreignKey: "created_by", as: "creator" });
-DebitNote.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
 
 export default DebitNote;
