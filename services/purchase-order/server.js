@@ -78,10 +78,14 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get all po
-v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
+v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
   try {
     const usedPoIds = await GRN.findAll({
       attributes: ['po_id'],
+      where: {
+        grn_status:"fully_received",
+        status:"active"
+      },
       raw: true,
     });
 
@@ -167,7 +171,7 @@ v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
               {
                 model: ItemMaster,
                 as: "item_info", // Alias from GRNItem → ItemMaster association
-                attributes: ["id", "item_generate_id"]
+                attributes: ["id", "item_generate_id","item_name"]
               }
             ] 
         }],
