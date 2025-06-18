@@ -78,37 +78,86 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get all po
+// v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
+//   try {
+//     const usedPoIds = await GRN.findAll({
+//       attributes: ['po_id'],
+//       where: {
+//         grn_status:"fully_received",
+//         status:"active"
+//       },
+//       raw: true,
+//     });
+
+//     const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+
+
+
+//     const orders = await PurchaseOrder.findAll({
+//       attributes: ["id", "purchase_generate_id"],
+//       where: {
+//         company_id: req.user.company_id,
+//         decision:"approve",
+//         status:"active",
+//         id: {
+//           [Op.notIn]: poIdList
+//         }
+//       }
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: orders,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch purchase orders",
+//     });
+//   }
+// });
+
 v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
   try {
+    const { search } = req.query; // Get search term from query string
+
+    // Step 1: Find fully received PO IDs to exclude
     const usedPoIds = await GRN.findAll({
       attributes: ['po_id'],
       where: {
-        grn_status:"fully_received",
-        status:"active"
+        grn_status: "fully_received",
+        status: "active"
       },
       raw: true,
     });
 
-    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean);
 
+    // Step 2: Build where clause dynamically
+    const whereClause = {
+      company_id: req.user.company_id,
+      decision: "approve",
+      status: "active",
+      id: { [Op.notIn]: poIdList },
+    };
 
+    if (search) {
+      // Add case-insensitive LIKE search on `purchase_generate_id`
+      whereClause.purchase_generate_id = { [Op.like]: `%${search}%` };
+    }
 
+    // Step 3: Query Purchase Orders
     const orders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
-      where: {
-        company_id: req.user.company_id,
-        decision:"approve",
-        status:"active",
-        id: {
-          [Op.notIn]: poIdList
-        }
-      }
+      where: whereClause,
     });
 
     return res.status(200).json({
       success: true,
       data: orders,
     });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -117,6 +166,7 @@ v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 
 
