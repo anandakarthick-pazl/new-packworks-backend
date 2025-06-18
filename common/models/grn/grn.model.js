@@ -80,6 +80,10 @@ const GRN = sequelize.define("GRN", {
     allowNull: false,
     defaultValue: "active",
   },
+  grn_status: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
