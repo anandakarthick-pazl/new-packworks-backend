@@ -7,6 +7,9 @@ import logger from "../../common/helper/logger.js";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import puppeteer from "puppeteer";
+import handlebars from "handlebars";
+import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
 
 dotenv.config();
 
@@ -309,6 +312,546 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
 //       .json({ message: "Internal Server Error", error: error.message });
 //   }
 // });
+
+
+
+
+
+
+
+
+// v1Router.get("/download/:id", async (req, res) => {
+//   let browser;
+//   try {
+//     const invoiceId = req.params.id;
+
+//     // Fetch invoice data
+//     const workOrderInvoice = await WorkOrderInvoice.findOne({
+//       where: { id: invoiceId, status: "active" },
+//       include: [
+//         {
+//           model: WorkOrder,
+//           as: "workOrder",
+//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+//         },
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_generate_id", "status"],
+//         },
+//       ],
+//     });
+
+//     if (!workOrderInvoice) {
+//       return res.status(404).json({ success: false, message: "Work Order Invoice not found" });
+//     }
+
+//     // Try to fetch HTML template, fallback to default if not found
+//     let htmlTemplate = await HtmlTemplate.findOne({
+//       where: {
+//         company_id: workOrderInvoice.company_id,
+//         template: "work_order_invoice",
+//         status: "active"
+//       }
+//     });
+
+//     if (!htmlTemplate) {
+//       htmlTemplate = await HtmlTemplate.findOne({
+//         where: { template: "work_order_invoice", status: "active" },
+//         order: [['id', 'ASC']]
+//       });
+//     }
+
+//     if (!htmlTemplate) {
+//       return generateOriginalInvoicePDF(req, res, workOrderInvoice);
+//     }
+
+//     // Prepare data for template
+//     let skuDetails = workOrderInvoice.sku_details;
+//     if (typeof skuDetails === "string") {
+//       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+//     }
+
+//     const templateData = {
+//       workOrderInvoice: {
+//         id: workOrderInvoice.id,
+//         invoice_number: workOrderInvoice.invoice_number,
+//         due_date: workOrderInvoice.due_date,
+//         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
+//         client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
+//         status: workOrderInvoice.status,
+//         total: workOrderInvoice.total || 0,
+//         total_tax: workOrderInvoice.total_tax || 0,
+//         total_amount: workOrderInvoice.total_amount || 0,
+//         payment_status: workOrderInvoice.payment_status || '',
+//         description: workOrderInvoice.description || '',
+//         quantity: workOrderInvoice.quantity || 0,
+//         discount: workOrderInvoice.discount || 0,
+//         discount_type: workOrderInvoice.discount_type || '',
+//         payment_expected_date: workOrderInvoice.payment_expected_date || '',
+//         transaction_type: workOrderInvoice.transaction_type || '',
+//         balance: workOrderInvoice.balance || 0,
+//       },
+//       workOrder: workOrderInvoice.workOrder || null,
+//       salesOrder: workOrderInvoice.salesOrder || null,
+//       sku_details: skuDetails || [],
+//       current_date: new Date().toLocaleDateString('en-IN')
+//     };
+
+//     // Compile Handlebars template
+//     const template = handlebars.compile(htmlTemplate.html_template);
+//     const html = template(templateData);
+
+//     // Generate PDF using Puppeteer
+//     browser = await puppeteer.launch({
+//       headless: true,
+//       args: [
+//         '--no-sandbox',
+//         '--disable-setuid-sandbox',
+//         '--disable-dev-shm-usage',
+//         '--disable-accelerated-2d-canvas',
+//         '--no-first-run',
+//         '--no-zygote',
+//         '--disable-gpu'
+//       ]
+//     });
+
+//     const page = await browser.newPage();
+//     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+
+//     const pdf = await page.pdf({
+//       format: 'A4',
+//       printBackground: true,
+//       preferCSSPageSize: true,
+//       margin: {
+//         top: '10mm',
+//         right: '10mm',
+//         bottom: '10mm',
+//         left: '10mm'
+//       }
+//     });
+
+//     await browser.close();
+
+//     // Send PDF response
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+//     res.setHeader('Content-Length', pdf.length);
+//     return res.end(pdf);
+
+//   } catch (error) {
+//     if (browser) {
+//       try { await browser.close(); } catch {}
+//     }
+//     return res.status(500).json({
+//       success: false,
+//       message: `Failed to generate PDF: ${error.message}`,
+//       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+//     });
+//   }
+// });
+
+
+v1Router.get("/download/:id", async (req, res) => {
+  let browser;
+  try {
+    const invoiceId = req.params.id;
+
+    // Fetch invoice data
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: { id: invoiceId, status: "active" },
+      include: [
+        {
+          model: WorkOrder,
+          as: "workOrder",
+          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+        },
+        {
+          model: SalesOrder,
+          as: "salesOrder",
+          attributes: ["id", "sales_generate_id", "status"],
+        },
+      ],
+    });
+
+    if (!workOrderInvoice) {
+      return res.status(404).json({ success: false, message: "Work Order Invoice not found" });
+    }
+
+    // Try to fetch HTML template, fallback to default if not found
+    let htmlTemplate = await HtmlTemplate.findOne({
+      where: {
+        company_id: workOrderInvoice.company_id,
+        template: "work_order_invoice",
+        status: "active"
+      }
+    });
+
+    if (!htmlTemplate) {
+      htmlTemplate = await HtmlTemplate.findOne({
+        where: { template: "work_order_invoice", status: "active" },
+        order: [['id', 'ASC']]
+      });
+    }
+
+    if (!htmlTemplate) {
+      return generateOriginalInvoicePDF(req, res, workOrderInvoice);
+    }
+
+    // Prepare data for template
+    let skuDetails = workOrderInvoice.sku_details;
+    if (typeof skuDetails === "string") {
+      try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+    }
+
+    // Map skuDetails to template fields
+    const items = (skuDetails || []).map((item, idx) => ({
+      serial_number: idx + 1,
+      item_name: item.item_name || item.sku || item.name || "",
+      quantity: item.quantity || item.quantity_required || item.qty || "",
+      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+      tax_percentage: item.tax_percentage || item.gst || "",
+      total_amount: item.total_amount || item.total_incl_gst || "",
+    }));
+
+    const templateData = {
+      workOrderInvoice: {
+        id: workOrderInvoice.id,
+        invoice_number: workOrderInvoice.invoice_number,
+        due_date: workOrderInvoice.due_date,
+        due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
+        client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
+        status: workOrderInvoice.status,
+        total: workOrderInvoice.total || 0,
+        total_tax: workOrderInvoice.total_tax || 0,
+        total_amount: workOrderInvoice.total_amount || 0,
+        payment_status: workOrderInvoice.payment_status || '',
+        description: workOrderInvoice.description || '',
+        quantity: workOrderInvoice.quantity || 0,
+        discount: workOrderInvoice.discount || 0,
+        discount_type: workOrderInvoice.discount_type || '',
+        payment_expected_date: workOrderInvoice.payment_expected_date || '',
+        transaction_type: workOrderInvoice.transaction_type || '',
+        balance: workOrderInvoice.balance || 0,
+      },
+      workOrder: workOrderInvoice.workOrder || null,
+      salesOrder: workOrderInvoice.salesOrder || null,
+      sku_details: items, // <-- mapped for template
+      current_date: new Date().toLocaleDateString('en-IN')
+    };
+
+    // Compile Handlebars template
+    const template = handlebars.compile(htmlTemplate.html_template);
+    const html = template(templateData);
+
+    // Generate PDF using Puppeteer
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: {
+        top: '10mm',
+        right: '10mm',
+        bottom: '10mm',
+        left: '10mm'
+      }
+    });
+
+    await browser.close();
+
+    // Send PDF response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    res.setHeader('Content-Length', pdf.length);
+    return res.end(pdf);
+
+  } catch (error) {
+    if (browser) {
+      try { await browser.close(); } catch {}
+    }
+    return res.status(500).json({
+      success: false,
+      message: `Failed to generate PDF: ${error.message}`,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// --- Fallback PDF (simple) ---
+async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
+  try {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
+    doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
+    doc.text(`Client: ${workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || ''}`, 40);
+    doc.moveDown(1);
+    doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
+
+    doc.end();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Failed to generate fallback PDF: ${error.message}`
+    });
+  }
+}
+
+// --- Work Order Invoice HTML Preview ---
+v1Router.get("/view/:id", async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: { id: invoiceId, status: "active" },
+      include: [
+        {
+          model: WorkOrder,
+          as: "workOrder",
+          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+        },
+        {
+          model: SalesOrder,
+          as: "salesOrder",
+          attributes: ["id", "sales_generate_id", "status"],
+        },
+      ],
+    });
+
+    if (!workOrderInvoice) {
+      return res.status(404).send('<h1>Work Order Invoice not found</h1>');
+    }
+
+    let htmlTemplate = await HtmlTemplate.findOne({
+      where: {
+        company_id: workOrderInvoice.company_id,
+        template: "work_order_invoice",
+        status: "active"
+      }
+    });
+
+    if (!htmlTemplate) {
+      htmlTemplate = await HtmlTemplate.findOne({
+        where: { template: "work_order_invoice", status: "active" },
+        order: [['id', 'ASC']]
+      });
+    }
+
+    if (!htmlTemplate) {
+      return res.status(404).send('<h1>No HTML template found</h1>');
+    }
+
+    let skuDetails = workOrderInvoice.sku_details;
+    if (typeof skuDetails === "string") {
+      try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+    }
+
+    const templateData = {
+      workOrderInvoice: {
+        id: workOrderInvoice.id,
+        invoice_number: workOrderInvoice.invoice_number,
+        due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
+        client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
+        status: workOrderInvoice.status,
+        total: workOrderInvoice.total || 0,
+        total_tax: workOrderInvoice.total_tax || 0,
+        total_amount: workOrderInvoice.total_amount || 0,
+        payment_status: workOrderInvoice.payment_status || '',
+        description: workOrderInvoice.description || '',
+        quantity: workOrderInvoice.quantity || 0,
+        discount: workOrderInvoice.discount || 0,
+        discount_type: workOrderInvoice.discount_type || '',
+        payment_expected_date: workOrderInvoice.payment_expected_date || '',
+        transaction_type: workOrderInvoice.transaction_type || '',
+        balance: workOrderInvoice.balance || 0,
+      },
+      workOrder: workOrderInvoice.workOrder || null,
+      salesOrder: workOrderInvoice.salesOrder || null,
+      sku_details: skuDetails || [],
+      current_date: new Date().toLocaleDateString('en-IN')
+    };
+
+    const template = handlebars.compile(htmlTemplate.html_template);
+    const html = template(templateData);
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+
+  } catch (error) {
+    return res.status(500).send(`<h1>Error: ${error.message}</h1>`);
+  }
+});
+
+// --- Render all Work Order Invoice Templates ---
+v1Router.get("/templates/rendered", async (req, res) => {
+  try {
+    const templates = await HtmlTemplate.findAll({
+      where: { template: "work_order_invoice" },
+      order: [['id', 'ASC']]
+    });
+
+    if (!templates || templates.length === 0) {
+      return res.status(404).send("<h1>No HTML templates found</h1>");
+    }
+
+    // Dummy data to render inside template
+    const sampleData = {
+      workOrderInvoice: {
+        invoice_number: "WO-INV-2024-001",
+        due_date_formatted: "12/06/2025",
+        client_name: "Sample Client",
+        status: "active",
+        total: 1500,
+        total_tax: 250,
+        total_amount: 1650,
+        payment_status: "pending",
+        description: "Sample work order invoice",
+        quantity: 100,
+        discount: 0,
+        discount_type: "",
+        payment_expected_date: "",
+        transaction_type: "",
+        balance: 0,
+      },
+      workOrder: {
+        work_generate_id: "WO-2024-001",
+        sku_name: "60ml",
+        qty: 100,
+        status: "active"
+      },
+      salesOrder: {
+        sales_generate_id: "SO-2024-001",
+        status: "active"
+      },
+      sku_details: [
+        {
+          serial_number: 1,
+          sku: "60ml",
+          quantity_required: 100,
+          rate_per_sku: 2,
+          total_amount: 100,
+          gst: 12,
+          total_incl_gst: 112
+        }
+      ],
+      current_date: new Date().toLocaleDateString('en-IN')
+    };
+
+    // Render all templates
+    const renderedBlocks = templates.map((template, index) => {
+      let renderedHTML = '';
+      try {
+        const compiled = handlebars.compile(template.html_template);
+        renderedHTML = compiled(sampleData);
+      } catch (err) {
+        renderedHTML = `<div style="color:red;">Error rendering template ID ${template.id}: ${err.message}</div>`;
+      }
+
+      return `
+        <div class="template-block">
+          <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
+          ${renderedHTML}
+        </div>
+        ${index !== templates.length - 1 ? '<hr/>' : ''}
+      `;
+    }).join('');
+
+    // Final full HTML
+    const html = `
+      <html>
+        <head>
+          <title>Rendered Work Order Invoice Templates</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f5f7fa; padding: 20px; }
+            .template-block { margin: 40px auto; max-width: 900px; background: #fff; border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 24px; }
+            .template-info { margin-bottom: 10px; color: #1976d2; font-weight: bold; }
+            hr { border: none; border-top: 2px solid #1976d2; margin: 40px 0; }
+          </style>
+        </head>
+        <body>
+          <h2 style="text-align:center;">All Rendered Work Order Invoice Templates</h2>
+          ${renderedBlocks}
+        </body>
+      </html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+
+  } catch (error) {
+    res.status(500).send(`<h1>Error: ${error.message}</h1>`);
+  }
+});
+
+// --- Activate Work Order Invoice Template ---
+v1Router.get("/activate/:id", async (req, res) => {
+  const templateId = parseInt(req.params.id);
+
+  try {
+    // 1. Set the selected template to active
+    await HtmlTemplate.update(
+      { status: "active" },
+      { where: { id: templateId, template: "work_order_invoice" } }
+    );
+
+    // 2. Set all other templates to inactive
+    await HtmlTemplate.update(
+      { status: "inactive" },
+      { where: { id: { [Op.ne]: templateId }, template: "work_order_invoice" } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Template ID ${templateId} activated successfully.`,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while activating the template.",
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
