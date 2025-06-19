@@ -195,33 +195,6 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         }
       }),
       
-      // Purchase Return Count (within date range)
-      db.PurchaseReturn ? db.PurchaseReturn.count({
-        where: { 
-          company_id,
-          status: 'active',
-          created_at: { [Op.between]: [startDate, endDate] }
-        }
-      }) : Promise.resolve(0),
-      
-      // Credit Note Count (within date range)
-      db.CreditNote ? db.CreditNote.count({
-        where: { 
-          company_id,
-          status: 'active',
-          created_at: { [Op.between]: [startDate, endDate] }
-        }
-      }) : Promise.resolve(0),
-      
-      // Debit Note Count (within date range)
-      db.DebitNote ? db.DebitNote.count({
-        where: { 
-          company_id,
-          status: 'active',
-          created_at: { [Op.between]: [startDate, endDate] }
-        }
-      }) : Promise.resolve(0),
-      
       // Sales Trend Data (within specified date range)
       sequelize.query(`
         SELECT 
@@ -264,7 +237,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
          FROM sales_order 
          WHERE company_id = :company_id AND status = 'active' 
          AND created_at BETWEEN :startDate AND :endDate
-         ORDER BY created_at DESC LIMIT 2)
+         ORDER BY created_at DESC LIMIT 3)
         UNION ALL
         (SELECT 
           'Work Order' COLLATE utf8mb4_unicode_ci as type, 
@@ -294,20 +267,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
          WHERE company_id = :company_id AND status = 'active' 
          AND created_at BETWEEN :startDate AND :endDate
          ORDER BY created_at DESC LIMIT 1)
-        UNION ALL
-        (SELECT 
-          'GRN' COLLATE utf8mb4_unicode_ci as type, 
-          grn_generate_id COLLATE utf8mb4_unicode_ci as reference, 
-          supplier_name COLLATE utf8mb4_unicode_ci as client_name,
-          CAST(total_amount AS CHAR) COLLATE utf8mb4_unicode_ci as amount, 
-          grn_status COLLATE utf8mb4_unicode_ci as status, 
-          created_at as date, 
-          'Low' COLLATE utf8mb4_unicode_ci as priority
-         FROM grn 
-         WHERE company_id = :company_id AND status = 'active' 
-         AND created_at BETWEEN :startDate AND :endDate
-         ORDER BY created_at DESC LIMIT 1)
-        ORDER BY date DESC LIMIT 8
+        ORDER BY date DESC LIMIT 6
       `, {
         replacements: { company_id, startDate, endDate },
         type: sequelize.QueryTypes.SELECT
@@ -346,9 +306,6 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
       purchaseOrdersCount = 0,
       grnCount = 0,
       stockAdjustmentsCount = 0,
-      purchaseReturnCount = 0,
-      creditNoteCount = 0,
-      debitNoteCount = 0,
       salesTrendData = [],
       machineEfficiencyData = [],
       recentTransactions = [],
@@ -360,7 +317,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         // Log the error for debugging
         logger.error(`Query ${index} failed:`, result.reason);
         // Return default values based on query index
-        const defaults = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], [{ total_work_orders: 0, completed_orders: 0, avg_progress: 85 }]];
+        const defaults = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, [], [], [], [{ total_work_orders: 0, completed_orders: 0, avg_progress: 85 }]];
         return defaults[index];
       }
     });
@@ -398,35 +355,34 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         finance: "#34495e",
         hr: "#1abc9c"
       },
-      // alerts: [
-      //   {
-      //     id: 1,
-      //     type: "info",
-      //     message: from_date && to_date ? 
-      //       `Dashboard showing data for custom date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}` :
-      //       `Dashboard showing data for default range: ${startDate.toISOString().split('T')[0]} (month start) to ${endDate.toISOString().split('T')[0]} (today)`,
-      //     time: "now",
-      //     icon: "cilCalendar",
-      //     module: "System"
-      //   },
-      //   {
-      //     id: 2,
-      //     type: "warning",
-      //     message: `${workOrdersCount} work orders are currently in progress`,
-      //     time: "30 minutes ago",
-      //     icon: "cilWarning",
-      //     module: "Production"
-      //   },
-      //   {
-      //     id: 3,
-      //     type: activeMachinesCount < machinesCount ? "warning" : "success",
-      //     message: `${activeMachinesCount}/${machinesCount} machines are currently active`,
-      //     time: "1 hour ago",
-      //     icon: "cilCalculator",
-      //     module: "Maintenance"
-      //   }
-      // ],
-      alert:[],
+      alerts: [
+        {
+          id: 1,
+          type: "info",
+          message: from_date && to_date ? 
+            `Dashboard showing data for custom date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}` :
+            `Dashboard showing data for default range: ${startDate.toISOString().split('T')[0]} (month start) to ${endDate.toISOString().split('T')[0]} (today)`,
+          time: "now",
+          icon: "cilCalendar",
+          module: "System"
+        },
+        {
+          id: 2,
+          type: "warning",
+          message: `${workOrdersCount} work orders are currently in progress`,
+          time: "30 minutes ago",
+          icon: "cilWarning",
+          module: "Production"
+        },
+        {
+          id: 3,
+          type: activeMachinesCount < machinesCount ? "warning" : "success",
+          message: `${activeMachinesCount}/${machinesCount} machines are currently active`,
+          time: "1 hour ago",
+          icon: "cilCalculator",
+          module: "Maintenance"
+        }
+      ],
       erpWidgets: [
         {
           title: "Sales Orders",
@@ -533,7 +489,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           description: "Goods received",
           color: "#3498db",
           icon: "cilHome",
-          amount: `₹${(grnCount * 2500).toLocaleString()}`
+          amount: `${(grnCount * 2500).toLocaleString()}`
         },
         {
           title: "Stock Adjustments",
@@ -542,34 +498,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           description: "Inventory corrections",
           color: "#e67e22",
           icon: "cilSettings",
-          amount: `₹${(stockAdjustmentsCount * 500).toLocaleString()}`
-        },
-        {
-          title: "Purchase Returns",
-          value: purchaseReturnCount.toString(),
-          change: calculateGrowth(purchaseReturnCount),
-          description: "Returns to suppliers",
-          color: "#e74c3c",
-          icon: "cilArrowBottom",
-          amount: `₹${(purchaseReturnCount * 1200).toLocaleString()}`
-        },
-        {
-          title: "Credit Notes",
-          value: creditNoteCount.toString(),
-          change: calculateGrowth(creditNoteCount),
-          description: "Issued credits",
-          color: "#34495e",
-          icon: "cilCreditCard",
-          amount: `₹${(creditNoteCount * 800).toLocaleString()}`
-        },
-        {
-          title: "Debit Notes",
-          value: debitNoteCount.toString(),
-          change: calculateGrowth(debitNoteCount),
-          description: "Issued debits",
-          color: "#9b59b6",
-          icon: "cilFile",
-          amount: `₹${(debitNoteCount * 600).toLocaleString()}`
+          amount: `${(stockAdjustmentsCount * 500).toLocaleString()}`
         }
       ],
       productionMetrics: [
@@ -611,24 +540,16 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         type: transaction.type,
         reference: transaction.reference,
         client: transaction.client_name,
-        amount: transaction.amount ? `₹${parseFloat(transaction.amount).toLocaleString()}` : 'N/A',
+        amount: transaction.amount ? `${parseFloat(transaction.amount).toLocaleString()}` : 'N/A',
         status: transaction.status,
         date: new Date(transaction.date).toISOString().split('T')[0],
         priority: transaction.priority,
         icon: transaction.type === 'Sales Order' ? 'cilCart' : 
               transaction.type === 'Work Order' ? 'cilPencil' :
-              transaction.type === 'Purchase Order' ? 'cilTruck' : 
-              transaction.type === 'GRN' ? 'cilHome' :
-              transaction.type === 'Purchase Return' ? 'cilArrowBottom' :
-              transaction.type === 'Credit Note' ? 'cilCreditCard' :
-              transaction.type === 'Debit Note' ? 'cilFile' : 'cilInfo',
+              transaction.type === 'Purchase Order' ? 'cilTruck' : 'cilHome',
         color: transaction.type === 'Sales Order' ? '#2ecc71' : 
                transaction.type === 'Work Order' ? '#e74c3c' :
-               transaction.type === 'Purchase Order' ? '#f39c12' : 
-               transaction.type === 'GRN' ? '#3498db' :
-               transaction.type === 'Purchase Return' ? '#e74c3c' :
-               transaction.type === 'Credit Note' ? '#34495e' :
-               transaction.type === 'Debit Note' ? '#9b59b6' : '#95a5a6'
+               transaction.type === 'Purchase Order' ? '#f39c12' : '#3498db'
       })),
       chartData: {
         salesTrend: {
