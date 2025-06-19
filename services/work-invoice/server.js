@@ -263,63 +263,6 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-
-// GET work order invoices by SKU ID
-// v1Router.get("/get-by-sku/:sku_id", authenticateJWT, async (req, res) => {
-//   try {
-//     const { sku_id } = req.params;
-//     const { status = "active" } = req.query;
-
-//     // Build where clause for filtering
-//     const whereClause = {
-//       company_id: req.user.company_id,
-//       sku_id: sku_id, // Filter by SKU ID
-//     };
-
-//     // Status filtering - default to active, but allow override
-//     if (status !== "all") {
-//       whereClause.status = status;
-//     }
-
-//     // Fetch from database
-//     const invoices = await WorkOrderInvoice.findAll({
-//       where: whereClause,
-//       order: [["updated_at", "DESC"]],
-//       include: [
-//         {
-//           model: WorkOrder,
-//           as: "workOrder",
-//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-//         },
-//         {
-//           model: SalesOrder,
-//           as: "salesOrder",
-//           attributes: ["id", "sales_generate_id", "status"],
-//         },
-//       ],
-//     });
-
-//     res.json({
-//       message: `Work order invoices for SKU ID: ${sku_id}`,
-//       sku_id: sku_id,
-//       invoices: invoices.map((invoice) => invoice.get({ plain: true })),
-//       total: invoices.length,
-//     });
-//   } catch (error) {
-//     logger.error("Error fetching work order invoices by SKU ID:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
-
-
-
-
-
-
-
-
 // v1Router.get("/download/:id", async (req, res) => {
 //   let browser;
 //   try {
@@ -451,6 +394,34 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
 //   }
 // });
 
+
+// --- Fallback PDF (simple) ---
+
+
+async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
+  try {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
+    doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
+    doc.text(`Client: ${workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || ''}`, 40);
+    doc.moveDown(1);
+    doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
+
+    doc.end();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Failed to generate fallback PDF: ${error.message}`
+    });
+  }
+}
 
 v1Router.get("/download/:id", async (req, res) => {
   let browser;
@@ -592,32 +563,6 @@ v1Router.get("/download/:id", async (req, res) => {
     });
   }
 });
-
-// --- Fallback PDF (simple) ---
-async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
-  try {
-    const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-    doc.pipe(res);
-
-    doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
-    doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
-    doc.text(`Client: ${workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || ''}`, 40);
-    doc.moveDown(1);
-    doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
-
-    doc.end();
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: `Failed to generate fallback PDF: ${error.message}`
-    });
-  }
-}
 
 // --- Work Order Invoice HTML Preview ---
 v1Router.get("/view/:id", async (req, res) => {

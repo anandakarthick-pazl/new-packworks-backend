@@ -1346,7 +1346,10 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
 
 v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
   try {
-    const templates = await HtmlTemplate.findAll({ order: [['id', 'ASC']] });
+   const templates = await HtmlTemplate.findAll({
+      where: { template: "purchase_order" },
+      order: [['id', 'ASC']]
+    });
 
     if (!templates || templates.length === 0) {
       return res.status(404).send("<h1>No HTML templates found</h1>");
