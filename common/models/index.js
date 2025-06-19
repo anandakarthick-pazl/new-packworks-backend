@@ -55,6 +55,7 @@ import AllocationHistory from "./Production/allocationHistory.model.js";
 import DemoRequest from "./demoRequest.model.js";
 import PasswordReset from "./passwordReset.model.js";
 import ContactMessage from "./contactMessage.model.js";
+import PurchaseOrderBilling from "./po/purchaseOrderBilling.model.js";
 
 const db = {
   sequelize,
@@ -113,7 +114,8 @@ const db = {
   AllocationHistory,
   DemoRequest,
   PasswordReset,
-  ContactMessage
+  ContactMessage,
+  PurchaseOrderBilling,
 
 };
 

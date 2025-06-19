@@ -4,6 +4,7 @@ import { Op } from "sequelize";
 import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
+import logger from "../../common/helper/logger.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import PDFDocument from "pdfkit";
@@ -25,12 +26,397 @@ const GRNItem = db.GRNItem;
 const GRN = db.GRN;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const Item = db.ItemMaster;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+
+// billings
+
+// POST create new purchase order billing
+v1Router.post("/purchase-order/bill-create", authenticateJWT, async (req, res) => {
+  const billingDetails = req.body;
+
+  if (!billingDetails) {
+    return res.status(400).json({ message: "Invalid input data" });
+  }
+
+  // Validate required fields
+  if (!billingDetails.purchase_order_id) {
+    return res.status(400).json({ message: "Purchase Order ID is required" });
+  }
+
+  if (!billingDetails.bill_date) {
+    return res.status(400).json({ message: "Bill date is required" });
+  }
+
+  if (!billingDetails.remarks) {
+    return res.status(400).json({ message: "Remarks are required" });
+  }
+
+  try {
+    const bill_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderBilling,
+      "billings"
+    );
+
+    // Create Purchase Order Billing
+    const newBilling = await PurchaseOrderBilling.create({
+      bill_generate_id: bill_generate_id,
+      company_id: req.user.company_id,
+      purchase_order_id: billingDetails.purchase_order_id,
+      bill_reference_number: billingDetails.bill_reference_number || null,
+      bill_date: billingDetails.bill_date,
+      remarks: billingDetails.remarks,
+      status: billingDetails.status || "active",
+      created_by: req.user.id,
+      updated_by: req.user.id,
+    });
+
+    res.status(201).json({
+      message: "Purchase Order Billing created successfully",
+      data: newBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error creating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET all purchase order billings with pagination, filtering, and search
+v1Router.get("/purchase-order/bill-get", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      purchase_order_id,
+      status = "active", // Default to 'active' status
+      search = "", // Add search parameter
+      bill_date_from,
+      bill_date_to,
+    } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id, // Add company filter for security
+    };
+
+    // Status filtering - default to active, but allow override
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+
+    if (purchase_order_id) {
+      whereClause.purchase_order_id = purchase_order_id;
+    }
+
+    // Date range filtering
+    if (bill_date_from && bill_date_to) {
+      whereClause.bill_date = {
+        [Op.between]: [bill_date_from, bill_date_to]
+      };
+    } else if (bill_date_from) {
+      whereClause.bill_date = {
+        [Op.gte]: bill_date_from
+      };
+    } else if (bill_date_to) {
+      whereClause.bill_date = {
+        [Op.lte]: bill_date_to
+      };
+    }
+
+    // Add search functionality if search parameter is provided
+    if (search && search.trim() !== "") {
+      const searchTerm = `%${search.trim()}%`; // Add wildcards for partial matching
+
+      // Define search condition to look across multiple fields
+      const searchCondition = {
+        [Op.or]: [
+          // Search in PurchaseOrderBilling fields
+          { bill_generate_id: { [Op.like]: searchTerm } },
+          { bill_reference_number: { [Op.like]: searchTerm } },
+          { remarks: { [Op.like]: searchTerm } },
+          { bill_date: { [Op.like]: searchTerm } },
+
+          // Search in related PurchaseOrder fields using Sequelize's nested include where
+          // { "$purchaseOrder.purchase_order_number$": { [Op.like]: searchTerm } },
+          // { "$purchaseOrder.supplier_name$": { [Op.like]: searchTerm } },
+        ],
+      };
+
+      // Add search condition to where clause
+      whereClause[Op.and] = whereClause[Op.and] || [];
+      whereClause[Op.and].push(searchCondition);
+    }
+
+    // Fetch from database with pagination, filters, and search
+    const { count, rows } = await PurchaseOrderBilling.findAndCountAll({
+      where: whereClause,
+      limit: limitNum,
+      offset: offset,
+      order: [["updated_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id",  "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id","email"],
+        },
+      ],
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(count / limitNum);
+
+    res.json({
+      billings: rows.map((billing) => billing.get({ plain: true })),
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching purchase order billings:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET specific purchase order billing by ID
+v1Router.get("/purchase-order/bill-get/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billing = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id", "email"],
+        },
+      ],
+    });
+
+    if (!billing) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    const result = billing.get({ plain: true });
+    res.json(result);
+  } catch (error) {
+    logger.error("Error fetching purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// PUT update purchase order billing
+v1Router.put("/purchase-order/bill-update/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    if (!updateData) {
+      return res.status(400).json({ message: "Invalid input data" });
+    }
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Prepare update object
+    const updateObject = {
+      ...updateData,
+      updated_by: req.user.id,
+      updated_at: new Date(),
+    };
+
+    // Remove fields that shouldn't be updated
+    delete updateObject.id;
+    delete updateObject.bill_generate_id;
+    delete updateObject.company_id;
+    delete updateObject.created_by;
+    delete updateObject.created_at;
+
+    // Update the billing
+    await PurchaseOrderBilling.update(updateObject, {
+      where: whereClause,
+    });
+
+    // Fetch updated billing with associations
+    const updatedBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id",  "email"],
+        },
+      ],
+    });
+
+    res.json({
+      message: "Purchase Order Billing updated successfully",
+      data: updatedBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error updating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// DELETE purchase order billing (soft delete)
+v1Router.delete("/purchase-order/bill-delete/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Soft delete by updating status to inactive
+    await PurchaseOrderBilling.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      },
+      {
+        where: whereClause,
+      }
+    );
+
+    res.json({
+      message: "Purchase Order Billing deleted successfully",
+    });
+  } catch (error) {
+    logger.error("Error deleting purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET purchase order billings by purchase order ID
+v1Router.get("/by-purchase-order/:purchase_order_id", authenticateJWT, async (req, res) => {
+  try {
+    const { purchase_order_id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      purchase_order_id: purchase_order_id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billings = await PurchaseOrderBilling.findAll({
+      where: whereClause,
+      order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_order_number", "supplier_name", "total_amount", "status"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "first_name", "last_name", "email"],
+        },
+      ],
+    });
+
+    res.json({
+      billings: billings.map((billing) => billing.get({ plain: true })),
+      total: billings.length,
+    });
+  } catch (error) {
+    logger.error("Error fetching billings by purchase order:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
 
 //Create Po
 v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {

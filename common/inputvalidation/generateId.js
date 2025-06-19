@@ -17,6 +17,7 @@ const stockAdjustment = db.stockAdjustment;
 const debit_note = db.DebitNote;
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
