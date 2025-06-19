@@ -23,6 +23,10 @@ const GRN = sequelize.define("GRN", {
     },
     onUpdate: "CASCADE",
   },
+  po_bill_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
