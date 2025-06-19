@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
+import { Sequelize, col } from "sequelize";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode";
@@ -26,6 +27,7 @@ const v1Router = Router();
 const WorkOrder = db.WorkOrder;
 const SalesOrder = db.SalesOrder;
 const SalesSkuDetails = db.SalesSkuDetails;
+const WorkOrderInvoice = db.WorkOrderInvoice;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1339,6 +1341,136 @@ v1Router.patch(
   }
 );
 
+// v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, res) => {
+//   try {
+//     const { clientId } = req.params;
+//     const {
+//       status = "active",
+//       production,
+//       sortBy,
+//       sortOrder = "desc",
+//       updateMissingQrCodes = "false", // Default to false for bulk fetch
+//     } = req.query;
+
+//     // Build where clause for filtering
+//     const whereClause = {
+//       client_id: clientId,
+//       company_id: req.user.company_id,
+//     };
+
+//     // Status filtering - default to active, but allow override
+//     if (status === "all") {
+//       // Don't filter by status if 'all' is specified
+//     } else {
+//       whereClause.status = status;
+//     }
+
+//     // Production filtering - filter by production stage if provided
+//     if (production) {
+//       whereClause.production = production;
+//     }
+
+//     // Build order clause - default to updated_at DESC
+//     let orderClause = [["updated_at", "DESC"]];
+
+//     // Handle sorting based on sortBy parameter
+//     if (sortBy) {
+//       const validSortFields = ["sku_name", "qty", "manufacture", "created_at", "updated_at", "edd"];
+//       const validSortOrders = ["asc", "desc"];
+
+//       if (
+//         validSortFields.includes(sortBy) &&
+//         validSortOrders.includes(sortOrder.toLowerCase())
+//       ) {
+//         orderClause = [[sortBy, sortOrder.toUpperCase()]];
+//       }
+//     }
+
+//     // Include sales order information
+//     const includeOptions = [
+//       {
+//         model: SalesOrder,
+//         as: "salesOrder",
+//         attributes: ["id", "sales_ui_id", "sales_generate_id", "client"],
+//         required: false,
+//       },
+//     ];
+
+//     // Fetch all work orders for the client
+//     const workOrders = await WorkOrder.findAll({
+//       where: whereClause,
+//       include: includeOptions,
+//       order: orderClause,
+//     });
+
+//     // Helper function to parse work_order_sku_values
+//     const parseWorkOrderSkuValues = (workOrderData) => {
+//       if (workOrderData.work_order_sku_values) {
+//         try {
+//           if (typeof workOrderData.work_order_sku_values === "string") {
+//             workOrderData.work_order_sku_values = JSON.parse(
+//               workOrderData.work_order_sku_values
+//             );
+//           }
+//         } catch (error) {
+//           logger.warn(
+//             `Failed to parse work_order_sku_values for work order ${workOrderData.id}:`,
+//             error
+//           );
+//         }
+//       }
+//       return workOrderData;
+//     };
+
+//     // Process work orders
+//     const processedWorkOrders = await Promise.all(
+//       workOrders.map(async (workOrder) => {
+//         const plainWorkOrder = workOrder.get({ plain: true });
+
+//         // Parse work_order_sku_values
+//         const parsedWorkOrder = parseWorkOrderSkuValues(plainWorkOrder);
+
+//         // If QR code URL is missing and update flag is true, generate and update
+//         if (updateMissingQrCodes === "true" && !parsedWorkOrder.qr_code_url) {
+//           try {
+//             const authHeader = req.headers.authorization;
+//             const token = authHeader.split(" ")[1];
+//             const qrCodeUrl = await generateQRCode(workOrder, token);
+//             await workOrder.update({ qr_code_url: qrCodeUrl });
+//             parsedWorkOrder.qr_code_url = qrCodeUrl;
+//           } catch (qrError) {
+//             logger.error(
+//               `Error generating QR code for work order ${parsedWorkOrder.id}:`,
+//               qrError
+//             );
+//           }
+//         }
+
+//         return parsedWorkOrder;
+//       })
+//     );
+
+//     // Log the request
+//     logger.info(
+//       `All work orders fetched for client ${clientId} by user ${req.user.id}. Found ${processedWorkOrders.length} work orders.`
+//     );
+
+//     res.json({
+//       workOrders: processedWorkOrders,
+//       total: processedWorkOrders.length,
+//       client_id: clientId,
+//     });
+//   } catch (error) {
+//     logger.error("Error fetching all work orders by client ID:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
+
+// ✅ Health Check Endpoint
+
+
 v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -1347,44 +1479,33 @@ v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, re
       production,
       sortBy,
       sortOrder = "desc",
-      updateMissingQrCodes = "false", // Default to false for bulk fetch
+      updateMissingQrCodes = "false",
     } = req.query;
 
-    // Build where clause for filtering
+    // Where clause
     const whereClause = {
       client_id: clientId,
       company_id: req.user.company_id,
     };
 
-    // Status filtering - default to active, but allow override
-    if (status === "all") {
-      // Don't filter by status if 'all' is specified
-    } else {
+    if (status !== "all") {
       whereClause.status = status;
     }
 
-    // Production filtering - filter by production stage if provided
     if (production) {
       whereClause.production = production;
     }
 
-    // Build order clause - default to updated_at DESC
+    // Sort logic
     let orderClause = [["updated_at", "DESC"]];
+    const validSortFields = ["sku_name", "qty", "manufacture", "created_at", "updated_at", "edd"];
+    const validSortOrders = ["asc", "desc"];
 
-    // Handle sorting based on sortBy parameter
-    if (sortBy) {
-      const validSortFields = ["sku_name", "qty", "manufacture", "created_at", "updated_at", "edd"];
-      const validSortOrders = ["asc", "desc"];
-
-      if (
-        validSortFields.includes(sortBy) &&
-        validSortOrders.includes(sortOrder.toLowerCase())
-      ) {
-        orderClause = [[sortBy, sortOrder.toUpperCase()]];
-      }
+    if (sortBy && validSortFields.includes(sortBy) && validSortOrders.includes(sortOrder.toLowerCase())) {
+      orderClause = [[sortBy, sortOrder.toUpperCase()]];
     }
 
-    // Include sales order information
+    // Include related SalesOrder
     const includeOptions = [
       {
         model: SalesOrder,
@@ -1394,41 +1515,60 @@ v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, re
       },
     ];
 
-    // Fetch all work orders for the client
+    // Fetch work orders
     const workOrders = await WorkOrder.findAll({
       where: whereClause,
       include: includeOptions,
       order: orderClause,
     });
 
-    // Helper function to parse work_order_sku_values
+    const workOrderIds = workOrders.map((wo) => wo.id);
+
+    // Fetch sum of invoice quantities per work_order_id
+    const invoiceData = await WorkOrderInvoice.findAll({
+      attributes: [
+        "work_id",
+        [Sequelize.fn("SUM", col("quantity")), "total_quantity"],
+      ],
+      where: {
+        work_id: workOrderIds,
+      },
+      group: ["work_id"],
+      raw: true,
+    });
+
+    // Create a map: { work_order_id: total_quantity }
+    const invoiceQuantityMap = invoiceData.reduce((acc, entry) => {
+      acc[entry.work_id] = parseInt(entry.total_quantity || 0, 10);
+      return acc;
+    }, {});
+
+    // Utility: parse work_order_sku_values
     const parseWorkOrderSkuValues = (workOrderData) => {
       if (workOrderData.work_order_sku_values) {
         try {
           if (typeof workOrderData.work_order_sku_values === "string") {
-            workOrderData.work_order_sku_values = JSON.parse(
-              workOrderData.work_order_sku_values
-            );
+            workOrderData.work_order_sku_values = JSON.parse(workOrderData.work_order_sku_values);
           }
         } catch (error) {
-          logger.warn(
-            `Failed to parse work_order_sku_values for work order ${workOrderData.id}:`,
-            error
-          );
+          logger.warn(`Failed to parse work_order_sku_values for work order ${workOrderData.id}:`, error);
         }
       }
       return workOrderData;
     };
 
-    // Process work orders
+    // Process and enrich work orders
     const processedWorkOrders = await Promise.all(
       workOrders.map(async (workOrder) => {
         const plainWorkOrder = workOrder.get({ plain: true });
 
-        // Parse work_order_sku_values
         const parsedWorkOrder = parseWorkOrderSkuValues(plainWorkOrder);
 
-        // If QR code URL is missing and update flag is true, generate and update
+        const workOrderQty = parsedWorkOrder.qty || 0;
+        const invoicedQty = invoiceQuantityMap[parsedWorkOrder.id] || 0;
+        parsedWorkOrder.pending_invoice = workOrderQty - invoicedQty;
+
+        // Generate QR if missing
         if (updateMissingQrCodes === "true" && !parsedWorkOrder.qr_code_url) {
           try {
             const authHeader = req.headers.authorization;
@@ -1437,10 +1577,7 @@ v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, re
             await workOrder.update({ qr_code_url: qrCodeUrl });
             parsedWorkOrder.qr_code_url = qrCodeUrl;
           } catch (qrError) {
-            logger.error(
-              `Error generating QR code for work order ${parsedWorkOrder.id}:`,
-              qrError
-            );
+            logger.error(`Error generating QR code for work order ${parsedWorkOrder.id}:`, qrError);
           }
         }
 
@@ -1448,10 +1585,7 @@ v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, re
       })
     );
 
-    // Log the request
-    logger.info(
-      `All work orders fetched for client ${clientId} by user ${req.user.id}. Found ${processedWorkOrders.length} work orders.`
-    );
+    logger.info(`All work orders fetched for client ${clientId} by user ${req.user.id}. Found ${processedWorkOrders.length} work orders.`);
 
     res.json({
       workOrders: processedWorkOrders,
@@ -1460,13 +1594,12 @@ v1Router.get("/work-order/client/:clientId/all", authenticateJWT, async (req, re
     });
   } catch (error) {
     logger.error("Error fetching all work orders by client ID:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
 
-// ✅ Health Check Endpoint
+
+
 app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
