@@ -22,6 +22,7 @@ const v1Router = Router();
 const WorkOrderInvoice = db.WorkOrderInvoice;
 const WorkOrder = db.WorkOrder;
 const SalesOrder = db.SalesOrder;
+const Client = db.Client;
 
 // POST create new work order invoice
 v1Router.post("/create", authenticateJWT, async (req, res) => {
@@ -263,63 +264,6 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-
-// GET work order invoices by SKU ID
-// v1Router.get("/get-by-sku/:sku_id", authenticateJWT, async (req, res) => {
-//   try {
-//     const { sku_id } = req.params;
-//     const { status = "active" } = req.query;
-
-//     // Build where clause for filtering
-//     const whereClause = {
-//       company_id: req.user.company_id,
-//       sku_id: sku_id, // Filter by SKU ID
-//     };
-
-//     // Status filtering - default to active, but allow override
-//     if (status !== "all") {
-//       whereClause.status = status;
-//     }
-
-//     // Fetch from database
-//     const invoices = await WorkOrderInvoice.findAll({
-//       where: whereClause,
-//       order: [["updated_at", "DESC"]],
-//       include: [
-//         {
-//           model: WorkOrder,
-//           as: "workOrder",
-//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-//         },
-//         {
-//           model: SalesOrder,
-//           as: "salesOrder",
-//           attributes: ["id", "sales_generate_id", "status"],
-//         },
-//       ],
-//     });
-
-//     res.json({
-//       message: `Work order invoices for SKU ID: ${sku_id}`,
-//       sku_id: sku_id,
-//       invoices: invoices.map((invoice) => invoice.get({ plain: true })),
-//       total: invoices.length,
-//     });
-//   } catch (error) {
-//     logger.error("Error fetching work order invoices by SKU ID:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
-
-
-
-
-
-
-
-
 // v1Router.get("/download/:id", async (req, res) => {
 //   let browser;
 //   try {
@@ -452,12 +396,50 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
 // });
 
 
+// --- Fallback PDF (simple) ---
+
+
+async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
+  try {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
+    doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
+    
+    // Updated to use client details
+    const clientName = workOrderInvoice.Client?.display_name || 
+                      workOrderInvoice.Client?.company_name || 
+                      workOrderInvoice.client_name || 
+                      workOrderInvoice.salesOrder?.Client?.display_name || 
+                      workOrderInvoice.salesOrder?.Client?.company_name || 
+                      `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() || 
+                      `${workOrderInvoice.salesOrder?.Client?.first_name || ''} ${workOrderInvoice.salesOrder?.Client?.last_name || ''}`.trim() || '';
+    
+    doc.text(`Client: ${clientName}`, 40);
+    doc.moveDown(1);
+    doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
+
+    doc.end();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Failed to generate fallback PDF: ${error.message}`
+    });
+  }
+}
+
 v1Router.get("/download/:id", async (req, res) => {
   let browser;
   try {
     const invoiceId = req.params.id;
 
-    // Fetch invoice data
+    // Fetch invoice data with client details
     const workOrderInvoice = await WorkOrderInvoice.findOne({
       where: { id: invoiceId, status: "active" },
       include: [
@@ -469,8 +451,48 @@ v1Router.get("/download/:id", async (req, res) => {
         {
           model: SalesOrder,
           as: "salesOrder",
-          attributes: ["id", "sales_generate_id", "status"],
+          attributes: ["id", "sales_generate_id", "status", "client_id"],
+          include: [
+            {
+              model: Client, // Make sure to import Client model
+              as: "Client", // Use capital C to match the association alias
+              attributes: [
+                "client_id", 
+                "display_name", 
+                "first_name", 
+                "last_name", 
+                "company_name", 
+                "email", 
+                "work_phone", 
+                "mobile", 
+                "customer_type",
+                "salutation",
+                "PAN",
+                "gst_number",
+                "client_ref_id"
+              ]
+            }
+          ]
         },
+        {
+          model: Client, // Direct client association if it exists
+          as: "Client", // Use capital C to match the association alias
+          attributes: [
+            "client_id", 
+            "display_name", 
+            "first_name", 
+            "last_name", 
+            "company_name", 
+            "email", 
+            "work_phone", 
+            "mobile", 
+            "customer_type",
+            "salutation",
+            "PAN",
+            "gst_number",
+            "client_ref_id"
+          ]
+        }
       ],
     });
 
@@ -514,13 +536,21 @@ v1Router.get("/download/:id", async (req, res) => {
       total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
+    // Get client details from different possible sources
+    const clientDetails = workOrderInvoice.Client || 
+                         workOrderInvoice.salesOrder?.Client || 
+                         null;
+
     const templateData = {
       workOrderInvoice: {
         id: workOrderInvoice.id,
         invoice_number: workOrderInvoice.invoice_number,
         due_date: workOrderInvoice.due_date,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
-        client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
+        client_name: clientDetails?.display_name || 
+                    clientDetails?.company_name || 
+                    `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() || 
+                    workOrderInvoice.client_name || '',
         status: workOrderInvoice.status,
         total: workOrderInvoice.total || 0,
         total_tax: workOrderInvoice.total_tax || 0,
@@ -536,6 +566,23 @@ v1Router.get("/download/:id", async (req, res) => {
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
+      // Add client details to template data
+      client: clientDetails ? {
+        client_id: clientDetails.client_id,
+        display_name: clientDetails.display_name || '',
+        first_name: clientDetails.first_name || '',
+        last_name: clientDetails.last_name || '',
+        full_name: `${clientDetails.first_name || ''} ${clientDetails.last_name || ''}`.trim(),
+        company_name: clientDetails.company_name || '',
+        email: clientDetails.email || '',
+        work_phone: clientDetails.work_phone || '',
+        mobile: clientDetails.mobile || '',
+        customer_type: clientDetails.customer_type || '',
+        salutation: clientDetails.salutation || '',
+        PAN: clientDetails.PAN || '',
+        gst_number: clientDetails.gst_number || '',
+        client_ref_id: clientDetails.client_ref_id || ''
+      } : null,
       sku_details: items, // <-- mapped for template
       current_date: new Date().toLocaleDateString('en-IN')
     };
@@ -593,32 +640,6 @@ v1Router.get("/download/:id", async (req, res) => {
   }
 });
 
-// --- Fallback PDF (simple) ---
-async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
-  try {
-    const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-    doc.pipe(res);
-
-    doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
-    doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
-    doc.text(`Client: ${workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || ''}`, 40);
-    doc.moveDown(1);
-    doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
-
-    doc.end();
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: `Failed to generate fallback PDF: ${error.message}`
-    });
-  }
-}
-
 // --- Work Order Invoice HTML Preview ---
 v1Router.get("/view/:id", async (req, res) => {
   try {
@@ -635,8 +656,48 @@ v1Router.get("/view/:id", async (req, res) => {
         {
           model: SalesOrder,
           as: "salesOrder",
-          attributes: ["id", "sales_generate_id", "status"],
+          attributes: ["id", "sales_generate_id", "status", "client_id"],
+          include: [
+            {
+              model: Client, // Make sure to import Client model
+              as: "Client", // Use capital C to match the association alias
+              attributes: [
+                "client_id", 
+                "display_name", 
+                "first_name", 
+                "last_name", 
+                "company_name", 
+                "email", 
+                "work_phone", 
+                "mobile", 
+                "customer_type",
+                "salutation",
+                "PAN",
+                "gst_number",
+                "client_ref_id"
+              ]
+            }
+          ]
         },
+        {
+          model: Client, // Direct client association if it exists
+          as: "Client", // Use capital C to match the association alias
+          attributes: [
+            "client_id", 
+            "display_name", 
+            "first_name", 
+            "last_name", 
+            "company_name", 
+            "email", 
+            "work_phone", 
+            "mobile", 
+            "customer_type",
+            "salutation",
+            "PAN",
+            "gst_number",
+            "client_ref_id"
+          ]
+        }
       ],
     });
 
@@ -668,12 +729,20 @@ v1Router.get("/view/:id", async (req, res) => {
       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
     }
 
+    // Get client details from different possible sources
+    const clientDetails = workOrderInvoice.Client || 
+                         workOrderInvoice.salesOrder?.Client || 
+                         null;
+
     const templateData = {
       workOrderInvoice: {
         id: workOrderInvoice.id,
         invoice_number: workOrderInvoice.invoice_number,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
-        client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
+        client_name: clientDetails?.display_name || 
+                    clientDetails?.company_name || 
+                    `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() || 
+                    workOrderInvoice.client_name || '',
         status: workOrderInvoice.status,
         total: workOrderInvoice.total || 0,
         total_tax: workOrderInvoice.total_tax || 0,
@@ -689,6 +758,23 @@ v1Router.get("/view/:id", async (req, res) => {
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
+      // Add client details to template data
+      client: clientDetails ? {
+        client_id: clientDetails.client_id,
+        display_name: clientDetails.display_name || '',
+        first_name: clientDetails.first_name || '',
+        last_name: clientDetails.last_name || '',
+        full_name: `${clientDetails.first_name || ''} ${clientDetails.last_name || ''}`.trim(),
+        company_name: clientDetails.company_name || '',
+        email: clientDetails.email || '',
+        work_phone: clientDetails.work_phone || '',
+        mobile: clientDetails.mobile || '',
+        customer_type: clientDetails.customer_type || '',
+        salutation: clientDetails.salutation || '',
+        PAN: clientDetails.PAN || '',
+        gst_number: clientDetails.gst_number || '',
+        client_ref_id: clientDetails.client_ref_id || ''
+      } : null,
       sku_details: skuDetails || [],
       current_date: new Date().toLocaleDateString('en-IN')
     };
