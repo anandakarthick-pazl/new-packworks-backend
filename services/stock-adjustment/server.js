@@ -75,7 +75,7 @@ v1Router.get("/stock-adjustments/items/:item_id", authenticateJWT, async (req, r
 v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {   
-    const { remarks, items } = req.body;
+    const { reference_number, mode_of_adjustment, date, description, remarks, items } = req.body;
     const company_id = req.user.company_id;
 
     const stockAdjustmentId = await generateId(req.user.company_id, StockAdjustment, "stock_adjustment");
@@ -84,8 +84,11 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
       {
         stock_adjustment_generate_id: stockAdjustmentId,
         company_id,
-        adjustment_date: new Date(),
+        adjustment_date: date,
         remarks,
+        reference_number,
+        mode_of_adjustment,
+        description,
         created_by: req.user.id,
         updated_by: req.user.id,
       },
@@ -446,7 +449,9 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const adjustmentId = req.params.id;
-    const { remarks, items } = req.body;
+    // const { remarks, items } = req.body;
+    const { reference_number, mode_of_adjustment, date, description, remarks, items } = req.body;
+
     const company_id = req.user.company_id;
  
     const adjustment = await StockAdjustment.findOne({
@@ -524,11 +529,20 @@ v1Router.put("/stock-adjustments/:id", authenticateJWT, async (req, res) => {
       {
         remarks,
         updated_by: req.user.id,
-        adjustment_date: new Date(),
+        adjustment_date: date,
         updated_at: new Date(),
+        reference_number,
+        mode_of_adjustment,
+        description,
       },
       { transaction }
     );
+
+
+
+
+
+
  
     await transaction.commit();
     return res.status(200).json({
