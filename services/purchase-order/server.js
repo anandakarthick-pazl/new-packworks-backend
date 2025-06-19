@@ -211,34 +211,99 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get one po
-v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+// v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+//   try {
+//     const po = await PurchaseOrder.findOne({
+//       where: { id: req.params.id, status: "active" },
+//       include: [{ 
+//         model: PurchaseOrderItem,
+//         include: [
+//               {
+//                 model: ItemMaster,
+//                 as: "item_info", // Alias from GRNItem → ItemMaster association
+//                 attributes: ["id", "item_generate_id","item_name"]
+//               }
+//             ] 
+//         }],
+//     });
+
+//     if (!po) return res.status(404).json({ success: false, message: "Not found" });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase Order fetched",
+//       data: po,
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// });
+
+// Updated GET API for Purchase Order with Received Qty Calculation
+v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
   try {
+    const poId = req.params.id;
+
     const po = await PurchaseOrder.findOne({
-      where: { id: req.params.id, status: "active" },
-      include: [{ 
-        model: PurchaseOrderItem,
-        include: [
-              {
-                model: ItemMaster,
-                as: "item_info", // Alias from GRNItem → ItemMaster association
-                attributes: ["id", "item_generate_id","item_name"]
-              }
-            ] 
-        }],
+      where: { id: poId, status: "active" },
+      include: [
+        {
+          model: PurchaseOrderItem,
+          as: "PurchaseOrderItems",
+          include: [
+            {
+              model: ItemMaster,
+              as: "item_info",
+              attributes: ["id", "item_generate_id", "item_name"]
+            }
+          ]
+        }
+      ]
     });
 
-    if (!po) return res.status(404).json({ success: false, message: "Not found" });
+    if (!po) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    const grns = await GRN.findAll({ where: { po_id: poId } });
+    const grnIds = grns.map(grn => grn.id);
+
+    const grnItems = await GRNItem.findAll({
+      where: { grn_id: grnIds }
+    });
+
+    const itemReceivedMap = {};
+    grnItems.forEach(item => {
+      const key = item.po_item_id;
+      itemReceivedMap[key] = (itemReceivedMap[key] || 0) + parseFloat(item.accepted_quantity || 0);
+    });
+
+    // Attach received quantity info to each PO item
+    const updatedItems = po.PurchaseOrderItems.map(item => {
+      const received = itemReceivedMap[item.id] || 0;
+      return {
+        ...item.toJSON(),
+        received_quantity: received,
+        status: received >= parseFloat(item.quantity || 0) ? "fully_received" : "pending"
+      };
+    });
 
     return res.status(200).json({
       success: true,
       message: "Purchase Order fetched",
-      data: po,
+      data: {
+        ...po.toJSON(),
+        PurchaseOrderItems: updatedItems
+      }
     });
 
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 });
+
+
 
 //update po
 v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
