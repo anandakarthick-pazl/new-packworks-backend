@@ -10,6 +10,13 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 import puppeteer from "puppeteer";
 import handlebars from "handlebars";
 import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// For ES6 modules, we need to recreate __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -264,14 +271,59 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
+// async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
+//   try {
+//     const PDFDocument = require('pdfkit');
+//     const doc = new PDFDocument({ margin: 40, size: 'A4' });
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+//     doc.pipe(res);
+
+//     doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
+//     doc.moveDown(0.5);
+//     doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
+//     doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
+    
+//     // Updated to use client details
+//     const clientName = workOrderInvoice.Client?.display_name || 
+//                       workOrderInvoice.Client?.company_name || 
+//                       workOrderInvoice.client_name || 
+//                       workOrderInvoice.salesOrder?.Client?.display_name || 
+//                       workOrderInvoice.salesOrder?.Client?.company_name || 
+//                       `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() || 
+//                       `${workOrderInvoice.salesOrder?.Client?.first_name || ''} ${workOrderInvoice.salesOrder?.Client?.last_name || ''}`.trim() || '';
+    
+//     doc.text(`Client: ${clientName}`, 40);
+//     doc.moveDown(1);
+//     doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
+
+//     doc.end();
+//   } catch (error) {
+//     return res.status(500).json({
+//       success: false,
+//       message: `Failed to generate fallback PDF: ${error.message}`
+//     });
+//   }
+// }
+
+
+
 async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    
+    const fileName = `work-order-invoice-${workOrderInvoice.invoice_number}.pdf`;
+    
+    // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-    doc.pipe(res);
-
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    
+    // Create a buffer to store the PDF data
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    
+    // Generate PDF content
     doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
@@ -290,7 +342,32 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     doc.moveDown(1);
     doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
 
+    // Handle PDF completion
+    doc.on('end', async () => {
+      const pdfData = Buffer.concat(buffers);
+      
+      // *** Save PDF to local directory ***
+      const invoiceDir = path.join(__dirname, '..','..', 'public', 'invoice'); // Adjust path as needed
+      const filePath = path.join(invoiceDir, fileName);
+
+      try {
+        // Create directory if it doesn't exist
+        await fs.mkdir(invoiceDir, { recursive: true });
+        
+        // Save PDF to file
+        await fs.writeFile(filePath, pdfData);
+        
+        console.log(`PDF saved successfully at: ${filePath}`);
+      } catch (saveError) {
+        console.error('Error saving PDF to local directory:', saveError);
+        // Continue with response even if saving fails
+      }
+    });
+
+    // Stream PDF to response
+    doc.pipe(res);
     doc.end();
+
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -298,6 +375,7 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     });
   }
 }
+
 v1Router.get("/download/:id", async (req, res) => {
   let browser;
   try {
@@ -318,8 +396,8 @@ v1Router.get("/download/:id", async (req, res) => {
           attributes: ["id", "sales_generate_id", "status", "client_id"],
           include: [
             {
-              model: Client, // Make sure to import Client model
-              as: "Client", // Use capital C to match the association alias
+              model: Client,
+              as: "Client",
               attributes: [
                 "client_id", 
                 "display_name", 
@@ -339,8 +417,8 @@ v1Router.get("/download/:id", async (req, res) => {
           ]
         },
         {
-          model: Client, // Direct client association if it exists
-          as: "Client", // Use capital C to match the association alias
+          model: Client,
+          as: "Client",
           attributes: [
             "client_id", 
             "display_name", 
@@ -400,8 +478,6 @@ v1Router.get("/download/:id", async (req, res) => {
       total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
-    console.log("Mapped SKU Details:", items);
-
     // Get client details from different possible sources
     const clientDetails = workOrderInvoice.Client || 
                          workOrderInvoice.salesOrder?.Client || 
@@ -432,7 +508,6 @@ v1Router.get("/download/:id", async (req, res) => {
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
-      // Add client details to template data
       client: clientDetails ? {
         client_id: clientDetails.client_id,
         display_name: clientDetails.display_name || '',
@@ -449,7 +524,7 @@ v1Router.get("/download/:id", async (req, res) => {
         gst_number: clientDetails.gst_number || '',
         client_ref_id: clientDetails.client_ref_id || ''
       } : null,
-      sku_details: items, // <-- mapped for template
+      sku_details: items,
       current_date: new Date().toLocaleDateString('en-IN')
     };
 
@@ -488,9 +563,27 @@ v1Router.get("/download/:id", async (req, res) => {
 
     await browser.close();
 
-    // Send PDF response
+    // *** NEW CODE: Save PDF to local directory ***
+    const fileName = `work-order-invoice-${workOrderInvoice.invoice_number}.pdf`;
+    const invoiceDir = path.join(__dirname, '..', 'public', 'invoice'); // Adjust path as needed
+    const filePath = path.join(invoiceDir, fileName);
+
+    try {
+      // Create directory if it doesn't exist
+      await fs.mkdir(invoiceDir, { recursive: true });
+      
+      // Save PDF to file
+      await fs.writeFile(filePath, pdf);
+      
+      console.log(`PDF saved successfully at: ${filePath}`);
+    } catch (saveError) {
+      console.error('Error saving PDF to local directory:', saveError);
+      // Continue with response even if saving fails
+    }
+
+    // Send PDF response (original functionality)
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
     res.setHeader('Content-Length', pdf.length);
     return res.end(pdf);
 
@@ -505,6 +598,213 @@ v1Router.get("/download/:id", async (req, res) => {
     });
   }
 });
+// v1Router.get("/download/:id", async (req, res) => {
+//   let browser;
+//   try {
+//     const invoiceId = req.params.id;
+
+//     // Fetch invoice data with client details
+//     const workOrderInvoice = await WorkOrderInvoice.findOne({
+//       where: { id: invoiceId, status: "active" },
+//       include: [
+//         {
+//           model: WorkOrder,
+//           as: "workOrder",
+//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+//         },
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_generate_id", "status", "client_id"],
+//           include: [
+//             {
+//               model: Client, // Make sure to import Client model
+//               as: "Client", // Use capital C to match the association alias
+//               attributes: [
+//                 "client_id", 
+//                 "display_name", 
+//                 "first_name", 
+//                 "last_name", 
+//                 "company_name", 
+//                 "email", 
+//                 "work_phone", 
+//                 "mobile", 
+//                 "customer_type",
+//                 "salutation",
+//                 "PAN",
+//                 "gst_number",
+//                 "client_ref_id"
+//               ]
+//             }
+//           ]
+//         },
+//         {
+//           model: Client, // Direct client association if it exists
+//           as: "Client", // Use capital C to match the association alias
+//           attributes: [
+//             "client_id", 
+//             "display_name", 
+//             "first_name", 
+//             "last_name", 
+//             "company_name", 
+//             "email", 
+//             "work_phone", 
+//             "mobile", 
+//             "customer_type",
+//             "salutation",
+//             "PAN",
+//             "gst_number",
+//             "client_ref_id"
+//           ]
+//         }
+//       ],
+//     });
+
+//     if (!workOrderInvoice) {
+//       return res.status(404).json({ success: false, message: "Work Order Invoice not found" });
+//     }
+
+//     // Try to fetch HTML template, fallback to default if not found
+//     let htmlTemplate = await HtmlTemplate.findOne({
+//       where: {
+//         company_id: workOrderInvoice.company_id,
+//         template: "work_order_invoice",
+//         status: "active"
+//       }
+//     });
+
+//     if (!htmlTemplate) {
+//       htmlTemplate = await HtmlTemplate.findOne({
+//         where: { template: "work_order_invoice", status: "active" },
+//         order: [['id', 'ASC']]
+//       });
+//     }
+
+//     if (!htmlTemplate) {
+//       return generateOriginalInvoicePDF(req, res, workOrderInvoice);
+//     }
+
+//     // Prepare data for template
+//     let skuDetails = workOrderInvoice.sku_details;
+//     if (typeof skuDetails === "string") {
+//       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+//     }
+
+//     // Map skuDetails to template fields
+//     const items = (skuDetails || []).map((item, idx) => ({
+//       serial_number: idx + 1,
+//       item_name: item.item_name || item.sku || item.name || "",
+//       quantity: item.quantity || item.quantity_required || item.qty || "",
+//       unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+//       tax_percentage: item.tax_percentage || item.gst || "",
+//       total_amount: item.total_amount || item.total_incl_gst || "",
+//     }));
+
+//     console.log("Mapped SKU Details:", items);
+
+//     // Get client details from different possible sources
+//     const clientDetails = workOrderInvoice.Client || 
+//                          workOrderInvoice.salesOrder?.Client || 
+//                          null;
+
+//     const templateData = {
+//       workOrderInvoice: {
+//         id: workOrderInvoice.id,
+//         invoice_number: workOrderInvoice.invoice_number,
+//         due_date: workOrderInvoice.due_date,
+//         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
+//         client_name: clientDetails?.display_name || 
+//                     clientDetails?.company_name || 
+//                     `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() || 
+//                     workOrderInvoice.client_name || '',
+//         status: workOrderInvoice.status,
+//         total: workOrderInvoice.total || 0,
+//         total_tax: workOrderInvoice.total_tax || 0,
+//         total_amount: workOrderInvoice.total_amount || 0,
+//         payment_status: workOrderInvoice.payment_status || '',
+//         description: workOrderInvoice.description || '',
+//         quantity: workOrderInvoice.quantity || 0,
+//         discount: workOrderInvoice.discount || 0,
+//         discount_type: workOrderInvoice.discount_type || '',
+//         payment_expected_date: workOrderInvoice.payment_expected_date || '',
+//         transaction_type: workOrderInvoice.transaction_type || '',
+//         balance: workOrderInvoice.balance || 0,
+//       },
+//       workOrder: workOrderInvoice.workOrder || null,
+//       salesOrder: workOrderInvoice.salesOrder || null,
+//       // Add client details to template data
+//       client: clientDetails ? {
+//         client_id: clientDetails.client_id,
+//         display_name: clientDetails.display_name || '',
+//         first_name: clientDetails.first_name || '',
+//         last_name: clientDetails.last_name || '',
+//         full_name: `${clientDetails.first_name || ''} ${clientDetails.last_name || ''}`.trim(),
+//         company_name: clientDetails.company_name || '',
+//         email: clientDetails.email || '',
+//         work_phone: clientDetails.work_phone || '',
+//         mobile: clientDetails.mobile || '',
+//         customer_type: clientDetails.customer_type || '',
+//         salutation: clientDetails.salutation || '',
+//         PAN: clientDetails.PAN || '',
+//         gst_number: clientDetails.gst_number || '',
+//         client_ref_id: clientDetails.client_ref_id || ''
+//       } : null,
+//       sku_details: items, // <-- mapped for template
+//       current_date: new Date().toLocaleDateString('en-IN')
+//     };
+
+//     // Compile Handlebars template
+//     const template = handlebars.compile(htmlTemplate.html_template);
+//     const html = template(templateData);
+
+//     // Generate PDF using Puppeteer
+//     browser = await puppeteer.launch({
+//       headless: true,
+//       args: [
+//         '--no-sandbox',
+//         '--disable-setuid-sandbox',
+//         '--disable-dev-shm-usage',
+//         '--disable-accelerated-2d-canvas',
+//         '--no-first-run',
+//         '--no-zygote',
+//         '--disable-gpu'
+//       ]
+//     });
+
+//     const page = await browser.newPage();
+//     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+
+//     const pdf = await page.pdf({
+//       format: 'A4',
+//       printBackground: true,
+//       preferCSSPageSize: true,
+//       margin: {
+//         top: '10mm',
+//         right: '10mm',
+//         bottom: '10mm',
+//         left: '10mm'
+//       }
+//     });
+
+//     await browser.close();
+
+//     // Send PDF response
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+//     res.setHeader('Content-Length', pdf.length);
+//     return res.end(pdf);
+
+//   } catch (error) {
+//     if (browser) {
+//       try { await browser.close(); } catch {}
+//     }
+//     return res.status(500).json({
+//       success: false,
+//       message: `Failed to generate PDF: ${error.message}`,
+//       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+//     });
+//   }
+// });
 // --- Work Order Invoice HTML Preview ---
 v1Router.get("/view/:id", async (req, res) => {
   try {
