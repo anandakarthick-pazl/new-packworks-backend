@@ -264,141 +264,6 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.get("/download/:id", async (req, res) => {
-//   let browser;
-//   try {
-//     const invoiceId = req.params.id;
-
-//     // Fetch invoice data
-//     const workOrderInvoice = await WorkOrderInvoice.findOne({
-//       where: { id: invoiceId, status: "active" },
-//       include: [
-//         {
-//           model: WorkOrder,
-//           as: "workOrder",
-//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-//         },
-//         {
-//           model: SalesOrder,
-//           as: "salesOrder",
-//           attributes: ["id", "sales_generate_id", "status"],
-//         },
-//       ],
-//     });
-
-//     if (!workOrderInvoice) {
-//       return res.status(404).json({ success: false, message: "Work Order Invoice not found" });
-//     }
-
-//     // Try to fetch HTML template, fallback to default if not found
-//     let htmlTemplate = await HtmlTemplate.findOne({
-//       where: {
-//         company_id: workOrderInvoice.company_id,
-//         template: "work_order_invoice",
-//         status: "active"
-//       }
-//     });
-
-//     if (!htmlTemplate) {
-//       htmlTemplate = await HtmlTemplate.findOne({
-//         where: { template: "work_order_invoice", status: "active" },
-//         order: [['id', 'ASC']]
-//       });
-//     }
-
-//     if (!htmlTemplate) {
-//       return generateOriginalInvoicePDF(req, res, workOrderInvoice);
-//     }
-
-//     // Prepare data for template
-//     let skuDetails = workOrderInvoice.sku_details;
-//     if (typeof skuDetails === "string") {
-//       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
-//     }
-
-//     const templateData = {
-//       workOrderInvoice: {
-//         id: workOrderInvoice.id,
-//         invoice_number: workOrderInvoice.invoice_number,
-//         due_date: workOrderInvoice.due_date,
-//         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
-//         client_name: workOrderInvoice.client_name || workOrderInvoice.salesOrder?.client || '',
-//         status: workOrderInvoice.status,
-//         total: workOrderInvoice.total || 0,
-//         total_tax: workOrderInvoice.total_tax || 0,
-//         total_amount: workOrderInvoice.total_amount || 0,
-//         payment_status: workOrderInvoice.payment_status || '',
-//         description: workOrderInvoice.description || '',
-//         quantity: workOrderInvoice.quantity || 0,
-//         discount: workOrderInvoice.discount || 0,
-//         discount_type: workOrderInvoice.discount_type || '',
-//         payment_expected_date: workOrderInvoice.payment_expected_date || '',
-//         transaction_type: workOrderInvoice.transaction_type || '',
-//         balance: workOrderInvoice.balance || 0,
-//       },
-//       workOrder: workOrderInvoice.workOrder || null,
-//       salesOrder: workOrderInvoice.salesOrder || null,
-//       sku_details: skuDetails || [],
-//       current_date: new Date().toLocaleDateString('en-IN')
-//     };
-
-//     // Compile Handlebars template
-//     const template = handlebars.compile(htmlTemplate.html_template);
-//     const html = template(templateData);
-
-//     // Generate PDF using Puppeteer
-//     browser = await puppeteer.launch({
-//       headless: true,
-//       args: [
-//         '--no-sandbox',
-//         '--disable-setuid-sandbox',
-//         '--disable-dev-shm-usage',
-//         '--disable-accelerated-2d-canvas',
-//         '--no-first-run',
-//         '--no-zygote',
-//         '--disable-gpu'
-//       ]
-//     });
-
-//     const page = await browser.newPage();
-//     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
-
-//     const pdf = await page.pdf({
-//       format: 'A4',
-//       printBackground: true,
-//       preferCSSPageSize: true,
-//       margin: {
-//         top: '10mm',
-//         right: '10mm',
-//         bottom: '10mm',
-//         left: '10mm'
-//       }
-//     });
-
-//     await browser.close();
-
-//     // Send PDF response
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-//     res.setHeader('Content-Length', pdf.length);
-//     return res.end(pdf);
-
-//   } catch (error) {
-//     if (browser) {
-//       try { await browser.close(); } catch {}
-//     }
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to generate PDF: ${error.message}`,
-//       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-//     });
-//   }
-// });
-
-
-// --- Fallback PDF (simple) ---
-
-
 async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
     const PDFDocument = require('pdfkit');
@@ -433,7 +298,6 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     });
   }
 }
-
 v1Router.get("/download/:id", async (req, res) => {
   let browser;
   try {
@@ -639,7 +503,6 @@ v1Router.get("/download/:id", async (req, res) => {
     });
   }
 });
-
 // --- Work Order Invoice HTML Preview ---
 v1Router.get("/view/:id", async (req, res) => {
   try {
@@ -789,7 +652,6 @@ v1Router.get("/view/:id", async (req, res) => {
     return res.status(500).send(`<h1>Error: ${error.message}</h1>`);
   }
 });
-
 // --- Render all Work Order Invoice Templates ---
 v1Router.get("/templates/rendered", async (req, res) => {
   try {
@@ -803,47 +665,56 @@ v1Router.get("/templates/rendered", async (req, res) => {
     }
 
     // Dummy data to render inside template
-    const sampleData = {
-      workOrderInvoice: {
-        invoice_number: "WO-INV-2024-001",
-        due_date_formatted: "12/06/2025",
-        client_name: "Sample Client",
-        status: "active",
-        total: 1500,
-        total_tax: 250,
-        total_amount: 1650,
-        payment_status: "pending",
-        description: "Sample work order invoice",
-        quantity: 100,
-        discount: 0,
-        discount_type: "",
-        payment_expected_date: "",
-        transaction_type: "",
-        balance: 0,
-      },
-      workOrder: {
-        work_generate_id: "WO-2024-001",
-        sku_name: "60ml",
-        qty: 100,
-        status: "active"
-      },
-      salesOrder: {
-        sales_generate_id: "SO-2024-001",
-        status: "active"
-      },
-      sku_details: [
-        {
-          serial_number: 1,
-          sku: "60ml",
-          quantity_required: 100,
-          rate_per_sku: 2,
-          total_amount: 100,
-          gst: 12,
-          total_incl_gst: 112
-        }
-      ],
-      current_date: new Date().toLocaleDateString('en-IN')
-    };
+
+  // Updated sample data with correct property names
+const sampleData = {
+  workOrderInvoice: {
+    invoice_number: "INV-2024-001",
+    due_date_formatted: "12/06/2025",
+    client_name: "Sample Client",
+    status: "active",
+    total: 1500,
+    total_tax: 250,
+    total_amount: 1650,
+    payment_status: "pending",
+    description: "Sample work order invoice",
+    quantity: 100,
+    discount: 5,
+    discount_type: "bulk qty",
+    payment_expected_date: "12/12/2025",
+    transaction_type: "UPI",
+    balance: 100,
+  },
+  workOrder: {
+    work_generate_id: "WO-2024-001",
+    sku_name: "60ml",
+    qty: 100,
+    status: "active"
+  },
+  salesOrder: {
+    sales_generate_id: "SO-2024-001",
+    status: "active"
+  },
+  sku_details: [
+    {
+      serial_number: 1,
+      item_name: "60ml Bottle",           // Changed from 'sku'
+      quantity: 100,                      // Changed from 'quantity_required'
+      unit_price: 15,                     // Changed from 'rate_per_sku'
+      tax_percentage: 12,                 // Changed from 'gst'
+      total_amount: 1680                  // Changed from 'total_incl_gst'
+    },
+    {
+      serial_number: 2,
+      item_name: "30ml Bottle",
+      quantity: 50,
+      unit_price: 10,
+      tax_percentage: 12,
+      total_amount: 560
+    }
+  ],
+  current_date: new Date().toLocaleDateString('en-IN')
+};
 
     // Render all templates
     const renderedBlocks = templates.map((template, index) => {
@@ -890,7 +761,6 @@ v1Router.get("/templates/rendered", async (req, res) => {
     res.status(500).send(`<h1>Error: ${error.message}</h1>`);
   }
 });
-
 // --- Activate Work Order Invoice Template ---
 v1Router.get("/activate/:id", async (req, res) => {
   const templateId = parseInt(req.params.id);
@@ -919,25 +789,6 @@ v1Router.get("/activate/:id", async (req, res) => {
     });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
