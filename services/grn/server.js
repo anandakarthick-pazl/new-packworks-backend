@@ -349,8 +349,8 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         work_order_no,
         description,
         quantity_available: parseFloat(accepted_quantity),
-        rate: newGRNItem.amount,
-        total_amount: parseFloat(accepted_quantity) * newGRNItem.amount,
+        rate: newGRNItem.unit_price,
+        total_amount: parseFloat(accepted_quantity) * newGRNItem.unit_price,
         batch_no,
         location,
         status: 'active',
@@ -358,7 +358,6 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         updated_by: req.user.id
       }, { transaction });
     }
-
     const allPoItems = await PurchaseOrderItem.findAll({ where: { po_id: grnData.po_id }, transaction });
     const allGrns = await GRN.findAll({ where: { po_id: grnData.po_id }, transaction });
     const allGrnIds = allGrns.map(grn => grn.id);
