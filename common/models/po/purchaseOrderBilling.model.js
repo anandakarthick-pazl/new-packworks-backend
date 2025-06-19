@@ -80,14 +80,10 @@ const PurchaseOrderBilling = sequelize.define(
   }
 );
 
-PurchaseOrderBilling.belongsTo(Company, { foreignKey: "company_id" });
-PurchaseOrderBilling.belongsTo(User, {
-  foreignKey: "created_by",
-  as: "creator",
-});
-PurchaseOrderBilling.belongsTo(User, {
-  foreignKey: "updated_by",
-  as: "updater",
-});
+// In PurchaseOrderBilling model
+PurchaseOrderBilling.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id', as: 'purchaseOrder' });
+PurchaseOrderBilling.belongsTo(User, { foreignKey: 'created_by', as: 'createdBy' });
+PurchaseOrderBilling.belongsTo(User, { foreignKey: 'updated_by', as: 'updatedBy' });
+PurchaseOrderBilling.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
 
 export default PurchaseOrderBilling;

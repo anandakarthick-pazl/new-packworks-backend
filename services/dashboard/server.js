@@ -67,8 +67,10 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
     if (!from_date || !to_date || from_date === '' || to_date === '') {
       // Default: First day of current month to today
       const now = new Date();
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1); // First day of current month
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1+1); // First day of current month
+     
       endDate = new Date(); // Today
+      
     } else {
       // Use provided dates
       startDate = new Date(from_date);

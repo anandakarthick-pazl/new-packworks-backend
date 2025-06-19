@@ -5,3 +5,5 @@ docker-compose.yml
 Dokerfile
 qrcodes/
 ecosystem.config.cjs
+dummy.js
+
