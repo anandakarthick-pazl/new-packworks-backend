@@ -400,6 +400,8 @@ v1Router.get("/download/:id", async (req, res) => {
       total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
+    console.log("Mapped SKU Details:", items);
+
     // Get client details from different possible sources
     const clientDetails = workOrderInvoice.Client || 
                          workOrderInvoice.salesOrder?.Client || 
@@ -522,8 +524,8 @@ v1Router.get("/view/:id", async (req, res) => {
           attributes: ["id", "sales_generate_id", "status", "client_id"],
           include: [
             {
-              model: Client, // Make sure to import Client model
-              as: "Client", // Use capital C to match the association alias
+              model: Client,
+              as: "Client",
               attributes: [
                 "client_id", 
                 "display_name", 
@@ -543,8 +545,8 @@ v1Router.get("/view/:id", async (req, res) => {
           ]
         },
         {
-          model: Client, // Direct client association if it exists
-          as: "Client", // Use capital C to match the association alias
+          model: Client,
+          as: "Client",
           attributes: [
             "client_id", 
             "display_name", 
@@ -587,10 +589,25 @@ v1Router.get("/view/:id", async (req, res) => {
       return res.status(404).send('<h1>No HTML template found</h1>');
     }
 
+    // Parse sku_details if it's a string
     let skuDetails = workOrderInvoice.sku_details;
     if (typeof skuDetails === "string") {
-      try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+      try { 
+        skuDetails = JSON.parse(skuDetails); 
+      } catch { 
+        skuDetails = []; 
+      }
     }
+
+    // Map skuDetails to template fields (same as download route)
+    const items = (skuDetails || []).map((item, idx) => ({
+      serial_number: idx + 1,
+      item_name: item.item_name || item.sku || item.name || "",
+      quantity: item.quantity || item.quantity_required || item.qty || "",
+      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+      tax_percentage: item.tax_percentage || item.gst || "",
+      total_amount: item.total_amount || item.total_incl_gst || "",
+    }));
 
     // Get client details from different possible sources
     const clientDetails = workOrderInvoice.Client || 
@@ -621,7 +638,6 @@ v1Router.get("/view/:id", async (req, res) => {
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
-      // Add client details to template data
       client: clientDetails ? {
         client_id: clientDetails.client_id,
         display_name: clientDetails.display_name || '',
@@ -638,7 +654,7 @@ v1Router.get("/view/:id", async (req, res) => {
         gst_number: clientDetails.gst_number || '',
         client_ref_id: clientDetails.client_ref_id || ''
       } : null,
-      sku_details: skuDetails || [],
+      sku_details: items, // <-- Now using mapped items instead of raw skuDetails
       current_date: new Date().toLocaleDateString('en-IN')
     };
 
