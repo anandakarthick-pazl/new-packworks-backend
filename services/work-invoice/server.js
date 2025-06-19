@@ -728,8 +728,15 @@ const sampleData = {
 
       return `
         <div class="template-block">
-          <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
-          ${renderedHTML}
+<div style="display: flex; gap: 20px; align-items: center;">
+            <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
+            <div class="template-info">
+              <strong>Template Status:</strong>
+              <span style="color: ${template.status === "active" ? "green" : "red"};">
+                ${template.status === "active" ? "Active" : "Inactive"}
+              </span>
+            </div>          
+          </div>          ${renderedHTML}
         </div>
         ${index !== templates.length - 1 ? '<hr/>' : ''}
       `;
