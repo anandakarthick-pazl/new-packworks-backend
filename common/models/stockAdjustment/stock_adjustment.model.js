@@ -9,6 +9,18 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     autoIncrement: true,
     primaryKey: true,
   },
+  reference_number: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
+  mode_of_adjustment: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   stock_adjustment_generate_id: {
     type: DataTypes.STRING(200),
     allowNull: true,
