@@ -63,19 +63,19 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
 
     // Set default dates if parameters are empty
     let startDate, endDate;
-    
+
     if (!from_date || !to_date || from_date === '' || to_date === '') {
       // Default: First day of current month to today
       const now = new Date();
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1+1); // First day of current month
-     
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1 + 1); // First day of current month
+
       endDate = new Date(); // Today
-      
+
     } else {
       // Use provided dates
       startDate = new Date(from_date);
       endDate = new Date(to_date);
-      
+
       // Validate dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         return res.status(400).json({
@@ -84,7 +84,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           error: "Invalid date parameters"
         });
       }
-      
+
       // Ensure start date is not after end date
       if (startDate > endDate) {
         return res.status(400).json({
@@ -94,107 +94,134 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         });
       }
     }
-    
+
     // Set end date to end of day for proper filtering
     endDate.setHours(23, 59, 59, 999);
-    
+
     // Calculate additional date ranges for charts (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
+
     // Log the date range being used
     logger.info(`Dashboard request for company_id: ${company_id}, Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-    
+
     // Parallel database queries for better performance with error handling
     const queryResults = await Promise.allSettled([
       // Sales Orders Count (within date range)
       SalesOrder.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           created_at: { [Op.between]: [startDate, endDate] }
         }
       }),
-      
+
       // Work Orders Count (within date range)
       WorkOrder.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           created_at: { [Op.between]: [startDate, endDate] },
           progress: { [Op.in]: ['Pending', 'Raw Material Allocation', 'Production Planned'] }
         }
       }),
-      
+
       // SKU Count
       db.Sku.count({
-        where: { 
+        where: {
           company_id,
           status: 'active'
         }
       }),
-      
+
       // Total Machines Count
       db.Machine.count({
-        where: { 
+        where: {
           company_id,
           status: 'active'
         }
       }),
-      
+
       // Active Machines Count
       db.Machine.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           machine_status: 'Active'
         }
       }),
-      
+
       // Employees Count
       db.User.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           is_superadmin: 0
         }
       }),
-      
+
       // Clients Count
       db.Client.count({
-        where: { 
+        where: {
           company_id,
           status: 'active'
         }
       }),
-      
+
       // Purchase Orders Count (within date range)
       db.PurchaseOrder.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           created_at: { [Op.between]: [startDate, endDate] }
         }
       }),
-      
+
       // GRN Count (within date range)
       db.GRN.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           created_at: { [Op.between]: [startDate, endDate] }
         }
       }),
-      
+
       // Stock Adjustments Count (within date range)
       db.stockAdjustment.count({
-        where: { 
+        where: {
           company_id,
           status: 'active',
           created_at: { [Op.between]: [startDate, endDate] }
         }
       }),
-      
+
+      // Purchase Return Count (within date range)
+      db.PurchaseReturn ? db.PurchaseReturn.count({
+        where: {
+          company_id,
+          status: 'active',
+          created_at: { [Op.between]: [startDate, endDate] }
+        }
+      }) : Promise.resolve(0),
+
+      // Credit Note Count (within date range)
+      db.CreditNote ? db.CreditNote.count({
+        where: {
+          company_id,
+          status: 'active',
+          created_at: { [Op.between]: [startDate, endDate] }
+        }
+      }) : Promise.resolve(0),
+
+      // Debit Note Count (within date range)
+      db.DebitNote ? db.DebitNote.count({
+        where: {
+          company_id,
+          status: 'active',
+          created_at: { [Op.between]: [startDate, endDate] }
+        }
+      }) : Promise.resolve(0),
+
       // Sales Trend Data (within specified date range)
       sequelize.query(`
         SELECT 
@@ -213,17 +240,17 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         replacements: { company_id, startDate, endDate },
         type: sequelize.QueryTypes.SELECT
       }),
-      
+
       // Machine Efficiency Data
       db.Machine.findAll({
-        where: { 
+        where: {
           company_id,
           status: 'active'
         },
         attributes: ['machine_name', 'machine_status'],
         limit: 6
       }),
-      
+
       // Recent Transactions with fixed collation (within date range)
       sequelize.query(`
         (SELECT 
@@ -237,7 +264,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
          FROM sales_order 
          WHERE company_id = :company_id AND status = 'active' 
          AND created_at BETWEEN :startDate AND :endDate
-         ORDER BY created_at DESC LIMIT 3)
+         ORDER BY created_at DESC LIMIT 2)
         UNION ALL
         (SELECT 
           'Work Order' COLLATE utf8mb4_unicode_ci as type, 
@@ -276,7 +303,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         // Return empty array as fallback
         return [];
       }),
-      
+
       // Production Metrics (within date range)
       sequelize.query(`
         SELECT 
@@ -306,6 +333,9 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
       purchaseOrdersCount = 0,
       grnCount = 0,
       stockAdjustmentsCount = 0,
+      purchaseReturnCount = 0,
+      creditNoteCount = 0,
+      debitNoteCount = 0,
       salesTrendData = [],
       machineEfficiencyData = [],
       recentTransactions = [],
@@ -317,7 +347,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         // Log the error for debugging
         logger.error(`Query ${index} failed:`, result.reason);
         // Return default values based on query index
-        const defaults = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, [], [], [], [{ total_work_orders: 0, completed_orders: 0, avg_progress: 85 }]];
+        const defaults = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], [{ total_work_orders: 0, completed_orders: 0, avg_progress: 85 }]];
         return defaults[index];
       }
     });
@@ -340,7 +370,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         appliedFilters: {
           from_date: from_date || 'auto',
           to_date: to_date || 'auto',
-          filterDescription: from_date && to_date ? 
+          filterDescription: from_date && to_date ?
             `Custom date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}` :
             `Default range: ${startDate.toISOString().split('T')[0]} (month start) to ${endDate.toISOString().split('T')[0]} (today)`
         }
@@ -355,34 +385,35 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         finance: "#34495e",
         hr: "#1abc9c"
       },
-      alerts: [
-        {
-          id: 1,
-          type: "info",
-          message: from_date && to_date ? 
-            `Dashboard showing data for custom date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}` :
-            `Dashboard showing data for default range: ${startDate.toISOString().split('T')[0]} (month start) to ${endDate.toISOString().split('T')[0]} (today)`,
-          time: "now",
-          icon: "cilCalendar",
-          module: "System"
-        },
-        {
-          id: 2,
-          type: "warning",
-          message: `${workOrdersCount} work orders are currently in progress`,
-          time: "30 minutes ago",
-          icon: "cilWarning",
-          module: "Production"
-        },
-        {
-          id: 3,
-          type: activeMachinesCount < machinesCount ? "warning" : "success",
-          message: `${activeMachinesCount}/${machinesCount} machines are currently active`,
-          time: "1 hour ago",
-          icon: "cilCalculator",
-          module: "Maintenance"
-        }
-      ],
+      // alerts: [
+      //   {
+      //     id: 1,
+      //     type: "info",
+      //     message: from_date && to_date ? 
+      //       `Dashboard showing data for custom date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}` :
+      //       `Dashboard showing data for default range: ${startDate.toISOString().split('T')[0]} (month start) to ${endDate.toISOString().split('T')[0]} (today)`,
+      //     time: "now",
+      //     icon: "cilCalendar",
+      //     module: "System"
+      //   },
+      //   {
+      //     id: 2,
+      //     type: "warning",
+      //     message: `${workOrdersCount} work orders are currently in progress`,
+      //     time: "30 minutes ago",
+      //     icon: "cilWarning",
+      //     module: "Production"
+      //   },
+      //   {
+      //     id: 3,
+      //     type: activeMachinesCount < machinesCount ? "warning" : "success",
+      //     message: `${activeMachinesCount}/${machinesCount} machines are currently active`,
+      //     time: "1 hour ago",
+      //     icon: "cilCalculator",
+      //     module: "Maintenance"
+      //   }
+      // ],
+      alert: [],
       erpWidgets: [
         {
           title: "Sales Orders",
@@ -489,7 +520,7 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           description: "Goods received",
           color: "#3498db",
           icon: "cilHome",
-          amount: `${(grnCount * 2500).toLocaleString()}`
+          amount: `₹${(grnCount * 2500).toLocaleString()}`
         },
         {
           title: "Stock Adjustments",
@@ -498,7 +529,34 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           description: "Inventory corrections",
           color: "#e67e22",
           icon: "cilSettings",
-          amount: `${(stockAdjustmentsCount * 500).toLocaleString()}`
+          amount: `₹${(stockAdjustmentsCount * 500).toLocaleString()}`
+        },
+        {
+          title: "Purchase Returns",
+          value: purchaseReturnCount.toString(),
+          change: calculateGrowth(purchaseReturnCount),
+          description: "Returns to suppliers",
+          color: "#e74c3c",
+          icon: "cilArrowBottom",
+          amount: `₹${(purchaseReturnCount * 1200).toLocaleString()}`
+        },
+        {
+          title: "Credit Notes",
+          value: creditNoteCount.toString(),
+          change: calculateGrowth(creditNoteCount),
+          description: "Issued credits",
+          color: "#34495e",
+          icon: "cilCreditCard",
+          amount: `₹${(creditNoteCount * 800).toLocaleString()}`
+        },
+        {
+          title: "Debit Notes",
+          value: debitNoteCount.toString(),
+          change: calculateGrowth(debitNoteCount),
+          description: "Issued debits",
+          color: "#9b59b6",
+          icon: "cilFile",
+          amount: `₹${(debitNoteCount * 600).toLocaleString()}`
         }
       ],
       productionMetrics: [
@@ -540,16 +598,26 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
         type: transaction.type,
         reference: transaction.reference,
         client: transaction.client_name,
-        amount: transaction.amount ? `${parseFloat(transaction.amount).toLocaleString()}` : 'N/A',
+        amount: transaction.amount ? `₹${parseFloat(transaction.amount).toLocaleString()}` : 'N/A',
         status: transaction.status,
         date: new Date(transaction.date).toISOString().split('T')[0],
         priority: transaction.priority,
-        icon: transaction.type === 'Sales Order' ? 'cilCart' : 
-              transaction.type === 'Work Order' ? 'cilPencil' :
-              transaction.type === 'Purchase Order' ? 'cilTruck' : 'cilHome',
-        color: transaction.type === 'Sales Order' ? '#2ecc71' : 
-               transaction.type === 'Work Order' ? '#e74c3c' :
-               transaction.type === 'Purchase Order' ? '#f39c12' : '#3498db'
+        icon: transaction.type === 'Sales Order' ? 'cilCart'
+          : transaction.type === 'Work Order' ? 'cilPencil'
+          : transaction.type === 'GRN' ? 'cilHome'
+          : transaction.type === 'Purchase Return' ? 'cilArrowBottom'
+          : transaction.type === 'Credit Note' ? 'cilCreditCard'
+          : transaction.type === 'Debit Note' ? 'cilFile'
+          : transaction.type === 'Purchase Order' ? 'cilTruck'
+          : 'cilInfo',
+        color: transaction.type === 'Sales Order' ? '#2ecc71'
+          : transaction.type === 'Work Order' ? '#e74c3c'
+          : transaction.type === 'Purchase Order' ? '#f39c12'
+          : transaction.type === 'GRN' ? '#3498db'
+          : transaction.type === 'Purchase Return' ? '#e74c3c'
+          : transaction.type === 'Credit Note' ? '#34495e'
+          : transaction.type === 'Debit Note' ? '#9b59b6'
+          : '#95a5a6'
       })),
       chartData: {
         salesTrend: {
@@ -586,10 +654,10 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
           labels: (machineEfficiencyData || []).map(machine => machine.machine_name || `M-${machine.id || '001'}`),
           datasets: [{
             label: "Efficiency %",
-            data: (machineEfficiencyData || []).map(machine => 
+            data: (machineEfficiencyData || []).map(machine =>
               machine.machine_status === 'Active' ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 50
             ),
-            backgroundColor: (machineEfficiencyData || []).map((_, index) => 
+            backgroundColor: (machineEfficiencyData || []).map((_, index) =>
               index % 2 === 0 ? "#e67e22" : "#e74c3c"
             ),
             borderRadius: 8
@@ -687,14 +755,14 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
 
   } catch (error) {
     logger.error("Error fetching dashboard data:", error);
-    
+
     // Provide more specific error information
     const errorMessage = error.message || 'Unknown error occurred';
-    
+
     res
       .status(500)
-      .json({ 
-        message: "Internal Server Error", 
+      .json({
+        message: "Internal Server Error",
         error: errorMessage,
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
