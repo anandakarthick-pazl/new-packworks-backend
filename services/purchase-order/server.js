@@ -14,6 +14,7 @@ import { fileURLToPath } from "url";
 import HtmlTemplate  from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
+import addWalletHistory from "../../common/helper/walletHelper.js";
 
 const Company = db.Company;
 const User =db.User;
@@ -27,6 +28,9 @@ const GRN = db.GRN;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const Item = db.ItemMaster;
 const PurchaseOrderBilling = db.PurchaseOrderBilling;
+const Client = db.Client;
+const WalletHistory = db.WalletHistory;
+
 
 dotenv.config();
 const app = express();
@@ -1221,10 +1225,35 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
       await PurchaseOrderReturnItem.create(item); 
+
+
+
+      const inventory = await Inventory.findOne({
+      where: {
+        item_id: item.item_id,
+        po_id: poReturn.po_id,
+        company_id: req.user.company_id
+      }
+    });
+
+    if (!inventory) {
+      return res.status(404).json({
+        success: false,
+        message: `Inventory record not found for item ${item.item_id}`
+      });
+    }
+
+    // 2. Compute total_amount
+    const quantity = parseFloat(inventory.quantity_available || 0);
+    const rate = parseFloat(inventory.rate || 0);
+    const total_amount = quantity * rate;
       
       ///
       await Inventory.update(
-        { po_return_id: poReturn.id },
+        { 
+          po_return_id: poReturn.id,
+          total_amount: total_amount
+        },
         {
           where: {
             item_id: item.item_id,
@@ -1291,6 +1320,28 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
       { po_status: allReturned ? "returned" : "amended" },
       { where: { id: po_id } }
     );
+
+
+    // client
+    const client = await Client.findOne({
+      where: { client_id: purchaseOrder.supplier_id, company_id: req.user.company_id },
+    });
+    if (!client) throw new Error("supplier Id not found");
+
+    // Update debit_balance
+    client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount_total);
+    await client.save();
+
+    // Insert wallet history record
+    await addWalletHistory({
+      type: 'debit',
+      client_id: client.client_id,
+      amount: total_amount_total,
+      company_id: req.user.company_id,
+      reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
+      created_by: req.user.id,
+    });
+
 
     return res.status(201).json({
       message: 'Purchase Order Return created successfully.',
