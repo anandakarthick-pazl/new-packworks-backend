@@ -58,6 +58,8 @@ import ContactMessage from "./contactMessage.model.js";
 import PurchaseOrderBilling from "./po/purchaseOrderBilling.model.js";
 import WalletHistory from "./walletHistory.model.js";
 import PartialPayment from "./salesOrder/partialPayment.model.js";
+import SalesReturn  from "./sales_return/sales_return.model.js";
+import SalesReturnItem  from "./sales_return/sales_return_item.model.js";
 
 const db = {
   sequelize,
@@ -120,6 +122,9 @@ const db = {
   PurchaseOrderBilling,
   WalletHistory,
   PartialPayment,
+  SalesReturnItem,
+  SalesReturn
+
 
 };
 
