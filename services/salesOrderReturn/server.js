@@ -76,7 +76,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
     // 1. Create Sales Return Header
     const salesReturnHeader = await db.SalesReturn.create({
       return_generate_id: return_id,
-      sales_order_id,
+      sales_id:sales_order_id,
       client_id,
       return_date: return_date || new Date(),
       reason: return_reason,
