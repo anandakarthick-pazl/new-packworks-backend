@@ -432,46 +432,63 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     poData.created_by = req.user.id;
     poData.updated_by = req.user.id;
     poData.company_id = req.user.company_id;
-    // poData.use_this = use_this;
-    // poData.debit_amount = debit_amount;
+
     
     
     const use_this = poData.use_this;
-    const debit_balance = parseFloat(poData.debit_amount || 0);
+const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
+const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
 
-    if (use_this === true && debit_balance > 0) {
-      const client = await Client.findOne({
-        where: { client_id: poData.supplier_id },
-        attributes: ['client_id','debit_balance']
-      });
+if (use_this === true) {
+  const client = await Client.findOne({
+    where: { client_id: poData.supplier_id },
+    attributes: ['client_id', 'debit_balance']
+  });
 
-      console.log("client :", client);
-      
+  if (!client) {
+    return res.status(404).json({ success: false, message: "Client not found" });
+  }
 
-      if (!client) {
-        return res.status(404).json({ success: false, message: "Client not found" });
-      }
+  console.log("client :", client);
 
-      const updatedDebitNote = parseFloat(client.debit_balance || 0) - debit_balance;
+  const currentDebit = parseFloat(client.debit_balance || 0);
 
-      console.log("updatedDebitNote :", updatedDebitNote);
+  // If client has enough debit balance to cover this
+  if (debit_balance_amount > 0 && currentDebit >= debit_balance_amount) {
+    const updatedDebitBalance = currentDebit - debit_balance_amount;
 
-      await addWalletHistory({
-        type: 'debit',
-        client_id: client.client_id,
-        amount: updatedDebitNote,
-        company_id: req.user.company_id,
-        reference_number: "Purchase Order " + purchase_generate_id, 
-        created_by: req.user.id,
-      });
+    console.log("updatedDebitNote :", updatedDebitBalance);
 
+    await addWalletHistory({
+      type: 'credit',
+      client_id: client.client_id,
+      amount: debit_balance_amount,
+      company_id: req.user.company_id,
+      reference_number: "Purchase Order " + purchase_generate_id,
+      created_by: req.user.id,
+    });
 
+    await Client.update(
+      { debit_balance: updatedDebitBalance },
+      { where: { client_id: poData.supplier_id } }
+    );
+  } else {
+    // Not enough balance or amount is zero
+    await addWalletHistory({
+      type: 'credit',
+      client_id: client.client_id,
+      amount: 0,
+      company_id: req.user.company_id,
+      reference_number: "Purchase Order " + purchase_generate_id,
+      created_by: req.user.id,
+    });
 
-      await Client.update(
-        { debit_balance: updatedDebitNote },
-        { where: { client_id: poData.supplier_id } }
-      );
-    }   
+    await Client.update(
+      { debit_balance: 0 },
+      { where: { client_id: poData.supplier_id } }
+    );
+  }
+}
 
 
     const newPO = await PurchaseOrder.create(poData, { transaction });
@@ -1239,7 +1256,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     }
 
     // 5. Generate purchase return ID
-    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "purchase_return");
 
     // 6. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({

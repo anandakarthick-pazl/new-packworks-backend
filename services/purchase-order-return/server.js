@@ -272,8 +272,13 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
       include: [
         {
           model: PurchaseOrderReturnItem,
-          as: "items",
-        }
+          as: "items"
+        },
+        {
+          model: PurchaseOrder,
+          as: "PurchaseOrder", // must match your model association alias
+          attributes: ["id", "purchase_generate_id"]
+        },      
       ]
     });
 
@@ -284,9 +289,32 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
       });
     }
 
-    return res.status(200).json({
+    const itemIds = purchaseOrderReturn.items.map(item => item.item_id);
+
+    // Step 3: Get all matching ItemMaster records
+    const itemMasterData = await ItemMaster.findAll({
+      where: { id: itemIds },
+      attributes: ["id", "item_generate_id", "item_name"]
+    });
+
+    // // Step 4: Map itemMasterData by id for fast lookup
+    // const itemMap = {};
+    // itemMasterData.forEach(item => {
+    //   itemMap[item.id] = item;
+    // });
+
+    // // Step 5: Append itemMaster info manually to each return item
+    // purchaseOrderReturn.items = purchaseOrderReturn.items.map(item => {
+    //   return {
+    //     ...item.toJSON(),
+    //     item_info: itemMap[item.item_id] || null
+    //   };
+    // });
+
+  return res.status(200).json({
       success: true,
-      data: purchaseOrderReturn
+      data: purchaseOrderReturn,
+      item_data : itemMasterData
     });
 
   } catch (error) {

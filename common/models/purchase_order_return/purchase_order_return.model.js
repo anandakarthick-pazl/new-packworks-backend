@@ -5,6 +5,7 @@ import User from "../user.model.js"; // If you have this model
 import PurchaseOrder from "../po/purchase_order.model.js"; // If you have this model
 import GRN from "../grn/grn.model.js"; // If you have this model
 import GRNItem from "../grn/grn_item.model.js"; // If you have this model
+import ItemMaster from "../item.model.js";
  
 const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
   id: {
@@ -127,11 +128,12 @@ const PurchaseOrderReturn = sequelize.define('PurchaseOrderReturn', {
 });
  
 // Associations
-PurchaseOrderReturn.belongsTo(PurchaseOrder, { foreignKey: "po_id" });
+PurchaseOrderReturn.belongsTo(PurchaseOrder, { foreignKey: "po_id", as: "PurchaseOrder"  });
 PurchaseOrderReturn.belongsTo(Company, { foreignKey: "company_id" });
 PurchaseOrderReturn.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 PurchaseOrderReturn.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 PurchaseOrderReturn.belongsTo(GRN, { foreignKey: "grn_id" });
+
  
  
  
