@@ -822,7 +822,6 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
     }
 
     // --- Add GST percentage from SKU table ---
-    // const Sku = db.Sku || db.SKU || db.sku;
     if (Sku) {
       // For each sales_sku_details, add gst_percentage if sku_id exists
       if (Array.isArray(result.sales_sku_details)) {
@@ -845,6 +844,16 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
       }
     }
     // --- End GST percentage logic ---
+
+    // --- Add credit_balance from Client table ---
+    const Client = db.Client;
+    if (Client && result.client_id) {
+      const clientRecord = await Client.findOne({ where: { client_id: result.client_id } });
+      result.credit_balance = clientRecord ? clientRecord.credit_balance : null;
+    } else {
+      result.credit_balance = null;
+    }
+    // --- End credit_balance logic ---
 
     res.json(result);
   } catch (error) {
