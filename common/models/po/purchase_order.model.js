@@ -37,6 +37,16 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      use_this: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      debit_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.00
+      },
       supplier_name: {
         type: DataTypes.STRING(100)
       },
