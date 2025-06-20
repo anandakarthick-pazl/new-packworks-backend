@@ -17,6 +17,7 @@ const PurchaseOrderItem = db.PurchaseOrderItem;
 const Inventory = db.Inventory;
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 
 dotenv.config();
@@ -643,6 +644,45 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
       return res.status(500).json({ success: false, message: error.message });
     }
   });
+
+
+
+  v1Router.get("/grn/bill/:id", authenticateJWT, async (req, res) => {
+  try {
+    const grnId = req.params.id;    
+
+    // Find the corresponding purchase order
+    const po = await PurchaseOrder.findOne({
+      where: { id: grnId },
+      attributes: ["id"]
+    });
+
+    if (!po) {
+      return res.status(404).json({
+        success: false,
+        message: "Purchase Order not found"
+      });
+    }    
+
+    const bills = await PurchaseOrderBilling.findAll({
+      where: { purchase_order_id: po.id },
+      attributes: ["id", "bill_generate_id"]
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: bills
+    });
+
+  } catch (error) {
+    console.error("Error fetching GRN bill:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase order billing"
+    });
+  }
+});
+
   
   
 
