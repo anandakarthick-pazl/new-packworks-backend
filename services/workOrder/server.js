@@ -28,6 +28,7 @@ const WorkOrder = db.WorkOrder;
 const SalesOrder = db.SalesOrder;
 const SalesSkuDetails = db.SalesSkuDetails;
 const WorkOrderInvoice = db.WorkOrderInvoice;
+const Sku = db.Sku;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -819,6 +820,31 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
     } else {
       result.sales_sku_details = [];
     }
+
+    // --- Add GST percentage from SKU table ---
+    // const Sku = db.Sku || db.SKU || db.sku;
+    if (Sku) {
+      // For each sales_sku_details, add gst_percentage if sku_id exists
+      if (Array.isArray(result.sales_sku_details)) {
+        for (let i = 0; i < result.sales_sku_details.length; i++) {
+          const skuDetail = result.sales_sku_details[i];
+          if (skuDetail.sku_id) {
+            const skuRecord = await Sku.findOne({ where: { id: skuDetail.sku_id } });
+            skuDetail.gst_percentage = skuRecord ? skuRecord.gst_percentage : null;
+          } else {
+            skuDetail.gst_percentage = null;
+          }
+        }
+      }
+      // If workOrder itself has sku_id, add gst_percentage at top level
+      if (result.sku_id) {
+        const skuRecord = await Sku.findOne({ where: { id: result.sku_id } });
+        result.gst_percentage = skuRecord ? skuRecord.gst_percentage : null;
+      } else {
+        result.gst_percentage = null;
+      }
+    }
+    // --- End GST percentage logic ---
 
     res.json(result);
   } catch (error) {
