@@ -84,7 +84,6 @@ const WorkOrder = sequelize.define(
     pending_invoice_qty: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      defaultValue: null,
     },
     edd: {
       type: DataTypes.DATE,

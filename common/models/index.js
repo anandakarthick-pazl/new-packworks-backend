@@ -57,6 +57,7 @@ import PasswordReset from "./passwordReset.model.js";
 import ContactMessage from "./contactMessage.model.js";
 import PurchaseOrderBilling from "./po/purchaseOrderBilling.model.js";
 import WalletHistory from "./walletHistory.model.js";
+import PartialPayment from "./salesOrder/partialPayment.model.js";
 
 const db = {
   sequelize,
@@ -118,6 +119,7 @@ const db = {
   ContactMessage,
   PurchaseOrderBilling,
   WalletHistory,
+  PartialPayment,
 
 };
 
