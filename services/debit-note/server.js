@@ -1,24 +1,15 @@
 import express, { json, Router } from "express";
 import cors from "cors";
-import { Op } from "sequelize";
 import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import GRN from "../../common/models/grn/grn.model.js";
-import GRNItem from "../../common/models/grn/grn_item.model.js";
 import "../../common/models/association.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 
-const Company = db.Company;
-const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
 const PurchaseOrderReturn = db.PurchaseOrderReturn;
-const ItemMaster = db.ItemMaster;
-const grnItem = db.GRNItem;
-const purchase_order_item = db.PurchaseOrderItem;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
-const InvoiceSetting = db.InvoiceSetting;
 const debit_note = db.DebitNote;
 const Inventory = db.Inventory;
 
@@ -29,10 +20,9 @@ app.use(cors());
 const v1Router = Router();
 
 
-
+// Create 
 v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
-
   try {
     const {
       debit_note_number,
@@ -53,8 +43,8 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     if (!po_return_id) throw new Error("Purchase Order Return ID (po_return_id) is required");
 
     // Check for duplicate
-    const existing = await debit_note.findOne({ where: { debit_note_number } });
-    if (existing) throw new Error(`Debit Note ${debit_note_number} already exists`);
+    const existing = await debit_note.findOne({ where: { po_return_id } });
+    if (existing) throw new Error(`Purchase order Return Based Debit Note already exists`);
 
     // Generate unique debit_note_generate_id
     const debit_note_generate_id = await generateId(user.company_id, debit_note, "debit_note");
@@ -85,12 +75,12 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
     const items = poReturn.items || [];
     if (!items.length) throw new Error("No Purchase Order Return Items found");
 
-    const rate = items[0]?.unit_price || 0;
+    // const rate = items[0]?.unit_price || 0;
     const amount = items.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-    const sub_total = amount;
-    const adjustment = 0;
+    // const sub_total = amount;
+    // const adjustment = 0;
     const tax_amount = parseFloat(poReturn.tax_amount || 0);
-    const total_amount = sub_total + tax_amount;
+    const total_amount = amount + tax_amount;
 
     // Create debit note
     const debitNote = await debit_note.create({
@@ -100,10 +90,10 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
       reference_id,
       company_id: user.company_id,
       supplier_id,
-      rate,
+      // rate,
       amount,
-      sub_total,
-      adjustment,
+      // sub_total,
+      // adjustment,
       tax_amount,
       total_amount,
       reason,
@@ -140,16 +130,16 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
         throw new Error(`Inventory not found for item_id=${item_id}, grn_id=${grn_id}, po_id=${po_id}`);
       }
 
-      const currentQty = parseFloat(inventory.quantity_available || 0);
+      // const currentQty = parseFloat(inventory.quantity_available || 0);
 
-      if (quantity > currentQty) {
-        throw new Error(`Return quantity exceeds available: item_id=${item_id}, available=${currentQty}, return=${quantity}`);
-      }
+      // if (quantity > currentQty) {
+      //   throw new Error(`Return quantity exceeds available: item_id=${item_id}, available=${currentQty}, return=${quantity}`);
+      // }
 
-      const newQty = currentQty - quantity;
+      // const newQty = currentQty - quantity;
 
       await inventory.update({
-        quantity_available: newQty,
+        // quantity_available: newQty,
         debit_note_id: debitNote.id
       }, { transaction });
     }

@@ -114,42 +114,25 @@ CREATE TABLE `production_group` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+CREATE TABLE `credit_notes` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `company_id` INT UNSIGNED NOT NULL,
+  `client_id` INT UNSIGNED NOT NULL,
+  `client_name` VARCHAR(255) NULL,
+  `work_order_invoice_id` INT UNSIGNED NOT NULL,
+  `work_order_invoice_number` VARCHAR(255) NULL,
+  `credit_generate_id` VARCHAR(255) NULL,
+  `credit_reference_id` VARCHAR(255) NULL,
+  `subject` VARCHAR(255) NULL,
+  `invoice_total_amout` TEXT NULL,
+  `credit_total_amount` TEXT NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-{
-    "success": true,
-    "message": "Grouped Inventory data fetched successfully",
-    "data": [
-        {
-            "id": 2,
-            "quantity_available": "10.00",
-            "item": {
-                "default_custom_fields": {
-                    "bf": "24",
-                    "gsm": "122",
-                    "color": "black",
-                    "size": "37",
-                    "net_wt(Kgs)": "52.5",
-                    "mill": "ABC Paper Mills Pvt Ltd",
-                    "unit": "CM"
-                }
-            }
-        },
-           {
-            "id": 3,
-            "quantity_available": "10.00",
-            "item": {
-                "default_custom_fields": {
-                    "bf": "24",
-                    "gsm": "122",
-                    "color": "black",
-                    "size": "37",
-                    "net_wt(Kgs)": "55",
-                    "mill": "ABC Paper Mills Pvt Ltd",
-                    "unit": "CM"
-                }
-            }
-        },
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-    ]
-}
  

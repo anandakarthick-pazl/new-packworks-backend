@@ -10,6 +10,8 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 import QRCode from "qrcode";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
+import axios from 'axios';
+import FormData from "form-data";
 
 dotenv.config();
 
@@ -43,9 +45,47 @@ const WorkOrder = db.WorkOrder;
 const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
-async function generateQRCode(workOrder) {
+// async function generateQRCode(workOrder) {
+//   try {
+//     // Create a nicely formatted plain text representation of the work order
+//     const textContent = `
+// Work Order: ${workOrder.work_generate_id}
+// SKU: ${workOrder.sku_name || "N/A"}
+// Quantity: ${workOrder.qty || "N/A"}
+// Manufacture: ${workOrder.manufacture || "N/A"}
+// Status: ${workOrder.status || "N/A"}
+// ${workOrder.description ? `Description: ${workOrder.description}` : ""}
+// ${workOrder.edd
+//         ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+//         : ""
+//       }
+// `.trim();
+
+//     // Generate a unique filename
+//     const qrFileName = `wo_${workOrder.work_generate_id.replace(
+//       /[^a-zA-Z0-9]/g,
+//       "_"
+//     )}_${Date.now()}.png`;
+//     const qrFilePath = path.join(qrCodeDir, qrFileName);
+
+//     // Generate QR code with the plain text
+//     await QRCode.toFile(qrFilePath, textContent, {
+//       errorCorrectionLevel: "H",
+//       margin: 1,
+//       width: 300,
+//     });
+
+//     // Return the URL to access the QR code
+//     const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
+//     return `${baseUrl}/qrcodes/${qrFileName}`;
+//   } catch (error) {
+//     logger.error("Error generating QR code:", error);
+//     throw error;
+//   }
+// }
+
+async function generateQRCode(workOrder, token) {
   try {
-    // Create a nicely formatted plain text representation of the work order
     const textContent = `
 Work Order: ${workOrder.work_generate_id}
 SKU: ${workOrder.sku_name || "N/A"}
@@ -53,37 +93,64 @@ Quantity: ${workOrder.qty || "N/A"}
 Manufacture: ${workOrder.manufacture || "N/A"}
 Status: ${workOrder.status || "N/A"}
 ${workOrder.description ? `Description: ${workOrder.description}` : ""}
-${
-  workOrder.edd
-    ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
-    : ""
-}
-`.trim();
+${workOrder.edd
+        ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
+        : ""
+      }`.trim();
 
-    // Generate a unique filename
-    const qrFileName = `wo_${workOrder.work_generate_id.replace(
-      /[^a-zA-Z0-9]/g,
-      "_"
-    )}_${Date.now()}.png`;
-    const qrFilePath = path.join(qrCodeDir, qrFileName);
+    const sanitizedId = workOrder.work_generate_id.replace(/[^a-zA-Z0-9]/g, "_");
+    const timestamp = Date.now();
+    const qrFileName = `wo_${sanitizedId}_${timestamp}.png`;
+    const qrFilePath = path.join(__dirname, "qrcodes", qrFileName);
 
-    // Generate QR code with the plain text
+    if (!fs.existsSync(path.dirname(qrFilePath))) {
+      fs.mkdirSync(path.dirname(qrFilePath), { recursive: true });
+    }
+
     await QRCode.toFile(qrFilePath, textContent, {
       errorCorrectionLevel: "H",
       margin: 1,
       width: 300,
     });
 
-    // Return the URL to access the QR code
-    const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
-    return `${baseUrl}/qrcodes/${qrFileName}`;
+    if (!fs.existsSync(qrFilePath)) {
+      throw new Error("QR code file was not created successfully");
+    }
+
+    // Prepare form data for upload
+    const form = new FormData();
+    form.append("file", fs.createReadStream(qrFilePath));
+
+    const config = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${process.env.BASE_URL}/file/upload`,
+      headers: {
+        // "x-api-key": "4b3e77f648e5b9055a45f0812b3a4c3b88b08ff10b2f34ec21d11b6f678b6876a4014c88ff2a3c7e8e934c4f4790a94d3acb28d2f78a9b90f18960feaf3e4f99",
+        Authorization: `Bearer ${token}`, // Replace with real token
+        ...form.getHeaders(),
+      },
+      data: form,
+    };
+
+    const uploadResponse = await axios.request(config);
+
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
+      throw new Error("Failed to upload QR code image.");
+    }
+
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || ""
+
+    // Optional: delete local QR file after uploading
+    fs.unlinkSync(qrFilePath);
+
+    return uploadedImageUrl;
+
   } catch (error) {
-    logger.error("Error generating QR code:", error);
+    logger.error("Error generating and uploading QR code:", error);
     throw error;
   }
 }
-
-
 // POST create new sales order - with SalesSkuDetails table
 v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
   const { salesDetails, skuDetails, workDetails } = req.body;
@@ -199,7 +266,9 @@ v1Router.post("/sale-order", authenticateJWT, async (req, res) => {
     // Generate QR codes and update each work order
     for (const workOrder of createdWorkOrders) {
       try {
-        const qrCodeUrl = await generateQRCode(workOrder);
+        const authHeader = req.headers.authorization;
+        const token = authHeader.split(" ")[1];
+        const qrCodeUrl = await generateQRCode(workOrder, token);
         await workOrder.update({ qr_code_url: qrCodeUrl }, { transaction });
       } catch (error) {
         logger.error(`Error generating QR code for work order ${workOrder.id}:`, error);
@@ -563,8 +632,8 @@ v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => 
         client: order.client,
         so_number: order.so_number,
         po_number: order.po_number,
-        delivery_date: order.delivery_date 
-          ? new Date(order.delivery_date).toLocaleDateString() 
+        delivery_date: order.delivery_date
+          ? new Date(order.delivery_date).toLocaleDateString()
           : "N/A",
         confirmation: order.confirmation ? "Yes" : "No",
         sales_status: order.sales_status,
@@ -678,7 +747,7 @@ v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => 
     const manufactureSuffix = manufacture ? `-${manufacture}` : "";
     const statusSuffix = sales_status ? `-${sales_status}` : "";
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    
+
     const filename = `sales-orders${clientSuffix}${skuSuffix}${manufactureSuffix}${statusSuffix}-${timestamp}.xlsx`;
 
     res.setHeader(
@@ -692,8 +761,7 @@ v1Router.get("/sale-order/download/excel", authenticateJWT, async (req, res) => 
 
     // Log the download
     logger.info(
-      `Sales Orders Excel download initiated by user ${
-        req.user.id
+      `Sales Orders Excel download initiated by user ${req.user.id
       } with filters: ${JSON.stringify({
         client,
         sku,
@@ -734,14 +802,14 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
     // Add sales_status filter if provided
     if (sales_status) where.sales_status = sales_status;
 
-    // Add unified search if provided - search across multiple fields
+    // Add unified search if provided - search across multiple fields in SalesOrder only
     if (search) {
       where[Op.or] = [
         { client: { [Op.like]: `%${search}%` } },
         { sales_generate_id: { [Op.like]: `%${search}%` } },
         { sales_ui_id: { [Op.like]: `%${search}%` } },
-        { sku: { [Op.like]: `%${search}%` } },
-        {sales_status: { [Op.like]: `%${search}%` } },
+        { sales_status: { [Op.like]: `%${search}%` } }
+        // Removed 'sku' from here as it doesn't exist in SalesOrder table
       ];
     }
 
@@ -774,14 +842,14 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
 
     // Add related model search conditions if search parameter is provided
     if (search) {
-      // Search in SKU details
+      // Search in SKU details - this will search for sku in the related model
       includeConditions[1].where = {
         ...includeConditions[1].where,
         [Op.or]: [
           { sku: { [Op.like]: `%${search}%` } },
         ],
       };
-      
+
       // Search in WorkOrder manufacture field
       includeConditions[0].where = {
         ...includeConditions[0].where,
@@ -789,6 +857,11 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
           { manufacture: { [Op.like]: `%${search}%` } },
         ],
       };
+
+      // If you want to include records where related models match the search,
+      // you might need to set required: true for those includes, but this will
+      // change the behavior to INNER JOIN instead of LEFT JOIN
+      // Alternatively, consider using a different approach for searching across related models
     }
 
     // Fetch data from database with all filters applied
@@ -825,20 +898,20 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
       totalPages: Math.ceil(count / limit),
       data: rows.map((order) => {
         const plainOrder = order.get({ plain: true });
-        
+
         // Parse work_order_sku_values in the main order
         parseWorkOrderSkuValues(plainOrder);
-        
+
         // Parse work_order_sku_values in work orders if they exist
         if (plainOrder.workOrders && Array.isArray(plainOrder.workOrders)) {
           plainOrder.workOrders = plainOrder.workOrders.map(parseWorkOrderSkuValues);
         }
-        
+
         // Parse work_order_sku_values in SKU details if they exist
         if (plainOrder.SalesSkuDetails && Array.isArray(plainOrder.SalesSkuDetails)) {
           plainOrder.SalesSkuDetails = plainOrder.SalesSkuDetails.map(parseWorkOrderSkuValues);
         }
-        
+
         return plainOrder;
       }),
     };
@@ -847,8 +920,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
     if (rows.length > 0) {
       logger.info(`First sales order ID: ${rows[0].id}`);
       logger.info(
-        `Work orders count: ${
-          rows[0].workOrders ? rows[0].workOrders.length : 0
+        `Work orders count: ${rows[0].workOrders ? rows[0].workOrders.length : 0
         }`
       );
     }
@@ -862,155 +934,7 @@ v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
   }
 });
 
-// v1Router.get("/sale-order", authenticateJWT, async (req, res) => {
-//   try {
-//     const {
-//       page = 1,
-//       limit = 10,
-//       client,
-//       sales_generate_id,
-//       sales_ui_id,
-//       sku,
-//       manufacture,
-//       confirmation,
-//       sales_status,
-//       status = "active",
-//     } = req.query;
-//     const offset = (page - 1) * limit;
 
-//     // Build base filter conditions for SalesOrder
-//     const where = {
-//       status: status,
-//       company_id: req.user.company_id, // Filter by the company ID from JWT token
-//     };
-
-//     // Add client search if provided
-//     if (client) where.client = { [Op.like]: `%${client}%` };
-//     if (sales_generate_id) where.sales_generate_id = { [Op.like]: `%${sales_generate_id}%` };
-//     if (sales_ui_id) where.sales_ui_id = { [Op.like]: `%${sales_ui_id}%` };
-
-//     // Add confirmation filter if provided
-//     if (confirmation !== undefined) where.confirmation = confirmation;
-
-//     // Add sales_status filter if provided
-//     if (sales_status) where.sales_status = sales_status;
-
-//     // Include conditions for related models
-//     const includeConditions = [
-//       {
-//         model: WorkOrder,
-//         as: "workOrders",
-//         where: { status: "active" }, // Only include active work orders
-//         required: false, // Don't require work orders by default (LEFT JOIN)
-//         separate: true, // Use separate query to ensure work orders are properly fetched
-//       },
-//       {
-//         model: SalesSkuDetails,
-//         where: { status: "active" }, // Only include active SKU details
-//         required: false, // Don't require SKU details by default (LEFT JOIN)
-//         separate: true, // Use separate query to ensure SKU details are properly fetched
-//       },
-//       {
-//         model: User,
-//         as: "creator_sales",
-//         attributes: ["id", "name", "email"],
-//       },
-//       {
-//         model: User,
-//         as: "updater_sales",
-//         attributes: ["id", "name", "email"],
-//       },
-//     ];
-
-//     // Add SKU search if provided
-//     if (sku) {
-//       includeConditions[1].where = {
-//         ...includeConditions[1].where,
-//         sku: { [Op.like]: `%${sku}%` },
-//       };
-//       includeConditions[1].required = true; // Make this association required when filtering
-//     }
-
-//     // Add manufacture search if provided
-//     if (manufacture) {
-//       includeConditions[0].where = {
-//         ...includeConditions[0].where,
-//         manufacture: { [Op.like]: `%${manufacture}%` },
-//       };
-//       includeConditions[0].required = true; // Make this association required when filtering
-//     }
-
-//     // Fetch data from database with all filters applied
-//     const { count, rows } = await SalesOrder.findAndCountAll({
-//       where,
-//       limit: parseInt(limit),
-//       offset: parseInt(offset),
-//       include: includeConditions,
-//       order: [["created_at", "DESC"]],
-//       distinct: true,
-//     });
-
-//     // Helper function to parse work_order_sku_values
-//     const parseWorkOrderSkuValues = (data) => {
-//       if (data && data.work_order_sku_values) {
-//         try {
-//           // If it's a string, parse it as JSON
-//           if (typeof data.work_order_sku_values === 'string') {
-//             data.work_order_sku_values = JSON.parse(data.work_order_sku_values);
-//           }
-//         } catch (error) {
-//           logger.warn(`Failed to parse work_order_sku_values for record ${data.id}:`, error);
-//           // Keep original value if parsing fails
-//         }
-//       }
-//       return data;
-//     };
-
-//     // Transform data and parse work_order_sku_values
-//     const result = {
-//       total: count,
-//       page: parseInt(page),
-//       limit: parseInt(limit),
-//       totalPages: Math.ceil(count / limit),
-//       data: rows.map((order) => {
-//         const plainOrder = order.get({ plain: true });
-        
-//         // Parse work_order_sku_values in the main order
-//         parseWorkOrderSkuValues(plainOrder);
-        
-//         // Parse work_order_sku_values in work orders if they exist
-//         if (plainOrder.workOrders && Array.isArray(plainOrder.workOrders)) {
-//           plainOrder.workOrders = plainOrder.workOrders.map(parseWorkOrderSkuValues);
-//         }
-        
-//         // Parse work_order_sku_values in SKU details if they exist
-//         if (plainOrder.SalesSkuDetails && Array.isArray(plainOrder.SalesSkuDetails)) {
-//           plainOrder.SalesSkuDetails = plainOrder.SalesSkuDetails.map(parseWorkOrderSkuValues);
-//         }
-        
-//         return plainOrder;
-//       }),
-//     };
-
-//     // Log for debugging - check if work orders are present
-//     if (rows.length > 0) {
-//       logger.info(`First sales order ID: ${rows[0].id}`);
-//       logger.info(
-//         `Work orders count: ${
-//           rows[0].workOrders ? rows[0].workOrders.length : 0
-//         }`
-//       );
-//     }
-
-//     res.json(result);
-//   } catch (error) {
-//     logger.error("Error fetching sales orders:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
-// GET single sales order by ID (including associated records)
 v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1073,15 +997,15 @@ v1Router.get("/sale-order/:id", authenticateJWT, async (req, res) => {
 
     // Transform data and parse work_order_sku_values
     let result = salesOrder.get({ plain: true });
-    
+
     // Parse work_order_sku_values in the main order
     result = parseWorkOrderSkuValues(result);
-    
+
     // Parse work_order_sku_values in work orders if they exist
     if (result.workOrders && Array.isArray(result.workOrders)) {
       result.workOrders = result.workOrders.map(parseWorkOrderSkuValues);
     }
-    
+
     // Parse work_order_sku_values in SKU details if they exist
     if (result.SalesSkuDetails && Array.isArray(result.SalesSkuDetails)) {
       result.SalesSkuDetails = result.SalesSkuDetails.map(parseWorkOrderSkuValues);
@@ -1295,7 +1219,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
       } else {
         // Create new work order with a generated ID
         const work_generate_id = await generateId(req.user.company_id, WorkOrder, "work");
-        
+
         const newWorkOrder = await WorkOrder.create(
           {
             work_generate_id: work_generate_id,
@@ -1324,7 +1248,7 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
           },
           { transaction }
         );
-        
+
         updatedAndNewWorkOrders.push(newWorkOrder);
       }
     }
@@ -1340,20 +1264,22 @@ v1Router.put("/sale-order/:id", authenticateJWT, async (req, res) => {
         { transaction }
       );
     }
-    
+
     // Generate or update QR codes for all updated and new work orders
     for (const workOrder of updatedAndNewWorkOrders) {
       try {
         // Skip if the work order already has a QR code URL and its data hasn't changed
-        if (workOrder.qr_code_url && !workOrder.changed('sku_name') && !workOrder.changed('qty') && 
-            !workOrder.changed('manufacture') && !workOrder.changed('status') && 
-            !workOrder.changed('description') && !workOrder.changed('edd')) {
+        if (workOrder.qr_code_url && !workOrder.changed('sku_name') && !workOrder.changed('qty') &&
+          !workOrder.changed('manufacture') && !workOrder.changed('status') &&
+          !workOrder.changed('description') && !workOrder.changed('edd')) {
           continue;
         }
-        
+
         // Generate a new QR code
-        const qrCodeUrl = await generateQRCode(workOrder);
-        
+        const authHeader = req.headers.authorization;
+        const token = authHeader.split(" ")[1];
+        const qrCodeUrl = await generateQRCode(workOrder, token);
+
         // Update the work order with the QR code URL
         await workOrder.update({ qr_code_url: qrCodeUrl }, { transaction });
       } catch (error) {
@@ -1477,7 +1403,6 @@ v1Router.delete("/sale-order/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// Add this new route to the v1Router section in your file
 
 // PATCH update sales_status only
 v1Router.patch("/sale-order/:id/status", authenticateJWT, async (req, res) => {
@@ -1551,6 +1476,6 @@ app.get("/health", (req, res) => {
 app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = 3005;
-app.listen(process.env.PORT_SALESORDER,'0.0.0.0', () => {
+app.listen(process.env.PORT_SALESORDER, '0.0.0.0', () => {
   console.log(`Sales order Service running on port ${process.env.PORT_SALESORDER}`);
 });

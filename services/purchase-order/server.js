@@ -4,15 +4,17 @@ import { Op } from "sequelize";
 import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
+import logger from "../../common/helper/logger.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import HtmlTemplate  from "../../common/models/purchaseOrderTemplate.model.js";
+import HtmlTemplate  from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
+import addWalletHistory from "../../common/helper/walletHelper.js";
 
 const Company = db.Company;
 const User =db.User;
@@ -25,12 +27,400 @@ const GRNItem = db.GRNItem;
 const GRN = db.GRN;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const Item = db.ItemMaster;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
+const Client = db.Client;
+const WalletHistory = db.WalletHistory;
+
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+
+// billings
+
+// POST create new purchase order billing
+v1Router.post("/purchase-order/bill-create", authenticateJWT, async (req, res) => {
+  const billingDetails = req.body;
+
+  if (!billingDetails) {
+    return res.status(400).json({ message: "Invalid input data" });
+  }
+
+  // Validate required fields
+  if (!billingDetails.purchase_order_id) {
+    return res.status(400).json({ message: "Purchase Order ID is required" });
+  }
+
+  if (!billingDetails.bill_date) {
+    return res.status(400).json({ message: "Bill date is required" });
+  }
+
+  if (!billingDetails.remarks) {
+    return res.status(400).json({ message: "Remarks are required" });
+  }
+
+  try {
+    const bill_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderBilling,
+      "billings"
+    );
+
+    // Create Purchase Order Billing
+    const newBilling = await PurchaseOrderBilling.create({
+      bill_generate_id: bill_generate_id,
+      company_id: req.user.company_id,
+      purchase_order_id: billingDetails.purchase_order_id,
+      bill_reference_number: billingDetails.bill_reference_number || null,
+      bill_date: billingDetails.bill_date,
+      remarks: billingDetails.remarks,
+      status: billingDetails.status || "active",
+      created_by: req.user.id,
+      updated_by: req.user.id,
+    });
+
+    res.status(201).json({
+      message: "Purchase Order Billing created successfully",
+      data: newBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error creating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET all purchase order billings with pagination, filtering, and search
+v1Router.get("/purchase-order/bill-get", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      purchase_order_id,
+      status = "active", // Default to 'active' status
+      search = "", // Add search parameter
+      bill_date_from,
+      bill_date_to,
+    } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id, // Add company filter for security
+    };
+
+    // Status filtering - default to active, but allow override
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+
+    if (purchase_order_id) {
+      whereClause.purchase_order_id = purchase_order_id;
+    }
+
+    // Date range filtering
+    if (bill_date_from && bill_date_to) {
+      whereClause.bill_date = {
+        [Op.between]: [bill_date_from, bill_date_to]
+      };
+    } else if (bill_date_from) {
+      whereClause.bill_date = {
+        [Op.gte]: bill_date_from
+      };
+    } else if (bill_date_to) {
+      whereClause.bill_date = {
+        [Op.lte]: bill_date_to
+      };
+    }
+
+    // Add search functionality if search parameter is provided
+    if (search && search.trim() !== "") {
+      const searchTerm = `%${search.trim()}%`; // Add wildcards for partial matching
+
+      // Define search condition to look across multiple fields
+      const searchCondition = {
+        [Op.or]: [
+          // Search in PurchaseOrderBilling fields
+          { bill_generate_id: { [Op.like]: searchTerm } },
+          { bill_reference_number: { [Op.like]: searchTerm } },
+          { remarks: { [Op.like]: searchTerm } },
+          { bill_date: { [Op.like]: searchTerm } },
+
+          // Search in related PurchaseOrder fields using Sequelize's nested include where
+          // { "$purchaseOrder.purchase_order_number$": { [Op.like]: searchTerm } },
+          // { "$purchaseOrder.supplier_name$": { [Op.like]: searchTerm } },
+        ],
+      };
+
+      // Add search condition to where clause
+      whereClause[Op.and] = whereClause[Op.and] || [];
+      whereClause[Op.and].push(searchCondition);
+    }
+
+    // Fetch from database with pagination, filters, and search
+    const { count, rows } = await PurchaseOrderBilling.findAndCountAll({
+      where: whereClause,
+      limit: limitNum,
+      offset: offset,
+      order: [["updated_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id",  "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id","email"],
+        },
+      ],
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(count / limitNum);
+
+    res.json({
+      billings: rows.map((billing) => billing.get({ plain: true })),
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching purchase order billings:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET specific purchase order billing by ID
+v1Router.get("/purchase-order/bill-get/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billing = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id", "email"],
+        },
+      ],
+    });
+
+    if (!billing) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    const result = billing.get({ plain: true });
+    res.json(result);
+  } catch (error) {
+    logger.error("Error fetching purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// PUT update purchase order billing
+v1Router.put("/purchase-order/bill-update/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    if (!updateData) {
+      return res.status(400).json({ message: "Invalid input data" });
+    }
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Prepare update object
+    const updateObject = {
+      ...updateData,
+      updated_by: req.user.id,
+      updated_at: new Date(),
+    };
+
+    // Remove fields that shouldn't be updated
+    delete updateObject.id;
+    delete updateObject.bill_generate_id;
+    delete updateObject.company_id;
+    delete updateObject.created_by;
+    delete updateObject.created_at;
+
+    // Update the billing
+    await PurchaseOrderBilling.update(updateObject, {
+      where: whereClause,
+    });
+
+    // Fetch updated billing with associations
+    const updatedBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id",  "email"],
+        },
+      ],
+    });
+
+    res.json({
+      message: "Purchase Order Billing updated successfully",
+      data: updatedBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error updating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// DELETE purchase order billing (soft delete)
+v1Router.delete("/purchase-order/bill-delete/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Soft delete by updating status to inactive
+    await PurchaseOrderBilling.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      },
+      {
+        where: whereClause,
+      }
+    );
+
+    res.json({
+      message: "Purchase Order Billing deleted successfully",
+    });
+  } catch (error) {
+    logger.error("Error deleting purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET purchase order billings by purchase order ID
+v1Router.get("/by-purchase-order/:purchase_order_id", authenticateJWT, async (req, res) => {
+  try {
+    const { purchase_order_id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      purchase_order_id: purchase_order_id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billings = await PurchaseOrderBilling.findAll({
+      where: whereClause,
+      order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_order_number", "supplier_name", "total_amount", "status"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "first_name", "last_name", "email"],
+        },
+      ],
+    });
+
+    res.json({
+      billings: billings.map((billing) => billing.get({ plain: true })),
+      total: billings.length,
+    });
+  } catch (error) {
+    logger.error("Error fetching billings by purchase order:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
 
 //Create Po
 v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
@@ -78,32 +468,86 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get all po
-v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
+// v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
+//   try {
+//     const usedPoIds = await GRN.findAll({
+//       attributes: ['po_id'],
+//       where: {
+//         grn_status:"fully_received",
+//         status:"active"
+//       },
+//       raw: true,
+//     });
+
+//     const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+
+
+
+//     const orders = await PurchaseOrder.findAll({
+//       attributes: ["id", "purchase_generate_id"],
+//       where: {
+//         company_id: req.user.company_id,
+//         decision:"approve",
+//         status:"active",
+//         id: {
+//           [Op.notIn]: poIdList
+//         }
+//       }
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: orders,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch purchase orders",
+//     });
+//   }
+// });
+
+v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
   try {
+    const { search } = req.query; // Get search term from query string
+
+    // Step 1: Find fully received PO IDs to exclude
     const usedPoIds = await GRN.findAll({
       attributes: ['po_id'],
+      where: {
+        grn_status: "fully_received",
+        status: "active"
+      },
       raw: true,
     });
 
-    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean);
 
+    // Step 2: Build where clause dynamically
+    const whereClause = {
+      company_id: req.user.company_id,
+      decision: "approve",
+      status: "active",
+      id: { [Op.notIn]: poIdList },
+    };
 
+    if (search) {
+      // Add case-insensitive LIKE search on `purchase_generate_id`
+      whereClause.purchase_generate_id = { [Op.like]: `%${search}%` };
+    }
 
+    // Step 3: Query Purchase Orders
     const orders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
-      where: {
-        company_id: req.user.company_id,
-        decision:"approve",
-        id: {
-          [Op.notIn]: poIdList
-        }
-      }
+      where: whereClause,
     });
 
     return res.status(200).json({
       success: true,
       data: orders,
     });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -112,6 +556,7 @@ v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 
 
@@ -156,34 +601,99 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get one po
-v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+// v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+//   try {
+//     const po = await PurchaseOrder.findOne({
+//       where: { id: req.params.id, status: "active" },
+//       include: [{ 
+//         model: PurchaseOrderItem,
+//         include: [
+//               {
+//                 model: ItemMaster,
+//                 as: "item_info", // Alias from GRNItem → ItemMaster association
+//                 attributes: ["id", "item_generate_id","item_name"]
+//               }
+//             ] 
+//         }],
+//     });
+
+//     if (!po) return res.status(404).json({ success: false, message: "Not found" });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase Order fetched",
+//       data: po,
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// });
+
+// Updated GET API for Purchase Order with Received Qty Calculation
+v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
   try {
+    const poId = req.params.id;
+
     const po = await PurchaseOrder.findOne({
-      where: { id: req.params.id, status: "active" },
-      include: [{ 
-        model: PurchaseOrderItem,
-        include: [
-              {
-                model: ItemMaster,
-                as: "item_info", // Alias from GRNItem → ItemMaster association
-                attributes: ["id", "item_generate_id"]
-              }
-            ] 
-        }],
+      where: { id: poId, status: "active" },
+      include: [
+        {
+          model: PurchaseOrderItem,
+          as: "PurchaseOrderItems",
+          include: [
+            {
+              model: ItemMaster,
+              as: "item_info",
+              attributes: ["id", "item_generate_id", "item_name"]
+            }
+          ]
+        }
+      ]
     });
 
-    if (!po) return res.status(404).json({ success: false, message: "Not found" });
+    if (!po) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    const grns = await GRN.findAll({ where: { po_id: poId } });
+    const grnIds = grns.map(grn => grn.id);
+
+    const grnItems = await GRNItem.findAll({
+      where: { grn_id: grnIds }
+    });
+
+    const itemReceivedMap = {};
+    grnItems.forEach(item => {
+      const key = item.po_item_id;
+      itemReceivedMap[key] = (itemReceivedMap[key] || 0) + parseFloat(item.accepted_quantity || 0);
+    });
+
+    // Attach received quantity info to each PO item
+    const updatedItems = po.PurchaseOrderItems.map(item => {
+      const received = itemReceivedMap[item.id] || 0;
+      return {
+        ...item.toJSON(),
+        received_quantity: received,
+        status: received >= parseFloat(item.quantity || 0) ? "fully_received" : "pending"
+      };
+    });
 
     return res.status(200).json({
       success: true,
       message: "Purchase Order fetched",
-      data: po,
+      data: {
+        ...po.toJSON(),
+        PurchaseOrderItems: updatedItems
+      }
     });
 
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 });
+
+
 
 //update po
 v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
@@ -715,10 +1225,35 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
       await PurchaseOrderReturnItem.create(item); 
+
+
+
+      const inventory = await Inventory.findOne({
+      where: {
+        item_id: item.item_id,
+        po_id: poReturn.po_id,
+        company_id: req.user.company_id
+      }
+    });
+
+    if (!inventory) {
+      return res.status(404).json({
+        success: false,
+        message: `Inventory record not found for item ${item.item_id}`
+      });
+    }
+
+    // 2. Compute total_amount
+    const quantity = parseFloat(inventory.quantity_available || 0);
+    const rate = parseFloat(inventory.rate || 0);
+    const total_amount = quantity * rate;
       
       ///
       await Inventory.update(
-        { po_return_id: poReturn.id },
+        { 
+          po_return_id: poReturn.id,
+          total_amount: total_amount
+        },
         {
           where: {
             item_id: item.item_id,
@@ -785,6 +1320,28 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
       { po_status: allReturned ? "returned" : "amended" },
       { where: { id: po_id } }
     );
+
+
+    // client
+    const client = await Client.findOne({
+      where: { client_id: purchaseOrder.supplier_id, company_id: req.user.company_id },
+    });
+    if (!client) throw new Error("supplier Id not found");
+
+    // Update debit_balance
+    client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount_total);
+    await client.save();
+
+    // Insert wallet history record
+    await addWalletHistory({
+      type: 'debit',
+      client_id: client.client_id,
+      amount: total_amount_total,
+      company_id: req.user.company_id,
+      reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
+      created_by: req.user.id,
+    });
+
 
     return res.status(201).json({
       message: 'Purchase Order Return created successfully.',
@@ -1291,7 +1848,10 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
 
 v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
   try {
-    const templates = await HtmlTemplate.findAll({ order: [['id', 'ASC']] });
+   const templates = await HtmlTemplate.findAll({
+      where: { template: "purchase_order" },
+      order: [['id', 'ASC']]
+    });
 
     if (!templates || templates.length === 0) {
       return res.status(404).send("<h1>No HTML templates found</h1>");
@@ -1351,8 +1911,15 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
       return `
         <div class="template-block">
-          <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
-          ${renderedHTML}
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
+            <div class="template-info">
+              <strong>Template Status:</strong>
+              <span style="color: ${template.status === "active" ? "green" : "red"};">
+                ${template.status === "active" ? "Active" : "Inactive"}
+              </span>
+            </div>          
+          </div>          ${renderedHTML}
         </div>
         ${index !== templates.length - 1 ? '<hr/>' : ''}
       `;
@@ -1394,19 +1961,19 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
 // ACtivate template
 v1Router.get("/purchase-order/activate/:id", async (req, res) => {
-  const templateId = req.params.id;
+  const templateId = parseInt(req.params.id);
 
   try {
     // 1. Set the selected template to active
     await HtmlTemplate.update(
       { status: "active" },
-      { where: { id: templateId } }
+      { where: { id: templateId,template:"purchase_order" } }
     );
 
     // 2. Set all other templates to inactive
     await HtmlTemplate.update(
       { status: "inactive" },
-      { where: { id: { [Op.ne]: templateId } } }
+      { where: { id: { [Op.ne]: templateId },template:"purchase_order" } }
     );
 
     return res.status(200).json({
@@ -1447,6 +2014,36 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
     res.status(200).json({
       success: true,
       data: purchaseOrders
+    });
+  } catch (error) {
+    console.error("Error fetching purchase order IDs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase order IDs"
+    });
+  }
+});
+
+
+
+//po_id based grn_id
+v1Router.get("/purchase-order/grn/:id", async (req, res) => {
+  try {
+
+      const poId = req.params.id;
+
+    const grnData = await GRN.findAll({
+      attributes: ["id", "grn_generate_id"],
+       where: {
+          po_id:poId,
+          status: "active",
+        },
+      order: [["id", "DESC"]]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: grnData
     });
   } catch (error) {
     console.error("Error fetching purchase order IDs:", error);

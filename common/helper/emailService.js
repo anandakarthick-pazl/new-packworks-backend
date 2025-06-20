@@ -21,16 +21,21 @@ const transporter = nodemailer.createTransport({
  * @param {string} htmlBody - HTML email content
  */
 export const sendEmail = async (to, subject, htmlBody) => {
+    console.log(`📩 First Email sent to ${to}`);
     try {
         const mailOptions = {
-            from: process.env.FROM_EMAIL, // Sender email
+             from: {
+                    name: process.env.FROM_NAME || 'PackWorkX',
+                    address: process.env.FROM_EMAIL || process.env.SMTP_USER
+                },
+            // from: process.env.FROM_EMAIL, // Sender email
             to, // Recipient
             subject, // Email subject
             html: htmlBody // Email content in HTML format
         };
 
         // Send email
-        const info = await transporter.sendMail(mailOptions);
+        const info = transporter.sendMail(mailOptions);
         console.log(`📩 Email sent to ${to}: ${info.messageId}`);
         return { success: true, message: "Email sent successfully" };
     } catch (error) {

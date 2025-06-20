@@ -453,6 +453,34 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    debit_note_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+      defaultValue: "DN",
+    },
+    debit_note_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+      defaultValue: "#",
+    },
+    debit_note_digit: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 3,
+    },
+      billings_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    billings_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    billings_digit: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 3,
+    },
   },
   {
     tableName: "invoice_settings",

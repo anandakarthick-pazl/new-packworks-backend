@@ -111,6 +111,9 @@ const GRNItem = sequelize.define("GRNItem", {
     allowNull: false,
     defaultValue: "active",
   },
+  grn_item_status: {
+    type: DataTypes.STRING(255),
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

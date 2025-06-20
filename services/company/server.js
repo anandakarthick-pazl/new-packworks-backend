@@ -11,7 +11,9 @@ import sequelize from '../../common/database/database.js';
 import dotenv from "dotenv";
 import { logRequestResponse } from "../../common/middleware/errorLogger.js";
 import logger from "../../common/helper/logger.js";
+import emailService from "../../common/services/email/emailService.js";
 dotenv.config();
+import bcrypt from "bcryptjs";
 
 const app = express();
 app.use(json());
@@ -30,38 +32,62 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
     const transaction = await sequelize.transaction(); // Start a transaction
 
     try {
-        const { companyAccountDetails, ...companyData } = req.body;
+        const { companyAccountDetails, package_name, ...companyData } = req.body;
 
         console.log("🔵 companyAccountDetails:", companyAccountDetails);
         console.log("🔵 companyData:", companyData);
+        console.log("🔵 package_name:", package_name);
 
-        // 🔹 Step 1: Call Stored Procedure (Insert Company & Users)
+        // 🔹 Step 1: Find package ID by package name
+        let packageId = null;
+        if (package_name) {
+            const packageResult = await sequelize.query(
+                `SELECT id FROM packages WHERE name = ?`,
+                {
+                    replacements: [package_name],
+                    type: sequelize.QueryTypes.SELECT,
+                    transaction
+                }
+            );
+
+            if (packageResult.length === 0) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    status: false,
+                    message: `Package with name '${package_name}' not found`,
+                    data: []
+                });
+            }
+
+            packageId = packageResult[0].id;
+            console.log("✅ Found Package ID:", packageId);
+        }
+
+        // 🔹 Step 2: Call Stored Procedure (Insert Company & Users)
         await sequelize.query(
-            `CALL ProcedureInsertCompanyAndUsers(
-                :name, :email, :currency, :timezone, :language,:address, :phone, :website, :logo,
-                :accountName, :accountEmail, :defaultPassword, :company_state_id, @newCompanyId);`,
+            `CALL ProcedureInsertCompanyAndUsers(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCompanyId);`,
             {
-                replacements: {
-                    name: companyData.name,
-                    email: companyData.email,
-                    currency: companyData.currency,
-                    timezone: companyData.timezone,
-                    language: companyData.language,
-                    address: companyData.address,
-                    phone: companyData.phone,
-                    website: companyData.website,
-                    logo: companyData.logo,
-                    accountName: companyAccountDetails[0].accountName, // Assuming at least one account
-                    accountEmail: companyAccountDetails[0].accountEmail,
-                    defaultPassword: "123456",
-                    company_state_id: companyData.company_state_id
-                },
+                replacements: [
+                    companyData.name,
+                    companyData.email,
+                    companyData.currency,
+                    companyData.timezone,
+                    companyData.language,
+                    companyData.address,
+                    companyData.phone,
+                    companyData.website,
+                    companyData.logo,
+                    companyAccountDetails[0].accountName, // Assuming at least one account
+                    companyAccountDetails[0].accountEmail,
+                    await bcrypt.hash(companyData.password || '123456', 10), // defaultPassword
+                    packageId // package_id
+                ],
                 type: sequelize.QueryTypes.RAW,
                 transaction
             }
         );
 
-        // 🔹 Step 2: Retrieve the new company ID
+        // 🔹 Step 3: Retrieve the new company ID from output parameter
         const companyIdResult = await sequelize.query(`SELECT @newCompanyId AS companyId;`, {
             type: sequelize.QueryTypes.SELECT,
             transaction
@@ -72,7 +98,32 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
 
         await transaction.commit(); // Commit transaction
 
-        // 🔹 Step 3: Publish `companyId` to RabbitMQ Queue for Background Processing
+        // 🔹 Step 4: Send Welcome Emails (async, non-blocking)
+        emailService.sendCompanyRegistrationEmails(
+            {
+                name: companyData.name,
+                email: companyData.email,
+                phone: companyData.phone,
+                website: companyData.website,
+                address: companyData.address
+            },
+            {
+                name: companyAccountDetails[0].accountName,
+                email: companyAccountDetails[0].accountEmail,
+                username: companyAccountDetails[0].accountEmail, // Username is the email
+                password: companyData.password || "123456" // Default password
+            }
+        ).then(() => {
+            logger.info(`📧 Registration emails sent successfully for company: ${companyData.name}`);
+        }).catch((emailError) => {
+            logger.error(`📧 Failed to send registration emails for company: ${companyData.name}`, {
+                error: emailError.message,
+                companyId: newCompanyId
+            });
+            // Don't fail the registration if email fails
+        });
+
+        // 🔹 Step 5: Publish `companyId` to RabbitMQ Queue for Background Processing
         const connection = await amqp.connect(RABBITMQ_URL);
         const channel = await connection.createChannel();
         await channel.assertQueue(QUEUE_NAME, { durable: true });
@@ -83,10 +134,17 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
         console.log(`📩 Sent Company ID ${newCompanyId} to RabbitMQ`);
         await channel.close();
         await connection.close();
+
+        // Return success response immediately (emails are sent asynchronously)
         return res.status(200).json({
             status: true,
-            message: "Company created successfully",
-            companyId: newCompanyId
+            message: "Company created successfully. Welcome emails are being sent.",
+            companyId: newCompanyId,
+            data: {
+                companyName: companyData.name,
+                adminEmail: companyAccountDetails[0].accountEmail,
+                emailStatus: "sending" // Indicates emails are being processed
+            }
         });
 
     } catch (error) {
@@ -101,6 +159,13 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
             fileName = match[1];
             lineNumber = match[2];
         }
+
+        logger.error('Company creation failed:', {
+            error: error.message,
+            file: fileName,
+            line: lineNumber,
+            // companyData: companyData.name || 'Unknown'
+        });
 
         return res.status(500).json({
             status: false,
@@ -260,6 +325,57 @@ v1Router.delete("/companies/:id", async (req, res) => {
     }
 });
 
+// 🔹 Test Email Endpoint (for development/testing)
+v1Router.post("/test-email", async (req, res) => {
+    try {
+        const { companyData, userData } = req.body;
+
+        // Default test data if not provided
+        const defaultCompanyData = {
+            name: companyData?.name || "Test Company Ltd",
+            email: companyData?.email || "test@company.com",
+            phone: companyData?.phone || "+1 (555) 123-4567",
+            website: companyData?.website || "https://testcompany.com",
+            address: companyData?.address || "123 Test Street, Test City"
+        };
+
+        const defaultUserData = {
+            name: userData?.name || "John Doe",
+            email: userData?.email || "john@company.com",
+            username: userData?.username || userData?.email || "john@company.com",
+            password: userData?.password || "123456"
+        };
+
+        logger.info('Testing email functionality with data:', {
+            company: defaultCompanyData.name,
+            user: defaultUserData.name
+        });
+
+        const result = await emailService.sendCompanyRegistrationEmails(
+            defaultCompanyData,
+            defaultUserData
+        );
+
+        return res.status(200).json({
+            status: true,
+            message: "Test emails sent successfully",
+            result: result,
+            data: {
+                companyData: defaultCompanyData,
+                userData: defaultUserData
+            }
+        });
+
+    } catch (error) {
+        logger.error('Test email failed:', error);
+        return res.status(500).json({
+            status: false,
+            message: "Failed to send test emails",
+            error: error.message
+        });
+    }
+});
+
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", authenticateStaticToken, (req, res) => {
     res.json({ status: "Service is running", timestamp: new Date() });
@@ -271,6 +387,6 @@ app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = 3001;
 const service = 'Company Service';
-app.listen(process.env.PORT_COMPANY,'0.0.0.0', async () => {
+app.listen(process.env.PORT_COMPANY, '0.0.0.0', async () => {
     console.log(`${service} running on port ${process.env.PORT_COMPANY}`);
 });
