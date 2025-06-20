@@ -83,9 +83,9 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       updated_by: req.user.id,
       quantity: invoiceDetails.quantity || null,
       sku_details: skuDetails || null,
-      client_name: invoiceDetails.client_name || null
-
-
+      client_name: invoiceDetails.client_name || null,
+      client_email: invoiceDetails.client_email || null,
+      client_phone: invoiceDetails.client_phone || null,
     });
 
     res.status(201).json({
@@ -332,7 +332,7 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     // Updated to use client details
     const clientName = workOrderInvoice.Client?.display_name || 
                       workOrderInvoice.Client?.company_name || 
-                      workOrderInvoice.client_name || 
+                      workOrderInvoice.client_name ||                       
                       workOrderInvoice.salesOrder?.Client?.display_name || 
                       workOrderInvoice.salesOrder?.Client?.company_name || 
                       `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() || 
