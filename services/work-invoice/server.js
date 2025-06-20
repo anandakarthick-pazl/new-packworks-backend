@@ -89,7 +89,8 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       client_phone: invoiceDetails.client_phone || null,
       received_amount: invoiceDetails.received_amount || 0.0,
       credit_amount: invoiceDetails.credit_amount || 0.0,
-      rate_per_qty: invoiceDetails.rate_per_qty || 0.0, // <-- Added
+      rate_per_qty: invoiceDetails.rate_per_qty || 0.0, 
+      invoice_pdf: invoiceDetails.invoice_pdf || null, 
     });
 
     res.status(201).json({
@@ -103,7 +104,6 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // GET all work order invoices with pagination, filtering, and search
 v1Router.get("/get", authenticateJWT, async (req, res) => {
   try {
@@ -299,43 +299,9 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
-//   try {
-//     const PDFDocument = require('pdfkit');
-//     const doc = new PDFDocument({ margin: 40, size: 'A4' });
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', `attachment; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-//     doc.pipe(res);
-
-//     doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
-//     doc.moveDown(0.5);
-//     doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
-//     doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
-    
-//     // Updated to use client details
-//     const clientName = workOrderInvoice.Client?.display_name || 
-//                       workOrderInvoice.Client?.company_name || 
-//                       workOrderInvoice.client_name || 
-//                       workOrderInvoice.salesOrder?.Client?.display_name || 
-//                       workOrderInvoice.salesOrder?.Client?.company_name || 
-//                       `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() || 
-//                       `${workOrderInvoice.salesOrder?.Client?.first_name || ''} ${workOrderInvoice.salesOrder?.Client?.last_name || ''}`.trim() || '';
-    
-//     doc.text(`Client: ${clientName}`, 40);
-//     doc.moveDown(1);
-//     doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
-
-//     doc.end();
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to generate fallback PDF: ${error.message}`
-//     });
-//   }
-// }
-
-
-
+// Define your specific invoice storage path
+const INVOICE_STORAGE_PATH = path.join(process.cwd(), 'public', 'invoice');
+// Updated generateOriginalInvoicePDF function
 async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
     const PDFDocument = require('pdfkit');
@@ -374,20 +340,28 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     doc.on('end', async () => {
       const pdfData = Buffer.concat(buffers);
       
-      // *** Save PDF to local directory ***
-      const invoiceDir = path.join(__dirname, '..','..', 'public', 'invoice'); // Adjust path as needed
-      const filePath = path.join(invoiceDir, fileName);
+      // Use your specific path
+      const fullFilePath = path.join(INVOICE_STORAGE_PATH, fileName);
 
       try {
         // Create directory if it doesn't exist
-        await fs.mkdir(invoiceDir, { recursive: true });
+        await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
         
         // Save PDF to file
-        await fs.writeFile(filePath, pdfData);
+        await fs.writeFile(fullFilePath, pdfData);
         
-        console.log(`PDF saved successfully at: ${filePath}`);
+        console.log(`PDF saved successfully at: ${fullFilePath}`);
+        
+        // Store the full path in database
+        await WorkOrderInvoice.update(
+          { invoice_pdf: fullFilePath },
+          { where: { id: workOrderInvoice.id } }
+        );
+        
+        console.log(`Database updated with PDF path: ${fullFilePath}`);
+        
       } catch (saveError) {
-        console.error('Error saving PDF to local directory:', saveError);
+        console.error('Error saving PDF to directory or updating database:', saveError);
         // Continue with response even if saving fails
       }
     });
@@ -404,6 +378,7 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   }
 }
 
+// Updated main download route
 v1Router.get("/download/:id", async (req, res) => {
   let browser;
   try {
@@ -535,7 +510,7 @@ v1Router.get("/download/:id", async (req, res) => {
         balance: workOrderInvoice.balance || 0,
         received_amount: workOrderInvoice.received_amount || 0.0,
         credit_amount: workOrderInvoice.credit_amount || 0.0,
-        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0, // <-- Added
+        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0,
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
@@ -594,21 +569,29 @@ v1Router.get("/download/:id", async (req, res) => {
 
     await browser.close();
 
-    // *** NEW CODE: Save PDF to local directory ***
+    // Save PDF to your specific directory
     const fileName = `work-order-invoice-${workOrderInvoice.invoice_number}.pdf`;
-    const invoiceDir = path.join(__dirname, '..', 'public', 'invoice'); // Adjust path as needed
-    const filePath = path.join(invoiceDir, fileName);
+    const fullFilePath = path.join(INVOICE_STORAGE_PATH, fileName);
 
     try {
       // Create directory if it doesn't exist
-      await fs.mkdir(invoiceDir, { recursive: true });
+      await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
       
       // Save PDF to file
-      await fs.writeFile(filePath, pdf);
+      await fs.writeFile(fullFilePath, pdf);
       
-      console.log(`PDF saved successfully at: ${filePath}`);
+      console.log(`PDF saved successfully at: ${fullFilePath}`);
+      
+      // Store the full path in database
+      await WorkOrderInvoice.update(
+        { invoice_pdf: fullFilePath },
+        { where: { id: workOrderInvoice.id } }
+      );
+      
+      console.log(`Database updated with PDF path: ${fullFilePath}`);
+      
     } catch (saveError) {
-      console.error('Error saving PDF to local directory:', saveError);
+      console.error('Error saving PDF to directory or updating database:', saveError);
       // Continue with response even if saving fails
     }
 
@@ -626,6 +609,70 @@ v1Router.get("/download/:id", async (req, res) => {
       success: false,
       message: `Failed to generate PDF: ${error.message}`,
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Updated PDF serving endpoint
+v1Router.get("/pdf/:id", authenticateJWT, async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    
+    // Find the invoice with the stored PDF path
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: { 
+        id: invoiceId, 
+        company_id: req.user.company_id,
+        status: "active" 
+      },
+      attributes: ["id", "invoice_number", "invoice_pdf"]
+    });
+
+    if (!workOrderInvoice) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Work Order Invoice not found" 
+      });
+    }
+
+    if (!workOrderInvoice.invoice_pdf) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "PDF file not found for this invoice" 
+      });
+    }
+
+    // Use the stored full path directly
+    const fullPath = workOrderInvoice.invoice_pdf;
+    
+    // Check if file exists
+    try {
+      await fs.access(fullPath);
+    } catch (error) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "PDF file not found on server",
+        path: fullPath
+      });
+    }
+
+    // Get file stats for content length
+    const stats = await fs.stat(fullPath);
+    
+    // Set headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `inline; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
+    
+    // Stream the file
+    const fileStream = require('fs').createReadStream(fullPath);
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    logger.error("Error serving PDF file:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message 
     });
   }
 });
