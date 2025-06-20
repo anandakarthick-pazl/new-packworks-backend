@@ -501,11 +501,24 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
           message: "GRN not found"
         });
       }
+
+      const po = grn.purchase_order; // this is the PurchaseOrder instance
+      const poId = po?.id;
+
+      if (!poId) {
+        return res.status(404).json({ success: false, message: "Purchase Order not found in GRN" });
+      }
+
+      const bills = await PurchaseOrderBilling.findAll({
+        where: { purchase_order_id: poId },
+        attributes: ["id", "bill_generate_id"]
+      });
   
       return res.status(200).json({
         success: true,
         message: "GRN fetched successfully",
-        data: grn
+        data: grn,
+        bills:bills
       });
     } catch (error) {
       console.error("Fetch GRN error:", error.message);
@@ -649,7 +662,8 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
 
   v1Router.get("/grn/bill/:id", authenticateJWT, async (req, res) => {
   try {
-    const grnId = req.params.id;    
+    const grnId = req.params.id;
+    
 
     // Find the corresponding purchase order
     const po = await PurchaseOrder.findOne({

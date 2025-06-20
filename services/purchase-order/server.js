@@ -432,6 +432,47 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     poData.created_by = req.user.id;
     poData.updated_by = req.user.id;
     poData.company_id = req.user.company_id;
+    // poData.use_this = use_this;
+    // poData.debit_amount = debit_amount;
+    
+    
+    const use_this = poData.use_this;
+    const debit_balance = parseFloat(poData.debit_amount || 0);
+
+    if (use_this === true && debit_balance > 0) {
+      const client = await Client.findOne({
+        where: { client_id: poData.supplier_id },
+        attributes: ['client_id','debit_balance']
+      });
+
+      console.log("client :", client);
+      
+
+      if (!client) {
+        return res.status(404).json({ success: false, message: "Client not found" });
+      }
+
+      const updatedDebitNote = parseFloat(client.debit_balance || 0) - debit_balance;
+
+      console.log("updatedDebitNote :", updatedDebitNote);
+
+      await addWalletHistory({
+        type: 'debit',
+        client_id: client.client_id,
+        amount: updatedDebitNote,
+        company_id: req.user.company_id,
+        reference_number: "Purchase Order " + purchase_generate_id, 
+        created_by: req.user.id,
+      });
+
+
+
+      await Client.update(
+        { debit_balance: updatedDebitNote },
+        { where: { client_id: poData.supplier_id } }
+      );
+    }   
+
 
     const newPO = await PurchaseOrder.create(poData, { transaction });
     for (const item of items) {
@@ -1323,24 +1364,24 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
 
 
     // client
-    const client = await Client.findOne({
-      where: { client_id: purchaseOrder.supplier_id, company_id: req.user.company_id },
-    });
-    if (!client) throw new Error("supplier Id not found");
+    // const client = await Client.findOne({
+    //   where: { client_id: purchaseOrder.supplier_id, company_id: req.user.company_id },
+    // });
+    // if (!client) throw new Error("supplier Id not found");
 
-    // Update debit_balance
-    client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount_total);
-    await client.save();
+    // // Update debit_balance
+    // client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount_total);
+    // await client.save();
 
-    // Insert wallet history record
-    await addWalletHistory({
-      type: 'debit',
-      client_id: client.client_id,
-      amount: total_amount_total,
-      company_id: req.user.company_id,
-      reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
-      created_by: req.user.id,
-    });
+    // // Insert wallet history record
+    // await addWalletHistory({
+    //   type: 'debit',
+    //   client_id: client.client_id,
+    //   amount: total_amount_total,
+    //   company_id: req.user.company_id,
+    //   reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
+    //   created_by: req.user.id,
+    // });
 
 
     return res.status(201).json({
