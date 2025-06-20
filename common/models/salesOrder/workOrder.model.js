@@ -81,6 +81,11 @@ const WorkOrder = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    pending_invoice_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
     edd: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -158,11 +163,6 @@ const WorkOrder = sequelize.define(
     select_plant: {
       type: DataTypes.STRING(100),
       allowNull: true,
-    },
-    pending_invoice_qty: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      defaultValue: 0,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
