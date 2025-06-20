@@ -42,7 +42,12 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         allowNull: false,
         defaultValue: false
       },
-      debit_amount: {
+      debit_balance_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.00
+      },
+      debit_used_amount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.00
