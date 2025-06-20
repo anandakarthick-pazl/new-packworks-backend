@@ -21,24 +21,31 @@ const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
-  const company = await InvoiceSetting.findByPk(companyId);
-  console.log(company, "companys");
+
+  const company = await InvoiceSetting.findByPk(companyId, {
+    attributes: [
+      `${prefixKey}_prefix`,
+      `${prefixKey}_number_separator`,
+      `${prefixKey}_digit`
+    ]
+  });
+
+  if (!company) throw new Error("Company/InvoiceSetting not found");
+
   const prefix = company[`${prefixKey}_prefix`];
   const separator = company[`${prefixKey}_number_separator`] || "-";
   const ticketNumberDigit = company[`${prefixKey}_digit`] || 5;
+
   console.log(prefix, "456");
-  // Determine the primary key based on the model
+
   const primaryKey = model === Client ? "client_id" : "id";
 
-  // Get latest record for that model
   const lastRecord = await model.findOne({
     where: { company_id: companyId },
     order: [[primaryKey, "DESC"]],
+    attributes: [primaryKey]
   });
 
-  console.log(lastRecord, "lastRecord");
-
-  // Use the appropriate primary key for incrementing
   const nextNumber = lastRecord ? lastRecord[primaryKey] + 1 : 1;
   const paddedNumber = String(nextNumber).padStart(ticketNumberDigit, "0");
 
@@ -46,3 +53,4 @@ export async function generateId(companyId, model, prefixKey) {
 
   return `${prefix}${separator}${paddedNumber}`;
 }
+

@@ -12,6 +12,7 @@ import ExcelJS from "exceljs";
 import { Readable } from "stream";
 import axios from 'axios';
 import FormData from "form-data";
+import { create } from "domain";
 
 dotenv.config();
 
@@ -35,7 +36,7 @@ app.get("/health", (req, res) => {
 v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   const companyId = req.user.company_id;
-  const userId = req.user.user_id;
+  const userId = req.user.id;
   try {
     const {
       // Header level data
@@ -70,13 +71,15 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
     }
 
     // Generate unique return ID
-    const return_id = generateId(companyId, db.SalesReturn, 'sales_returns');
+    const return_id = await generateId(companyId, db.SalesReturn, 'sales_returns');
+    console.log(return_id)
+    console.log("User Id " + " " + userId)
     // const return_number = `RET-${Date.now()}`;
 
     // 1. Create Sales Return Header
     const salesReturnHeader = await db.SalesReturn.create({
       return_generate_id: return_id,
-      sales_id:sales_order_id,
+      sales_id: sales_order_id,
       client_id,
       return_date: return_date || new Date(),
       reason: return_reason,
@@ -91,6 +94,8 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
       tax_amount,
       total_amount,
       company_id: companyId,
+      created_by: userId,
+      created_at: new Date()
 
     }, { transaction });
 
@@ -126,17 +131,18 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
       // const credit_note_number = `CN-${Date.now()}`;
 
       creditNote = await db.CreditNote.create({
-        credit_generate_id: generateId(companyId, db.CreditNote, 'credit_note'),
+        credit_generate_id: await generateId(companyId, db.CreditNote, 'credit_note'),
         client_id,
         client_name,
         work_order_invoice_id: sales_order_id,
         work_order_invoice_number: sale_order_number,
-        credit_reference_id: salesReturnHeader.id,
+        credit_reference_id: return_id,
         subject: `Credit Note for Sales Return ${return_id}`,
-        invoice_total_amout: invoice_total_amout,
+        invoice_total_amout: total_amount,
         credit_total_amount: total_amount,
         status: "active",
         created_by: req.user.user_id,
+        company_id: companyId,
         created_at: new Date()
       }, { transaction });
     }
@@ -144,14 +150,17 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
     // 4. Handle Wallet Update (if return_type is "wallet")
     let walletUpdate = null;
     if (return_type === "wallet") {
+      console.log("Return Type is Wallet", total_amount, client_id);
+
       // Update client's credit balance
-      await db.Client.increment(
+      const result = await db.Client.increment(
         { credit_balance: total_amount },
         {
-          where: { id: client_id },
+          where: { client_id: client_id }, // ✅ Use the correct column
           transaction
         }
       );
+      console.log("Increment result:", result);
 
       // Create wallet history entry
       walletUpdate = await db.WalletHistory.create({
@@ -212,24 +221,9 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
   try {
     const { return_id } = req.params;
 
+    // 1. Find Sales Return Header
     const salesReturn = await db.SalesReturn.findOne({
-      where: { return_id },
-      include: [
-        {
-          model: db.SalesReturnItem,
-          as: "return_items"
-        },
-        {
-          model: db.Client,
-          as: "client",
-          attributes: ["client_id", "name", "email", "credit_balance"]
-        },
-        {
-          model: db.CreditNote,
-          as: "credit_note",
-          required: false
-        }
-      ]
+      where: { id: return_id } // Make sure this is the correct column name
     });
 
     if (!salesReturn) {
@@ -239,9 +233,33 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
       });
     }
 
+    // 2. Find Return Items
+    const returnItems = await db.SalesReturnItem.findAll({
+      where: { sales_return_id: salesReturn.id }
+    });
+
+    // 3. Find Client Info
+    const client = await db.Client.findOne({
+      where: { client_id: salesReturn.client_id },
+      attributes: ["client_id", "first_name", "email", "credit_balance"]
+    });
+
+    // 4. Find Credit Note (optional)
+    const creditNote = await db.CreditNote.findOne({
+      where: { credit_reference_id: salesReturn.id }
+    });
+
+    // 5. Combine all data
+    const responseData = {
+      ...salesReturn.toJSON(),
+      return_items: returnItems,
+      client: client || null,
+      credit_note: creditNote || null
+    };
+
     res.json({
       success: true,
-      data: salesReturn
+      data: responseData
     });
 
   } catch (error) {
@@ -256,7 +274,7 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
 });
 
 // List Sales Returns
-v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
+v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
   try {
     const {
       page = 1,
@@ -268,7 +286,7 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
       end_date
     } = req.query;
 
-    const offset = (page - 1) * limit;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
     const where = {};
 
     if (client_id) where.client_id = client_id;
@@ -281,24 +299,39 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
       };
     }
 
+    // Fetch sales returns (without associations)
     const { rows: salesReturns, count } = await db.SalesReturn.findAndCountAll({
       where,
-      include: [
-        {
-          model: db.Client,
-          as: "client",
-          attributes: ["client_id", "name", "email"]
-        }
-      ],
       order: [["created_at", "DESC"]],
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset
+    });
+
+    // Get unique client IDs
+    const clientIds = [...new Set(salesReturns.map(ret => ret.client_id))];
+
+    // Fetch clients manually
+    const clients = await db.Client.findAll({
+      where: { client_id: clientIds },
+      attributes: ['client_id', 'first_name', 'email']
+    });
+
+    const clientMap = {};
+    clients.forEach(client => {
+      clientMap[client.client_id] = client;
+    });
+
+    // Attach client info manually
+    const results = salesReturns.map(ret => {
+      const json = ret.toJSON();
+      json.client = clientMap[ret.client_id] || null;
+      return json;
     });
 
     res.json({
       success: true,
       data: {
-        sales_returns: salesReturns,
+        sales_returns: results,
         pagination: {
           current_page: parseInt(page),
           total_pages: Math.ceil(count / limit),
@@ -318,6 +351,7 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
     });
   }
 });
+
 
 // await db.sequelize.sync();
 const PORT = 3005;
