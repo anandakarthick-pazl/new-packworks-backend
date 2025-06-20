@@ -385,7 +385,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         {
           model: GRN,
           as: "grn",
-          attributes: ["id", "grn_generate_id", "grn_date", "invoice_no", "invoice_date", "received_by",
+          attributes: ["id", "po_id","grn_generate_id", "grn_date", "invoice_no", "invoice_date", "received_by",
             "delivery_note_no", "created_at", "status"],
           include: [
             {
