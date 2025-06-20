@@ -761,6 +761,115 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
 // });
 
 
+// v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status = "active" } = req.query;
+
+//     const whereClause = {
+//       id: id,
+//       company_id: req.user.company_id,
+//     };
+
+//     if (status !== "all") {
+//       whereClause.status = status;
+//     }
+
+//     const workOrder = await WorkOrder.findOne({
+//       where: whereClause,
+//       include: [
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_ui_id", "sales_generate_id", "client"],
+//           required: false,
+//           include: [
+//             {
+//               model: SalesSkuDetails,
+//               attributes: [
+//                 "id",
+//                 "company_id",
+//                 "client_id",
+//                 "sales_order_id",
+//                 "sku_id",
+//                 "sku",
+//                 "quantity_required",
+//                 "rate_per_sku",
+//                 "acceptable_sku_units",
+//                 "total_amount",
+//                 "sgst",
+//                 "sgst_amount",
+//                 "cgst",
+//                 "cgst_amount",
+//                 "total_incl__gst",
+//                 "status",
+//                 "created_at",
+//                 "updated_at",
+//                 "created_by",
+//                 "updated_by"
+//               ],
+//               required: false
+//             }
+//           ]
+//         },
+//       ],
+//     });
+
+//     if (!workOrder) {
+//       return res.status(404).json({ message: "Work order not found" });
+//     }
+
+//     // If QR code URL doesn't exist, generate it now
+//     if (!workOrder.qr_code_url) {
+//       const authHeader = req.headers.authorization;
+//       const token = authHeader.split(" ")[1];
+//       const qrCodeUrl = await generateQRCode(workOrder, token);
+//       await workOrder.update({ qr_code_url: qrCodeUrl });
+//     }
+
+//     let result = workOrder.get({ plain: true });
+
+//     // Helper function to parse work_order_sku_values
+//     const parseWorkOrderSkuValues = (workOrderData) => {
+//       if (workOrderData.work_order_sku_values) {
+//         try {
+//           if (typeof workOrderData.work_order_sku_values === "string") {
+//             workOrderData.work_order_sku_values = JSON.parse(
+//               workOrderData.work_order_sku_values
+//             );
+//           }
+//         } catch (error) {
+//           logger.warn(
+//             `Failed to parse work_order_sku_values for work order ${workOrderData.id}:`,
+//             error
+//           );
+//         }
+//       }
+//       return workOrderData;
+//     };
+
+//     // Parse work_order_sku_values
+//     result = parseWorkOrderSkuValues(result);
+
+//     // Extract sales_sku_details from the nested salesOrder and add it as a top-level key
+//     if (result.salesOrder && result.salesOrder.SalesSkuDetails) {
+//       result.sales_sku_details = result.salesOrder.SalesSkuDetails;
+//       // Optionally remove it from the nested structure if you don't want it there
+//       delete result.salesOrder.SalesSkuDetails;
+//     } else {
+//       result.sales_sku_details = [];
+//     }
+
+//     res.json(result);
+//   } catch (error) {
+//     logger.error("Error fetching work order:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
+
+
 v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
@@ -819,6 +928,35 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: "Work order not found" });
     }
 
+    // Calculate pending invoice quantity
+    const calculatePendingInvoiceQty = async (workOrderId, workOrderQty) => {
+      try {
+        // Get sum of all invoiced quantities for this work order
+        const invoicedQtyResult = await WorkOrderInvoice.sum('quantity', {
+          where: {
+            work_id: workOrderId
+          }
+        });
+        
+        // Handle case where no invoices exist (sum returns null)
+        const totalInvoicedQty = invoicedQtyResult || 0;
+        
+        // Calculate pending quantity
+        const pendingQty = (workOrderQty || 0) - totalInvoicedQty;
+        
+        return Math.max(0, pendingQty); // Ensure it's not negative
+      } catch (error) {
+        logger.error(`Error calculating pending invoice quantity for work order ${workOrderId}:`, error);
+        return workOrderQty || 0; // Return original quantity if calculation fails
+      }
+    };
+
+    // Calculate and update pending_invoice_qty
+    const pendingInvoiceQty = await calculatePendingInvoiceQty(workOrder.id, workOrder.qty);
+    
+    // Update the work order with the calculated pending invoice quantity
+    await workOrder.update({ pending_invoice_qty: pendingInvoiceQty });
+
     // If QR code URL doesn't exist, generate it now
     if (!workOrder.qr_code_url) {
       const authHeader = req.headers.authorization;
@@ -828,6 +966,9 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
     }
 
     let result = workOrder.get({ plain: true });
+
+    // Add the calculated pending_invoice_qty to the result
+    result.pending_invoice_qty = pendingInvoiceQty;
 
     // Helper function to parse work_order_sku_values
     const parseWorkOrderSkuValues = (workOrderData) => {

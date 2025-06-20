@@ -81,6 +81,7 @@ const WorkOrderInvoice = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
@@ -163,7 +164,15 @@ const WorkOrderInvoice = sequelize.define(
     client_name: {
       type: DataTypes.STRING(50),
       allowNull: true,
-    }
+    },
+    client_email: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    client_phone: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "work_order_invoice",
