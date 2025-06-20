@@ -5,7 +5,7 @@ module.exports = {
     await queryInterface.addColumn('work_order', 'pending_invoice_qty', {
       type: Sequelize.INTEGER,
       allowNull: true,
-      defaultValue: 0,
+      defaultValue: null,
     });
   },
 
