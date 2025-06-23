@@ -48,8 +48,8 @@ v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
       entity_type === "Client"
         ? "client"
         : entity_type === "Vendor"
-        ? "vendor"
-        : "other"
+          ? "vendor"
+          : "other"
     );
 
     // Add user tracking information internally
@@ -674,8 +674,7 @@ v1Router.get("/clients/download/excel", authenticateJWT, async (req, res) => {
 
     // Log the download
     logger.info(
-      `Excel download initiated by user ${
-        req.user.id
+      `Excel download initiated by user ${req.user.id
       } with filters: ${JSON.stringify({
         search,
         includeInactive,
@@ -858,6 +857,77 @@ v1Router.patch("/clients/:id/status", authenticateJWT, async (req, res) => {
   }
 });
 
+v1Router.post("/add/wallet-balance", authenticateJWT, async (req, res) => {
+  try {
+    const { client_id, total_amount, remarks } = req.body;
+    const transaction = await sequelize.transaction();
+    const companyId = req.user.company_id;
+    const userId = req.user.id;
+
+    const result = await db.Client.increment(
+      { credit_balance: total_amount },
+      {
+        where: { client_id: client_id }, // ✅ Use the correct column
+        transaction
+      }
+    );
+
+    walletUpdate = await db.WalletHistory.create({
+      client_id,
+      type: "credit",
+      company_id: companyId,
+      created_by: userId,
+      amount: total_amount,
+      refference_number: `Cash received from the customer ! ${remarks || "No remarks provided"}`,
+      created_at: new Date()
+    }, { transaction });
+    console.log("Increment result:", result);
+
+    // ✅ Successful response
+    return res.status(200).json({
+      success: true,
+      message: "Amount has been updated successfully"
+    });
+  } catch (error) {
+    console.error("Error  Adding amount:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error Adding Amount to Wallet",
+      error: error.message
+    });
+  }
+});
+
+v1Router.get("/add/wallet-balance/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id: client_id } = req.params;
+    const transaction = await sequelize.transaction();
+    const companyId = req.user.company_id;
+    const userId = req.user.id;
+
+
+
+    const WalletHistory = await db.WalletHistory.get({
+      where: { client_id: client_id }
+    });
+
+
+    // ✅ Successful response
+    return res.status(200).json({
+      success: true,
+      message: "Fetched WalletHistory successfully",
+      data: WalletHistory
+    });
+  } catch (error) {
+    console.error("Error  Adding amount:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error Adding Amount to Wallet",
+      error: error.message
+    });
+  }
+});
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -883,6 +953,6 @@ app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = 3003;
 const service = "Client Service";
-app.listen(process.env.PORT_CLIENT,'0.0.0.0', () => {
+app.listen(process.env.PORT_CLIENT, '0.0.0.0', () => {
   console.log(`${service} running on port ${process.env.PORT_CLIENT}`);
 });
