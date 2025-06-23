@@ -84,7 +84,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
       return_date: return_date || new Date(),
       reason: return_reason,
       notes,
-      created_by: req.user.user_id,
+      // created_by: req.user.user_id,
       created_at: new Date(),
       total_qty,
       cgst_amount,
@@ -119,7 +119,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
       notes: item.notes || null,
       reason: item.reason || return_reason,
       company_id: companyId,
-      created_by: req.user.user_id,
+      created_by: userId,
       created_at: new Date()
     }));
 
@@ -141,7 +141,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
         invoice_total_amout: total_amount,
         credit_total_amount: total_amount,
         status: "active",
-        created_by: req.user.user_id,
+        created_by: userId,
         company_id: companyId,
         created_at: new Date()
       }, { transaction });
