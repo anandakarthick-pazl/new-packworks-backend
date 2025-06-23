@@ -31,6 +31,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
   });
 });
+const WorkOrderInvoice = db.WorkOrderInvoice;
 
 // Sales Return Creation Endpoint
 v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
@@ -237,7 +238,16 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
     const returnItems = await db.SalesReturnItem.findAll({
       where: { sales_return_id: salesReturn.id }
     });
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: {
+        id: salesReturn.sales_id,
+        company_id: req.user.company_id,
+        status: "active",
 
+
+      },
+      attributes: ["id", "invoice_number", "total_amount", "created_at", "sku_details"], // adjust as needed
+    });
     // 3. Find Client Info
     const client = await db.Client.findOne({
       where: { client_id: salesReturn.client_id },
@@ -254,7 +264,8 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
       ...salesReturn.toJSON(),
       return_items: returnItems,
       client: client || null,
-      credit_note: creditNote || null
+      credit_note: creditNote || null,
+      invoiceDetails: workOrderInvoice ? workOrderInvoice.toJSON() : null
     };
 
     res.json({
@@ -283,7 +294,7 @@ v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
       return_type,
       status,
       start_date,
-      end_date
+      end_date,
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -295,7 +306,7 @@ v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
 
     if (start_date && end_date) {
       where.return_date = {
-        [Op.between]: [new Date(start_date), new Date(end_date)]
+        [Op.between]: [new Date(start_date), new Date(end_date)],
       };
     }
 
@@ -304,29 +315,46 @@ v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
       where,
       order: [["created_at", "DESC"]],
       limit: parseInt(limit),
-      offset
+      offset,
     });
 
     // Get unique client IDs
-    const clientIds = [...new Set(salesReturns.map(ret => ret.client_id))];
+    const clientIds = [...new Set(salesReturns.map((ret) => ret.client_id))];
 
     // Fetch clients manually
     const clients = await db.Client.findAll({
       where: { client_id: clientIds },
-      attributes: ['client_id', 'first_name', 'email']
+      attributes: ["client_id", "first_name", "email"],
     });
 
     const clientMap = {};
-    clients.forEach(client => {
+    clients.forEach((client) => {
       clientMap[client.client_id] = client;
     });
 
-    // Attach client info manually
-    const results = salesReturns.map(ret => {
-      const json = ret.toJSON();
-      json.client = clientMap[ret.client_id] || null;
-      return json;
-    });
+    // Fetch work order invoices and attach data
+    const results = await Promise.all(
+      salesReturns.map(async (ret) => {
+        const json = ret.toJSON();
+
+        // Attach client info
+        json.client = clientMap[ret.client_id] || null;
+
+        // Attach work order invoice info
+        const workOrderInvoice = await WorkOrderInvoice.findOne({
+          where: {
+            id: ret.sales_id,
+            company_id: req.user.company_id,
+            status: "active",
+          },
+          attributes: ["id", "invoice_number", "total_amount", "created_at", "sku_details"], // adjust as needed
+        });
+
+        json.work_order_invoice = workOrderInvoice || null;
+
+        return json;
+      })
+    );
 
     res.json({
       success: true,
@@ -336,21 +364,21 @@ v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
           current_page: parseInt(page),
           total_pages: Math.ceil(count / limit),
           total_records: count,
-          per_page: parseInt(limit)
-        }
-      }
+          per_page: parseInt(limit),
+        },
+      },
     });
-
   } catch (error) {
     logger.error("Error fetching sales returns:", error);
 
     res.status(500).json({
       success: false,
       message: "Failed to fetch sales returns",
-      error: error.message
+      error: error.message,
     });
   }
 });
+
 
 
 // await db.sequelize.sync();
