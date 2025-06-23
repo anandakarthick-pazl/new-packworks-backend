@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, fn, col } from "sequelize";
 import express, { json, Router } from "express";
 import cors from "cors";
 import db from "../../common/models/index.js";
@@ -1019,15 +1019,16 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
     where: { id: work_order_invoice_id },
     attributes: ["total_amount"]
   });
-  const paymentAmountPaid = await PartialPayment.findAll({
+  const paymentAmountPaid = await PartialPayment.findOne({
     where: { work_order_invoice_id },
-    attributes: ["sum(amount)"]
-  });
-  if (totalInvoiceAmount == paymentAmountPaid) {
+    attributes: [[fn("SUM", col("amount")), "total_paid"]],
+    raw: true,
+  }) || { total_paid: 0 }; // Default to 0 if no payments found
+  if (totalInvoiceAmount == paymentAmountPaid.total_paid) {
     var paymentStatus = "paid";
-  } else if (paymentAmountPaid < totalInvoiceAmount) {
+  } else if (paymentAmountPaid.total_paid < totalInvoiceAmount) {
     var paymentStatus = "partial";
-  } else if (paymentAmountPaid > totalInvoiceAmount) {
+  } else if (paymentAmountPaid.total_paid > totalInvoiceAmount) {
     res.status(201).json({
       message: "Trying to make a an already paid invoice"
     });
