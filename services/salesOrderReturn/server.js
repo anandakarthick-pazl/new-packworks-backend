@@ -137,7 +137,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
         client_name,
         work_order_invoice_id: sales_order_id,
         work_order_invoice_number: sale_order_number,
-        credit_reference_id: return_id,
+        credit_reference_id: salesReturnHeader.id,
         subject: `Credit Note for Sales Return ${return_id}`,
         invoice_total_amout: total_amount,
         credit_total_amount: total_amount,
