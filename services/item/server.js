@@ -145,7 +145,21 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
 v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
   try {
     const item_id = req.params.id;
-    const itemData = await ItemMaster.findOne({ where: { id: item_id } });
+    const itemData = await ItemMaster.findOne({
+       where: { id: item_id },
+      include: [
+        {
+          model: Categories,
+          as: "category_info",
+          attributes: ["id", "category_name"]
+        },
+        {
+          model: Sub_categories,
+          as: "sub_category_info",
+          attributes: ["id", "sub_category_name"]
+        }
+      ]
+     });
 
     const parsedItem = {
       ...itemData.toJSON(),
@@ -159,7 +173,7 @@ v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
       message: "Item data fetched successfully",
       data: parsedItem,
     });
-  } catch (error) {s
+  } catch (error) {
     console.error(error.message);
     return res.status(500).json({
       success: false,
