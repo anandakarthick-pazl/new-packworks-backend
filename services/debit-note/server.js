@@ -183,6 +183,7 @@ v1Router.get("/debit-note", authenticateJWT, async (req, res) => {
             },
             {
               model: PurchaseOrder, // ✅ Include Purchase Order details
+              as: "PurchaseOrder",
               attributes: [ "id","supplier_id", "supplier_name", "shipping_address", "supplier_contact", "supplier_email", "payment_terms", "freight_terms", "total_qty", "cgst_amount", "sgst_amount", "amount", "tax_amount", "total_amount", "status", "decision", "created_at", "updated_at", "created_by", "updated_by"] // Add any fields you need
             }
           ]
@@ -226,6 +227,7 @@ v1Router.get("/debit-note/:id", authenticateJWT, async (req, res) => {
             },
             {
               model: PurchaseOrder,
+               as: "PurchaseOrder",
               attributes: [
                 "id",
                 "purchase_generate_id",

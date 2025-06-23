@@ -140,7 +140,7 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Item Created Successfully",
+      message: "Product Created Successfully",
       data: item.toJSON() 
     });
   } catch (error) {
@@ -148,7 +148,7 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
     console.error(error.message);
     return res.status(500).json({
       success: false,
-      message: `Item creation failed: ${error.message}`
+      message: `Product creation failed: ${error.message}`
     });
   }
 });
