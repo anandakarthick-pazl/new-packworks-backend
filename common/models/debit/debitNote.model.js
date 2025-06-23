@@ -14,11 +14,11 @@ const DebitNote = sequelize.define('DebitNote', {
     primaryKey: true
   },
 
-  debit_note_number: {
-    type: DataTypes.STRING(200),
-    allowNull: false,
-    unique: true
-  },
+  // debit_note_number: {
+  //   type: DataTypes.STRING(200),
+  //   allowNull: false,
+  //   unique: true
+  // },
   debit_note_generate_id:{
         type: DataTypes.STRING(200),
         allowNull: true,
