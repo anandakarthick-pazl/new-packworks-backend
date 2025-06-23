@@ -858,38 +858,44 @@ v1Router.patch("/clients/:id/status", authenticateJWT, async (req, res) => {
 });
 
 v1Router.post("/clients/add/wallet-balance", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction(); // Begin transaction
+
   try {
     const { client_id, total_amount, remarks } = req.body;
-    const transaction = await sequelize.transaction();
     const companyId = req.user.company_id;
     const userId = req.user.id;
 
-    const result = await db.Client.increment(
+    // Step 1: Increment client's credit_balance
+    await db.Client.increment(
       { credit_balance: total_amount },
       {
-        where: { client_id: client_id }, // ✅ Use the correct column
+        where: { client_id },
         transaction
       }
     );
 
+    // Step 2: Add wallet history
     await db.WalletHistory.create({
       client_id,
       type: "credit",
       company_id: companyId,
       created_by: userId,
       amount: total_amount,
-      refference_number: `Cash received from the customer ! ${remarks || "No remarks provided"}`,
+      refference_number: `Cash received from the customer! ${remarks || "No remarks provided"}`,
       created_at: new Date()
     }, { transaction });
-    console.log("Increment result:", result);
 
-    // ✅ Successful response
+    await transaction.commit(); // ✅ Commit the transaction
+
     return res.status(200).json({
       success: true,
       message: "Amount has been updated successfully"
     });
+
   } catch (error) {
-    console.error("Error  Adding amount:", error);
+    await transaction.rollback(); // ❌ Rollback on failure
+
+    console.error("Error Adding amount:", error);
     return res.status(500).json({
       success: false,
       message: "Error Adding Amount to Wallet",
@@ -897,6 +903,7 @@ v1Router.post("/clients/add/wallet-balance", authenticateJWT, async (req, res) =
     });
   }
 });
+
 
 v1Router.get("/clients/add/wallet-balance/:id", authenticateJWT, async (req, res) => {
   try {
