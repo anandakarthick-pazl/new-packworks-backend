@@ -1086,6 +1086,20 @@ v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) =>
   }
 });
 
+v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
+  const { id, mobileNUmber, emailId, amount } = req.body;
+  try {
+
+    res.status(201).json({
+      message: "Payment Link has been created successfully",
+      data: []
+    });
+  } catch (error) {
+    logger.error("Error creating sending  payment Link :", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
