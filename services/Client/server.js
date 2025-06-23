@@ -872,7 +872,7 @@ v1Router.post("/clients/add/wallet-balance", authenticateJWT, async (req, res) =
       }
     );
 
-    walletUpdate = await db.WalletHistory.create({
+    await db.WalletHistory.create({
       client_id,
       type: "credit",
       company_id: companyId,
