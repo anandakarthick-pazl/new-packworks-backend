@@ -11,13 +11,13 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import HtmlTemplate  from "../../common/models/htmlTemplate.model.js";
+import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
 import addWalletHistory from "../../common/helper/walletHelper.js";
 
 const Company = db.Company;
-const User =db.User;
+const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
 const PurchaseOrderItem = db.PurchaseOrderItem;
 const ItemMaster = db.ItemMaster;
@@ -181,12 +181,12 @@ v1Router.get("/purchase-order/bill-get", authenticateJWT, async (req, res) => {
         {
           model: User,
           as: "createdBy",
-          attributes: ["id",  "email"],
+          attributes: ["id", "email"],
         },
         {
           model: User,
           as: "updatedBy",
-          attributes: ["id","email"],
+          attributes: ["id", "email"],
         },
       ],
     });
@@ -316,7 +316,7 @@ v1Router.put("/purchase-order/bill-update/:id", authenticateJWT, async (req, res
         {
           model: User,
           as: "updatedBy",
-          attributes: ["id",  "email"],
+          attributes: ["id", "email"],
         },
       ],
     });
@@ -433,62 +433,62 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     poData.updated_by = req.user.id;
     poData.company_id = req.user.company_id;
 
-    
-    
+
+
     const use_this = poData.use_this;
-const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
-const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
+    const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
+    const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
 
-if (use_this === true) {
-  const client = await Client.findOne({
-    where: { client_id: poData.supplier_id },
-    attributes: ['client_id', 'debit_balance']
-  });
+    if (use_this === true) {
+      const client = await Client.findOne({
+        where: { client_id: poData.supplier_id },
+        attributes: ['client_id', 'debit_balance']
+      });
 
-  if (!client) {
-    return res.status(404).json({ success: false, message: "Client not found" });
-  }
+      if (!client) {
+        return res.status(404).json({ success: false, message: "Client not found" });
+      }
 
-  console.log("client :", client);
+      console.log("client :", client);
 
-  const currentDebit = parseFloat(client.debit_balance || 0);
+      const currentDebit = parseFloat(client.debit_balance || 0);
 
-  // If client has enough debit balance to cover this
-  if (debit_balance_amount > 0 && currentDebit >= debit_balance_amount) {
-    const updatedDebitBalance = currentDebit - debit_balance_amount;
+      // If client has enough debit balance to cover this
+      if (debit_balance_amount > 0 && currentDebit >= debit_balance_amount) {
+        const updatedDebitBalance = currentDebit - debit_balance_amount;
 
-    console.log("updatedDebitNote :", updatedDebitBalance);
+        console.log("updatedDebitNote :", updatedDebitBalance);
 
-    await addWalletHistory({
-      type: 'credit',
-      client_id: client.client_id,
-      amount: debit_balance_amount,
-      company_id: req.user.company_id,
-      reference_number: "Purchase Order " + purchase_generate_id,
-      created_by: req.user.id,
-    });
+        await addWalletHistory({
+          type: 'credit',
+          client_id: client.client_id,
+          amount: debit_balance_amount,
+          company_id: req.user.company_id,
+          reference_number: "Purchase Order " + purchase_generate_id,
+          created_by: req.user.id,
+        });
 
-    await Client.update(
-      { debit_balance: updatedDebitBalance },
-      { where: { client_id: poData.supplier_id } }
-    );
-  } else {
-    // Not enough balance or amount is zero
-    await addWalletHistory({
-      type: 'credit',
-      client_id: client.client_id,
-      amount: 0,
-      company_id: req.user.company_id,
-      reference_number: "Purchase Order " + purchase_generate_id,
-      created_by: req.user.id,
-    });
+        await Client.update(
+          { debit_balance: updatedDebitBalance },
+          { where: { client_id: poData.supplier_id } }
+        );
+      } else {
+        // Not enough balance or amount is zero
+        await addWalletHistory({
+          type: 'credit',
+          client_id: client.client_id,
+          amount: 0,
+          company_id: req.user.company_id,
+          reference_number: "Purchase Order " + purchase_generate_id,
+          created_by: req.user.id,
+        });
 
-    await Client.update(
-      { debit_balance: 0 },
-      { where: { client_id: poData.supplier_id } }
-    );
-  }
-}
+        await Client.update(
+          { debit_balance: 0 },
+          { where: { client_id: poData.supplier_id } }
+        );
+      }
+    }
 
 
     const newPO = await PurchaseOrder.create(poData, { transaction });
@@ -632,7 +632,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     if (search.trim()) {
       where.supplier_name = { [Op.like]: `%${search}%` };
     }
-    where.status="active";
+    where.status = "active";
     const data = await PurchaseOrder.findAll({
       where,
       limit: limitNumber,
@@ -756,65 +756,65 @@ v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
 //update po
 v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
   console.log("Update PO Request Body:", req.params.id, req.body);
-  
-    const transaction = await sequelize.transaction();
-    try {
-      const { items, ...poData } = req.body;
-      const poId = req.params.id;
-  
-      const po = await PurchaseOrder.findOne({
-        where: { id: poId },
-        transaction
-      });
-  
-      if (!po) {
-        return res.status(404).json({
-          success: false,
-          message: "Purchase Order not found"
-        });
-      }
-  
-      // Update purchase order
-      poData.updated_by = req.user.id;
-      await po.update(poData, { transaction });
-  
-      console.log("po Id ", poId)
-      // Delete old purchase order items
-     const deletePOId= await PurchaseOrderItem.destroy({
-        where: { po_id: poId },
-        transaction
-      });
-      console.log(" Delete po Id ", deletePOId)
-  
-      // Recreate new purchase order items
-      for (const item of items) {
-        await PurchaseOrderItem.create({
-          ...item,
-          po_id: poId,
-          company_id: req.user.company_id,
-          created_by: req.user.id,
-          updated_by: req.user.id
-        }, { transaction });
-      }
-  
-      await transaction.commit();
-  
-      return res.status(200).json({
-        success: true,
-        message: "Purchase Order and Items updated successfully",
-        data: po
-      });
-  
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Update Error:", error.message);
-      return res.status(500).json({
+
+  const transaction = await sequelize.transaction();
+  try {
+    const { items, ...poData } = req.body;
+    const poId = req.params.id;
+
+    const po = await PurchaseOrder.findOne({
+      where: { id: poId },
+      transaction
+    });
+
+    if (!po) {
+      return res.status(404).json({
         success: false,
-        message: `Update failed: ${error.message}`
+        message: "Purchase Order not found"
       });
     }
-  });
-  
+
+    // Update purchase order
+    poData.updated_by = req.user.id;
+    await po.update(poData, { transaction });
+
+    console.log("po Id ", poId)
+    // Delete old purchase order items
+    const deletePOId = await PurchaseOrderItem.destroy({
+      where: { po_id: poId },
+      transaction
+    });
+    console.log(" Delete po Id ", deletePOId)
+
+    // Recreate new purchase order items
+    for (const item of items) {
+      await PurchaseOrderItem.create({
+        ...item,
+        po_id: poId,
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        updated_by: req.user.id
+      }, { transaction });
+    }
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Purchase Order and Items updated successfully",
+      data: po
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Update Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Update failed: ${error.message}`
+    });
+  }
+});
+
 
 // delete po
 v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
@@ -841,7 +841,7 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
   try {
     const { po_id, grn_id } = req.query;
     console.log("PO ID:", po_id, "GRN ID:", grn_id);
-    
+
 
     if (!po_id || !grn_id) {
       return res.status(400).json({ error: 'po_id and grn_id are required.' });
@@ -1189,39 +1189,39 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       const sgst_amount = (amount * sgst) / 100;
       const tax_amount = cgst_amount + sgst_amount;
       const total_amount = amount + tax_amount;
-      
- // Calculate total available quantity
-let totalAvailable = inventories.reduce(
-  (sum, inv) => sum + parseFloat(inv.quantity_available || 0),
-  0
-);
 
-if (totalAvailable < return_qty) {
-  return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
-}
+      // Calculate total available quantity
+      let totalAvailable = inventories.reduce(
+        (sum, inv) => sum + parseFloat(inv.quantity_available || 0),
+        0
+      );
 
-// ✅ Declare this before the loop
-let remainingToDeduct = return_qty;
+      if (totalAvailable < return_qty) {
+        return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
+      }
 
-const deductionLog = [];
+      // ✅ Declare this before the loop
+      let remainingToDeduct = return_qty;
 
-for (const inventory of inventories) {
-  let available = parseFloat(inventory.quantity_available);
+      const deductionLog = [];
 
-  if (available >= remainingToDeduct) {
-    inventory.quantity_available = available - remainingToDeduct;
-    await inventory.save();
-    deductionLog.push({ id: inventory.id, deducted: remainingToDeduct });
-    break;
-  } else {
-    inventory.quantity_available = 0;
-    await inventory.save();
-    deductionLog.push({ id: inventory.id, deducted: available });
-    remainingToDeduct -= available;
-  }
-}
+      for (const inventory of inventories) {
+        let available = parseFloat(inventory.quantity_available);
 
-console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
+        if (available >= remainingToDeduct) {
+          inventory.quantity_available = available - remainingToDeduct;
+          await inventory.save();
+          deductionLog.push({ id: inventory.id, deducted: remainingToDeduct });
+          break;
+        } else {
+          inventory.quantity_available = 0;
+          await inventory.save();
+          deductionLog.push({ id: inventory.id, deducted: available });
+          remainingToDeduct -= available;
+        }
+      }
+
+      console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
 
 
       // await inventory.save();
@@ -1282,33 +1282,81 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     // 7. Save return items
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
-      await PurchaseOrderReturnItem.create(item); 
+      await PurchaseOrderReturnItem.create(item);
 
 
 
       const inventory = await Inventory.findOne({
-      where: {
-        item_id: item.item_id,
-        po_id: poReturn.po_id,
-        company_id: req.user.company_id
-      }
-    });
-
-    if (!inventory) {
-      return res.status(404).json({
-        success: false,
-        message: `Inventory record not found for item ${item.item_id}`
+        where: {
+          item_id: item.item_id,
+          po_id: poReturn.po_id,
+          company_id: req.user.company_id
+        }
       });
-    }
 
-    // 2. Compute total_amount
-    const quantity = parseFloat(inventory.quantity_available || 0);
-    const rate = parseFloat(inventory.rate || 0);
-    const total_amount = quantity * rate;
-      
+      let creditNote = null;
+      if (auto_Debit_Note === "yes") {
+        // const credit_note_number = `CN-${Date.now()}`;
+
+        creditNote = await db.DebitNote.create({
+          debit_note_generate_id: await generateId(req.user.company_id, db.CreditNote, 'debit_note'),
+          supplier_id: purchaseOrder.supplier_id,
+          po_return_id: poReturn.id,
+          work_order_invoice_number: sale_order_number,
+          reference_id: poReturn.purchase_return_generate_id,
+          remark: `Debit Note for Purchase Return ${poReturn.purchase_return_generate_id}`,
+          total_amount: total_amount_total,
+          status: "active",
+          created_by: req.user.id,
+          company_id: req.user.company_id,
+          created_at: new Date(),
+          debit_note_date: new Date(),
+        }, { transaction });
+      }
+
+      // 4. Handle Wallet Update (if return_type is "wallet")
+      let walletUpdate = null;
+      if (return_type === "wallet") {
+        console.log("Return Type is Wallet", total_amount_total, client_id);
+
+        // Update client's credit balance
+        const result = await db.Client.increment(
+          { debit_balance: total_amount_total },
+          {
+            where: { client_id: purchaseOrder.supplier_id }, // ✅ Use the correct column
+            transaction
+          }
+        );
+        console.log("Decrement result:", result);
+
+        // Create wallet history entry
+        walletUpdate = await db.WalletHistory.create({
+          client_id: purchaseOrder.supplier_id,
+          type: "credit",
+          company_id: req.user.company_id,
+          created_by: req.user.id,
+          amount: total_amount_total,
+          refference_number: `Purchase return credit to wallet for return ID ${poReturn.purchase_return_generate_id}`,
+          created_at: new Date()
+        }, { transaction });
+
+
+      }
+      if (!inventory) {
+        return res.status(404).json({
+          success: false,
+          message: `Inventory record not found for item ${item.item_id}`
+        });
+      }
+
+      // 2. Compute total_amount
+      const quantity = parseFloat(inventory.quantity_available || 0);
+      const rate = parseFloat(inventory.rate || 0);
+      const total_amount = quantity * rate;
+
       ///
       await Inventory.update(
-        { 
+        {
           po_return_id: poReturn.id,
           total_amount: total_amount
         },
@@ -1321,7 +1369,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
         }
       );
       ///
-      
+
     }
 
     // 8. Check if all received items are fully returned
@@ -1363,7 +1411,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
         .filter(retItem => retItem.item_id === poItem.item_id)
         .reduce((sum, retItem) => sum + parseFloat(retItem.return_qty || 0), 0);
 
-        // Debug log for troubleshooting
+      // Debug log for troubleshooting
       console.log(`Item ${poItem.item_id}: totalReceived=${totalReceived}, totalReturned=${totalReturned}`);
 
       // Use a small epsilon for float comparison
@@ -1629,16 +1677,16 @@ v1Router.get("/purchase-order/:id/download", async (req, res) => {
       return res.status(404).json({ success: false, message: "Purchase Order not found" });
     }
 
-  //   let poTemplateId = req.query.template_id 
-  // ? parseInt(req.query.template_id, 10) 
-  // : (purchaseOrder.po_template_id || 1);
+    //   let poTemplateId = req.query.template_id 
+    // ? parseInt(req.query.template_id, 10) 
+    // : (purchaseOrder.po_template_id || 1);
 
     // Try to fetch HTML template, fallback to default if not found
     let htmlTemplate = await HtmlTemplate.findOne({
-      where: { 
+      where: {
         company_id: purchaseOrder.company_id,
         // po_template_id: poTemplateId,
-        status: "active" 
+        status: "active"
       }
     });
 
@@ -1830,15 +1878,15 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
       return res.status(404).send('<h1>Purchase Order not found</h1>');
     }
 
-// let poTemplateId = req.query.template_id 
-//   ? parseInt(req.query.template_id, 10) 
-//   : (purchaseOrder.po_template_id || 1);
+    // let poTemplateId = req.query.template_id 
+    //   ? parseInt(req.query.template_id, 10) 
+    //   : (purchaseOrder.po_template_id || 1);
 
     let htmlTemplate = await HtmlTemplate.findOne({
-      where: { 
+      where: {
         company_id: purchaseOrder.company_id,
         // po_template_id : poTemplateId,
-        status: "active" 
+        status: "active"
       }
     });
 
@@ -1906,7 +1954,7 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
 
 v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
   try {
-   const templates = await HtmlTemplate.findAll({
+    const templates = await HtmlTemplate.findAll({
       where: { template: "purchase_order" },
       order: [['id', 'ASC']]
     });
@@ -2025,13 +2073,13 @@ v1Router.get("/purchase-order/activate/:id", async (req, res) => {
     // 1. Set the selected template to active
     await HtmlTemplate.update(
       { status: "active" },
-      { where: { id: templateId,template:"purchase_order" } }
+      { where: { id: templateId, template: "purchase_order" } }
     );
 
     // 2. Set all other templates to inactive
     await HtmlTemplate.update(
       { status: "inactive" },
-      { where: { id: { [Op.ne]: templateId },template:"purchase_order" } }
+      { where: { id: { [Op.ne]: templateId }, template: "purchase_order" } }
     );
 
     return res.status(200).json({
@@ -2060,12 +2108,12 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
   try {
     const purchaseOrders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
-       where: {
-          status: "active",
-          po_status: {
-            [Op.notIn]: ['created', 'returned', 'amended']
-          }
-        },
+      where: {
+        status: "active",
+        po_status: {
+          [Op.notIn]: ['created', 'returned', 'amended']
+        }
+      },
       order: [["id", "DESC"]]
     });
 
@@ -2088,14 +2136,14 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
 v1Router.get("/purchase-order/grn/:id", async (req, res) => {
   try {
 
-      const poId = req.params.id;
+    const poId = req.params.id;
 
     const grnData = await GRN.findAll({
       attributes: ["id", "grn_generate_id"],
-       where: {
-          po_id:poId,
-          status: "active",
-        },
+      where: {
+        po_id: poId,
+        status: "active",
+      },
       order: [["id", "DESC"]]
     });
 
@@ -2123,6 +2171,6 @@ v1Router.get("/purchase-order/grn/:id", async (req, res) => {
 app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = process.env.PORT_PURCHASE;
-app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
+app.listen(process.env.PORT_PURCHASE, '0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);
 });

@@ -1067,8 +1067,6 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
 
 v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
-
-
   try {
     const newPartialPayment = await PartialPayment.findAll({
       where: { work_order_invoice_id: id },
