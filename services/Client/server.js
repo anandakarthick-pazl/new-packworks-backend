@@ -904,7 +904,7 @@ v1Router.get("/clients/add/wallet-balance/:id", authenticateJWT, async (req, res
     const transaction = await sequelize.transaction();
     const companyId = req.user.company_id;
     const userId = req.user.id;
-    const WalletHistory = await db.WalletHistory.findOne({
+    const WalletHistory = await db.WalletHistory.findAll({
       where: { client_id: client_id }
     });
 
