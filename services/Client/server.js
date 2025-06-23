@@ -857,7 +857,7 @@ v1Router.patch("/clients/:id/status", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.post("/add/wallet-balance", authenticateJWT, async (req, res) => {
+v1Router.post("/clients/add/wallet-balance", authenticateJWT, async (req, res) => {
   try {
     const { client_id, total_amount, remarks } = req.body;
     const transaction = await sequelize.transaction();
@@ -898,19 +898,15 @@ v1Router.post("/add/wallet-balance", authenticateJWT, async (req, res) => {
   }
 });
 
-v1Router.get("/add/wallet-balance/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/clients/add/wallet-balance/:id", authenticateJWT, async (req, res) => {
   try {
     const { id: client_id } = req.params;
     const transaction = await sequelize.transaction();
     const companyId = req.user.company_id;
     const userId = req.user.id;
-
-
-
     const WalletHistory = await db.WalletHistory.get({
       where: { client_id: client_id }
     });
-
 
     // ✅ Successful response
     return res.status(200).json({
