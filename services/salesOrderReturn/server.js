@@ -31,6 +31,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
   });
 });
+const WorkOrderInvoice = db.WorkOrderInvoice;
 
 // Sales Return Creation Endpoint
 v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
@@ -237,7 +238,13 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
     const returnItems = await db.SalesReturnItem.findAll({
       where: { sales_return_id: salesReturn.id }
     });
-
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: {
+        id: salesReturn.sales_id,
+        company_id: req.user.company_id,
+        status: "active"
+      }
+    });
     // 3. Find Client Info
     const client = await db.Client.findOne({
       where: { client_id: salesReturn.client_id },
@@ -254,7 +261,8 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
       ...salesReturn.toJSON(),
       return_items: returnItems,
       client: client || null,
-      credit_note: creditNote || null
+      credit_note: creditNote || null,
+      invoiceDetails: workOrderInvoice ? workOrderInvoice.toJSON() : null
     };
 
     res.json({
