@@ -1087,7 +1087,7 @@ v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) =>
 });
 
 v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
-  const { id, mobileNUmber, emailId, amount } = req.body;
+  const { id, mobileNumber, emailId, amount } = req.body;
   try {
 
     res.status(201).json({
