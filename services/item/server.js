@@ -53,7 +53,20 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
     const items = await ItemMaster.findAll({
       where :whereCondition,
       limit:limitNumber,
-      offset
+      offset,
+      include: [
+        {
+          model: Categories,
+          as: "category_info",
+          attributes: ["id", "category_name"]
+        },
+        {
+          model: Sub_categories,
+          as: "sub_category_info",
+          attributes: ["id", "sub_category_name"]
+        }
+      ],
+      order: [["id", "DESC"]]
     });
 
     // Parse custom_fields & default_custom_fields for each item
