@@ -708,6 +708,7 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       status = "active",
       production,
       clientName,
+      progress,
       skuName,
       updateMissingQrCodes = "true",
       sortBy,
@@ -742,6 +743,9 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
     }
     if (skuName) {
       whereClause.sku_name = skuName;
+    }
+     if (progress) {
+      whereClause.progress = progress;
     }
 
     // Date range filtering on created_at only
