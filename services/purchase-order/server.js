@@ -435,12 +435,11 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     poData.company_id = req.user.company_id;
 
 
-
     const use_this = poData.use_this;
-const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
-const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
+    const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
+    const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
     const total_amount = parseFloat(poData.total_amount || 0);
-    
+
     let paymentMode = "cash"; // default
     let paymentAmount = total_amount;
 
@@ -560,8 +559,7 @@ v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, re
       payment_date
     } = req.body;
 
-    console.log("Payment Request Body:", req.body);
-    
+
 
     // Use == null to allow 0 as a valid amount
     if (po_id == null || paymentAmount == null || !payment_mode) {
@@ -602,7 +600,28 @@ v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, re
       updated_at: new Date()
     }, { transaction });
 
-    await transaction.commit();
+   // 🔄 Recalculate total paid amount for the PO
+    const paidResult = await PurchaseOrderPayment.findOne({
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('amount')), 'totalPaid']
+      ],
+      where: { po_id },
+      raw: true
+    });
+
+    const totalPaid = Number(paidResult.totalPaid || 0);
+
+    // 🧮 Compare with total order amount
+    const paymentStatus = totalPaid >= orderTotal ? "completed" : "partial";
+
+    // 🔁 Update the PO payment status
+    await PurchaseOrder.update(
+      { payment_status: paymentStatus },
+      { where: { id: po_id }, transaction }
+    );
+
+
+    await transaction.commit(); 
 
     return res.status(201).json({
       success: true,
@@ -622,92 +641,92 @@ v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, re
 
 
 //update purchase payments 
-v1Router.put("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  try {
-    const paymentId = req.params.id;
-    const {
-      paymentAmount,
-      payment_mode,
-      remark,
-      payment_date
-    } = req.body;
+// v1Router.put("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const  = req.params.id;
+//     const {
+//       paymentAmount,
+//       payment_mode,
+//       remark,
+//       payment_date
+//     } = req.body;
 
-console.log("Update Payment Request Body:", req.params.id, req.body);
+//     console.log("Update Payment Request Body:", req.params.id, req.body);
 
 
-    if (paymentAmount == null || !payment_mode) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: paymentAmount or payment_mode"
-      });
-    }
+//     if (paymentAmount == null || !payment_mode) {
+//       await transaction.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields: paymentAmount or payment_mode"
+//       });
+//     }
 
-    const payment = await PurchaseOrderPayment.findOne({
-      where: { id: paymentId },
-      transaction
-    });
+//     const payment = await PurchaseOrderPayment.findOne({
+//       where: { id: paymentId },
+//       transaction
+//     });
 
-    if (!payment) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "Payment record not found"
-      });
-    }
+//     if (!payment) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Payment record not found"
+//       });
+//     }
 
-    const purchaseOrder = await PurchaseOrder.findOne({
-      where: { id: payment.po_id },
-      transaction
-    });
+//     const purchaseOrder = await PurchaseOrder.findOne({
+//       where: { id: payment.po_id },
+//       transaction
+//     });
 
-    if (!purchaseOrder) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "Associated purchase order not found"
-      });
-    }
+//     if (!purchaseOrder) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Associated purchase order not found"
+//       });
+//     }
 
-    const orderTotal = purchaseOrder.total_amount || 0;
+//     const orderTotal = purchaseOrder.total_amount || 0;
 
-    await payment.update({
-      amount: paymentAmount,
-      payment_mode,
-      remark,
-      payment_date: payment_date || new Date(),
-      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
-      updated_by: req.user.id,
-      updated_at: new Date()
-    }, { transaction });
+//     await payment.update({
+//       amount: paymentAmount,
+//       payment_mode,
+//       remark,
+//       payment_date: payment_date || new Date(),
+//       status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+//       updated_by: req.user.id,
+//       updated_at: new Date()
+//     }, { transaction });
 
-    await transaction.commit();
+//     await transaction.commit();
 
-    return res.status(200).json({
-      success: true,
-      message: "Purchase order payment updated successfully",
-      data: payment
-    });
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase order payment updated successfully",
+//       data: payment
+//     });
 
-  } catch (error) {
-    await transaction.rollback();
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update purchase order payment",
-      error: error.message
-    });
-  }
-});
+//   } catch (error) {
+//     await transaction.rollback();
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update purchase order payment",
+//       error: error.message
+//     });
+//   }
+// });
 
 
 // get by id purchase order  payment details
 v1Router.get("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
   try {
-    const paymentId = req.params.id;
+    const po_id = req.params.id;
 
-    const payment = await PurchaseOrderPayment.findOne({
-      where: { po_id: paymentId },
+    const payment = await PurchaseOrderPayment.findAll({
+      where: { po_id: po_id },
       include: [
         {
           model: PurchaseOrder,
@@ -892,7 +911,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Purchase orders fetched",
-      data:dataWithPayments,
+      data: dataWithPayments,
       totalCount,
     });
 
@@ -1366,7 +1385,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
 
 v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res) => {
-  const { po_id, grn_id, items, reason, payment_terms, notes } = req.body;
+  const { po_id, grn_id, items, reason, payment_terms, notes,auto_Debit_Note, return_type } = req.body;
   console.log(" req.body : ", req.body);
 
   try {
@@ -1540,54 +1559,7 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
         }
       });
 
-      let creditNote = null;
-      if (auto_Debit_Note === "yes") {
-        // const credit_note_number = `CN-${Date.now()}`;
 
-        creditNote = await db.DebitNote.create({
-          debit_note_generate_id: await generateId(req.user.company_id, db.CreditNote, 'debit_note'),
-          supplier_id: purchaseOrder.supplier_id,
-          po_return_id: poReturn.id,
-          work_order_invoice_number: sale_order_number,
-          reference_id: poReturn.purchase_return_generate_id,
-          remark: `Debit Note for Purchase Return ${poReturn.purchase_return_generate_id}`,
-          total_amount: total_amount_total,
-          status: "active",
-          created_by: req.user.id,
-          company_id: req.user.company_id,
-          created_at: new Date(),
-          debit_note_date: new Date(),
-        }, { transaction });
-      }
-
-      // 4. Handle Wallet Update (if return_type is "wallet")
-      let walletUpdate = null;
-      if (return_type === "wallet") {
-        console.log("Return Type is Wallet", total_amount_total, client_id);
-
-        // Update client's credit balance
-        const result = await db.Client.increment(
-          { debit_balance: total_amount_total },
-          {
-            where: { client_id: purchaseOrder.supplier_id }, // ✅ Use the correct column
-            transaction
-          }
-        );
-        console.log("Decrement result:", result);
-
-        // Create wallet history entry
-        walletUpdate = await db.WalletHistory.create({
-          client_id: purchaseOrder.supplier_id,
-          type: "credit",
-          company_id: req.user.company_id,
-          created_by: req.user.id,
-          amount: total_amount_total,
-          refference_number: `Purchase return credit to wallet for return ID ${poReturn.purchase_return_generate_id}`,
-          created_at: new Date()
-        }, { transaction });
-
-
-      }
       if (!inventory) {
         return res.status(404).json({
           success: false,
@@ -1693,7 +1665,53 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
     //   reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
     //   created_by: req.user.id,
     // });
+    let creditNote = null;
+    if (auto_Debit_Note === "yes") {
+      // const credit_note_number = `CN-${Date.now()}`;
 
+      creditNote = await db.DebitNote.create({
+        debit_note_generate_id: await generateId(req.user.company_id, db.DebitNote, 'debit_note'),
+        supplier_id: purchaseOrder.supplier_id,
+        po_return_id: poReturn.id,
+        work_order_invoice_number: sale_order_number,
+        reference_id: poReturn.purchase_return_generate_id,
+        remark: `Debit Note for Purchase Return ${poReturn.purchase_return_generate_id}`,
+        total_amount: total_amount_total,
+        status: "active",
+        created_by: req.user.id,
+        company_id: req.user.company_id,
+        created_at: new Date(),
+        debit_note_date: new Date(),
+      });
+    }
+
+    // 4. Handle Wallet Update (if return_type is "wallet")
+    let walletUpdate = null;
+    if (return_type === "wallet") {
+      console.log("Return Type is Wallet", total_amount_total, purchaseOrder.supplier_id);
+
+      // Update client's credit balance
+      const result = await db.Client.increment(
+        { debit_balance: total_amount_total },
+        {
+          where: { client_id: purchaseOrder.supplier_id }, // ✅ Use the correct column
+        }
+      );
+      console.log("Decrement result:", result);
+
+      // Create wallet history entry
+      walletUpdate = await db.WalletHistory.create({
+        client_id: purchaseOrder.supplier_id,
+        type: "credit",
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        amount: total_amount_total,
+        refference_number: `Purchase return credit to wallet for return ID ${poReturn.purchase_return_generate_id}`,
+        created_at: new Date()
+      });
+
+
+    }
 
     return res.status(201).json({
       message: 'Purchase Order Return created successfully.',
