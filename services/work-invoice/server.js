@@ -13,12 +13,30 @@ import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Razorpay from 'razorpay';
+import twilio from 'twilio';
+import { sendEmail } from '../../common/helper/emailService.js';
+import { PaymentLinkTemplate } from '../../common/services/email/templates/paymentLink.js';
+// import { PaymentReceiptTemplate } from '../../common/services/email/templates/paymentReceipt.js';
 
 // For ES6 modules, we need to recreate __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_ID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const app = express();
 app.use(json());
@@ -115,200 +133,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-// // GET all work order invoices with pagination, filtering, and search
-// v1Router.get("/get", authenticateJWT, async (req, res) => {
-//   try {
-//     const {
-//       page = 1,
-//       limit = 10,
-//       work_id,
-//       sale_id,
-//       payment_status,
-//       status = "active", // Default to 'active' status
-//       search = "", // Add search parameter
-//     } = req.query;
 
-//     const pageNum = parseInt(page, 10);
-//     const limitNum = parseInt(limit, 10);
-//     const offset = (pageNum - 1) * limitNum;
-
-//     // Build where clause for filtering
-//     const whereClause = {
-//       company_id: req.user.company_id, // Add company filter for security
-//     };
-
-//     // Status filtering - default to active, but allow override
-//     if (status === "all") {
-//       // Don't filter by status if 'all' is specified
-//     } else {
-//       whereClause.status = status;
-//     }
-
-//     if (work_id) {
-//       whereClause.work_id = work_id;
-//     }
-//     if (sale_id) {
-//       whereClause.sale_id = sale_id;
-//     }
-//     if (payment_status) {
-//       whereClause.payment_status = payment_status;
-//     }
-
-//     // Add search functionality if search parameter is provided
-//     if (search && search.trim() !== "") {
-//       const searchTerm = `%${search.trim()}%`; // Add wildcards for partial matching
-
-//       // Define search condition to look across multiple fields
-//       const searchCondition = {
-//         [Op.or]: [
-//           // Search in WorkOrderInvoice fields
-//           { invoice_number: { [Op.like]: searchTerm } },
-//           //   { description: { [Op.like]: searchTerm } },
-//           { due_date: { [Op.like]: searchTerm } },
-
-//           // Search in related WorkOrder fields using Sequelize's nested include where
-//           { "$workOrder.work_generate_id$": { [Op.like]: searchTerm } },
-//           { "$workOrder.sku_name$": { [Op.like]: searchTerm } },
-
-//           // Search in related SalesOrder fields
-//           { "$salesOrder.sales_generate_id$": { [Op.like]: searchTerm } },
-//         ],
-//       };
-
-//       // Add search condition to where clause
-//       whereClause[Op.and] = whereClause[Op.and] || [];
-//       whereClause[Op.and].push(searchCondition);
-//     }
-
-//     // Fetch from database with pagination, filters, and search
-//     const { count, rows } = await WorkOrderInvoice.findAndCountAll({
-//       where: whereClause,
-//       limit: limitNum,
-//       offset: offset,
-//       order: [["updated_at", "DESC"]],
-//       include: [
-//         {
-//           model: WorkOrder,
-//           as: "workOrder",
-//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-//         },
-//         {
-//           model: SalesOrder,
-//           as: "salesOrder",
-//           attributes: ["id", "sales_generate_id", "status"],
-//         },
-//       ],
-//     });
-
-//     // Calculate pagination metadata
-//     const totalPages = Math.ceil(count / limitNum);
-
-//     res.json({
-//       // invoices: rows.map((invoice) => invoice.get({ plain: true })),
-
-//       invoices: rows.map((invoice) => {
-//         const plain = invoice.get({ plain: true });
-//         if (plain.sku_details && typeof plain.sku_details === "string") {
-//           try {
-//             plain.sku_details = JSON.parse(plain.sku_details);
-//           } catch (err) {
-//             plain.sku_details = null; // fallback if JSON invalid
-//           }
-//         }
-//         // Add received_amount to response (if not present)
-//         if (typeof plain.received_amount === 'undefined') {
-//           plain.received_amount = 0.0;
-//         }
-//         // Add credit_amount to response (if not present)
-//         if (typeof plain.credit_amount === 'undefined') {
-//           plain.credit_amount = 0.0;
-//         }
-//         // Add rate_per_qty to response (if not present)
-//         if (typeof plain.rate_per_qty === 'undefined') {
-//           plain.rate_per_qty = 0.0;
-//         }
-//         return plain;
-//       }),
-
-//       pagination: {
-//         total: count,
-//         page: pageNum,
-//         limit: limitNum,
-//         totalPages,
-//       },
-//     });
-//   } catch (error) {
-//     logger.error("Error fetching work order invoices:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
-// // GET specific work order invoice by ID
-// v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { status = "active" } = req.query;
-
-//     const whereClause = {
-//       id: id,
-//       company_id: req.user.company_id,
-//     };
-
-//     if (status !== "all") {
-//       whereClause.status = status;
-//     }
-
-//     const invoice = await WorkOrderInvoice.findOne({
-//       where: whereClause,
-//       include: [
-//         {
-//           model: WorkOrder,
-//           as: "workOrder",
-//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-//         },
-//         {
-//           model: SalesOrder,
-//           as: "salesOrder",
-//           attributes: ["id", "sales_generate_id", "status"],
-//         },
-//       ],
-//     });
-
-//     if (!invoice) {
-//       return res.status(404).json({ message: "Invoice not found" });
-//     }
-
-//     const result = invoice.get({ plain: true });
-
-//     if (typeof result.sku_details === "string") {
-//       try {
-//         result.sku_details = JSON.parse(result.sku_details);
-//       } catch (e) {
-//         result.sku_details = null; // fallback if parsing fails
-//       }
-//     }
-//     // Add received_amount to response (if not present)
-//     if (typeof result.received_amount === 'undefined') {
-//       result.received_amount = 0.0;
-//     }
-//     // Add credit_amount to response (if not present)
-//     if (typeof result.credit_amount === 'undefined') {
-//       result.credit_amount = 0.0;
-//     }
-//     // Add rate_per_qty to response (if not present)
-//     if (typeof result.rate_per_qty === 'undefined') {
-//       result.rate_per_qty = 0.0;
-//     }
-
-//     res.json(result);
-//   } catch (error) {
-//     logger.error("Error fetching work order invoice:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
 // Helper function to update received_amount for invoices
 const updateReceivedAmountForInvoices = async (invoiceIds) => {
   try {
@@ -342,7 +167,7 @@ const updateReceivedAmountForInvoices = async (invoiceIds) => {
     // Also update invoices that have no payments to 0.0
     const invoicesWithPayments = paymentSums.map(p => p.work_order_invoice_id);
     const invoicesWithoutPayments = invoiceIds.filter(id => !invoicesWithPayments.includes(id));
-    
+
     if (invoicesWithoutPayments.length > 0) {
       await WorkOrderInvoice.update(
         { received_amount: 0.0 },
@@ -579,7 +404,7 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
         result.sku_details = null; // fallback if parsing fails
       }
     }
-    
+
     // Ensure default values for missing fields
     if (typeof result.received_amount === 'undefined' || result.received_amount === null) {
       result.received_amount = 0.0;
@@ -599,8 +424,10 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 // Define your specific invoice storage path
 const INVOICE_STORAGE_PATH = path.join(process.cwd(), 'public', 'invoice');
+
 // Updated generateOriginalInvoicePDF function
 async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
@@ -1142,6 +969,7 @@ v1Router.get("/view/:id", async (req, res) => {
     return res.status(500).send(`<h1>Error: ${error.message}</h1>`);
   }
 });
+
 // --- Render all Work Order Invoice Templates ---
 v1Router.get("/templates/rendered", async (req, res) => {
   try {
@@ -1261,6 +1089,7 @@ v1Router.get("/templates/rendered", async (req, res) => {
     res.status(500).send(`<h1>Error: ${error.message}</h1>`);
   }
 });
+
 // --- Activate Work Order Invoice Template ---
 v1Router.get("/activate/:id", async (req, res) => {
   const templateId = parseInt(req.params.id);
@@ -1371,38 +1200,917 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   }
 });
 
-
 v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   try {
-    const newPartialPayment = await PartialPayment.findAll({
+    const partialPayments = await PartialPayment.findAll({
       where: { work_order_invoice_id: id },
       attributes: [
-        "payment_type", "reference_number", "amount", "remarks", "status", "created_at"
+        "id", "payment_type", "reference_number", "amount", "remarks", "status", "created_at", "updated_at"
       ],
       order: [['created_at', 'DESC']],
     });
-    res.status(201).json({
-      message: "Partial payment created successfully",
-      data: newPartialPayment
+    
+    res.status(200).json({
+      message: "Payment history retrieved successfully",
+      data: partialPayments
     });
   } catch (error) {
-    logger.error("Error creating partial payment:", error);
+    logger.error("Error fetching payment history:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
 
-v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
-  const { id, mobileNumber, emailId, amount } = req.body;
+// GET comprehensive payment status for an invoice
+v1Router.get("/payment/status/:invoiceId", authenticateJWT, async (req, res) => {
+  const { invoiceId } = req.params;
+  
   try {
+    // Fetch invoice details
+    const invoice = await WorkOrderInvoice.findOne({
+      where: {
+        id: invoiceId,
+        company_id: req.user.company_id,
+        status: 'active'
+      },
+      attributes: [
+        'id', 'invoice_number', 'total_amount', 'received_amount', 
+        'payment_status', 'due_date', 'created_at', 'updated_at'
+      ]
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+        success: false
+      });
+    }
+
+    // Fetch all payments for this invoice
+    const payments = await PartialPayment.findAll({
+      where: { work_order_invoice_id: invoiceId },
+      attributes: [
+        "id", "payment_type", "reference_number", "amount", 
+        "remarks", "status", "created_at", "updated_at"
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    // Calculate payment summary
+    const totalPaid = payments.reduce((sum, payment) => {
+      return sum + parseFloat(payment.amount || 0);
+    }, 0);
+
+    const totalAmount = parseFloat(invoice.total_amount || 0);
+    const remainingAmount = totalAmount - totalPaid;
+    const isFullyPaid = remainingAmount <= 0;
+    const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
+
+    // Payment status summary
+    const paymentSummary = {
+      total_amount: totalAmount,
+      total_paid: totalPaid,
+      remaining_amount: Math.max(0, remainingAmount),
+      payment_percentage: totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0,
+      is_fully_paid: isFullyPaid,
+      is_partially_paid: isPartiallyPaid,
+      is_overdue: invoice.due_date ? new Date(invoice.due_date) < new Date() && !isFullyPaid : false,
+      payment_count: payments.length,
+      last_payment_date: payments.length > 0 ? payments[0].created_at : null
+    };
+
+    res.status(200).json({
+      message: "Payment status retrieved successfully",
+      success: true,
+      data: {
+        invoice: {
+          id: invoice.id,
+          invoice_number: invoice.invoice_number,
+          total_amount: invoice.total_amount,
+          received_amount: invoice.received_amount,
+          payment_status: invoice.payment_status,
+          due_date: invoice.due_date,
+          created_at: invoice.created_at,
+          updated_at: invoice.updated_at
+        },
+        payment_summary: paymentSummary,
+        payments: payments.map(payment => ({
+          id: payment.id,
+          payment_type: payment.payment_type,
+          reference_number: payment.reference_number,
+          amount: parseFloat(payment.amount || 0),
+          remarks: payment.remarks,
+          status: payment.status,
+          created_at: payment.created_at,
+          updated_at: payment.updated_at,
+          formatted_amount: `₹${parseFloat(payment.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          formatted_date: new Date(payment.created_at).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        }))
+      }
+    });
+
+  } catch (error) {
+    logger.error("Error fetching comprehensive payment status:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Utility function to detect if input is email or mobile number
+const detectContactType = (input) => {
+  // Email regex pattern
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Mobile number regex pattern (supports various formats)
+  const mobileRegex = /^[+]?[0-9]{10,15}$/;
+
+  // Remove any spaces and special characters for mobile detection
+  const cleanInput = input.replace(/[\s()-]/g, '');
+
+  if (emailRegex.test(input)) {
+    return { type: 'email', value: input.trim() };
+  } else if (mobileRegex.test(cleanInput)) {
+    // Remove country code if present and ensure it's 10 digits for Indian numbers
+    let mobileNumber = cleanInput;
+    if (mobileNumber.startsWith('+91')) {
+      mobileNumber = mobileNumber.substring(3);
+    } else if (mobileNumber.startsWith('91') && mobileNumber.length === 12) {
+      mobileNumber = mobileNumber.substring(2);
+    }
+    return { type: 'mobile', value: mobileNumber };
+  } else {
+    return { type: 'invalid', value: null };
+  }
+};
+
+// POST send payment link (Main Razorpay Integration)
+v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
+  const { id, emailOrMobileNumber, amount } = req.body;
+
+  // Validate required fields
+  if (!id) {
+    return res.status(400).json({
+      message: "Invoice ID is required",
+      success: false
+    });
+  }
+
+  if (!emailOrMobileNumber) {
+    return res.status(400).json({
+      message: "Email or mobile number is required",
+      success: false
+    });
+  }
+
+  // Detect if input is email or mobile number
+  const contactInfo = detectContactType(emailOrMobileNumber);
+
+  if (contactInfo.type === 'invalid') {
+    return res.status(400).json({
+      message: "Invalid email or mobile number format",
+      success: false
+    });
+  }
+  console.log("Before query");
+  
+  // Check required environment variables
+  console.log("Environment check:", {
+    razorpay_key_id: !!process.env.RAZORPAY_KEY_ID,
+    razorpay_key_secret: !!process.env.RAZORPAY_KEY_SECRET,
+    twilio_account_id: !!process.env.TWILIO_ACCOUNT_ID,
+    twilio_auth_token: !!process.env.TWILIO_AUTH_TOKEN,
+    twilio_from_number: !!process.env.TWILIO_FROM_MOBILE_NUMBER,
+    frontend_url: !!process.env.FRONTEND_URL
+  });
+  
+  try {
+    console.log("Before database query - Invoice ID:", id, "Company ID:", req.user.company_id);
+    
+    // Fetch invoice details with client information
+    const invoice = await WorkOrderInvoice.findOne({
+      where: {
+        id: id,
+        company_id: req.user.company_id,
+        status: 'active'
+      },
+      include: [
+        {
+          model: Client,
+          as: "Client",
+          attributes: [
+            "client_id", "display_name", "first_name", "last_name",
+            "company_name", "email", "work_phone", "mobile"
+          ]
+        }
+      ]
+    });
+    
+    console.log("Invoice found:", !!invoice);
+    if (invoice) {
+      console.log("Invoice details:", {
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        total_amount: invoice.total_amount,
+        client_id: invoice.client_id,
+        has_client: !!invoice.Client
+      });
+    }
+   
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+        success: false
+      });
+    }
+
+    // Parse SKU details if it's a string
+    let skuDetails = invoice.sku_details;
+    console.log("SKU details type:", typeof skuDetails);
+    console.log("SKU details value:", skuDetails);
+     
+    if (typeof skuDetails === "string") {
+      try {
+        skuDetails = JSON.parse(skuDetails);
+        console.log("Parsed SKU details:", skuDetails);
+      } catch {
+        console.log("Failed to parse SKU details, using empty array");
+        skuDetails = [];
+      }
+    }
+
+    // Determine payment amount (use provided amount or invoice total)
+    const paymentAmount = amount || invoice.total_amount || 0;
+    const amountInPaise = Math.round(parseFloat(paymentAmount) * 100); // Convert to paise
+    
+    console.log("Payment amount:", paymentAmount, "Amount in paise:", amountInPaise);
+
+    // Get client details
+    const clientName = invoice.Client?.display_name ||
+      invoice.Client?.company_name ||
+      `${invoice.Client?.first_name || ''} ${invoice.Client?.last_name || ''}`.trim() ||
+      invoice.client_name ||
+      'Valued Customer';
+      
+    console.log("Client name:", clientName);
+
+    // Determine email and mobile based on input type and database fallback
+    let clientEmail = null;
+    let clientMobile = null;
+
+    if (contactInfo.type === 'email') {
+      clientEmail = contactInfo.value;
+      // Try to get mobile from database if available
+      clientMobile = invoice.Client?.mobile || invoice.client_phone;
+    } else if (contactInfo.type === 'mobile') {
+      clientMobile = contactInfo.value;
+      // Try to get email from database if available
+      clientEmail = invoice.Client?.email || invoice.client_email;
+    }
+    
+    console.log("Contact info - Type:", contactInfo.type, "Email:", clientEmail, "Mobile:", clientMobile);
+
+    // Create Razorpay payment link
+    console.log("Creating Razorpay payment link with data:", {
+      amount: amountInPaise,
+      currency: 'INR',
+      description: `Payment for Invoice ${invoice.invoice_number}`,
+      customerName: clientName,
+      customerEmail: clientEmail,
+      customerContact: clientMobile ? `+91${clientMobile}` : undefined
+    });
+    
+    const paymentLinkData = {
+      amount: amountInPaise,
+      currency: 'INR',
+      accept_partial: false,
+      description: `Payment for Invoice ${invoice.invoice_number}`,
+      customer: {
+        name: clientName,
+        email: clientEmail,
+        contact: clientMobile ? `+91${clientMobile}` : undefined
+      },
+      notify: {
+        sms: !!clientMobile,
+        email: !!clientEmail
+      },
+      reminder_enable: true,
+      notes: {
+        invoice_id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        company_id: req.user.company_id
+      },
+      callback_url: `${req.protocol}://${req.get('host')}/api/work-order-invoice/payment/callback?invoice_id=${invoice.id}`,
+      callback_method: 'get'
+    };
+    
+    console.log("About to create Razorpay payment link...");
+    
+    // Check if Razorpay is properly initialized
+    if (!razorpay) {
+      throw new Error("Razorpay client not initialized. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.");
+    }
+    
+    console.log("Razorpay client status:", !!razorpay);
+    console.log("Razorpay key_id (first 10 chars):", process.env.RAZORPAY_KEY_ID?.substring(0, 10) + '...');
+    
+    let paymentLink;
+    try {
+      paymentLink = await razorpay.paymentLink.create(paymentLinkData);
+      console.log("Razorpay payment link created successfully:", paymentLink.id);
+    } catch (razorpayError) {
+      console.error("Razorpay API Error Details:", {
+        message: razorpayError.message,
+        statusCode: razorpayError.statusCode,
+        error: razorpayError.error,
+        description: razorpayError.description,
+        code: razorpayError.code,
+        source: razorpayError.source,
+        step: razorpayError.step,
+        reason: razorpayError.reason,
+        field: razorpayError.field
+      });
+      
+      // Re-throw with more specific message
+      if (razorpayError.statusCode === 400) {
+        throw new Error(`Razorpay API Error (400): ${razorpayError.error?.description || razorpayError.message || 'Invalid request parameters. Check your Razorpay API credentials and request data.'}`);
+      } else if (razorpayError.statusCode === 401) {
+        throw new Error(`Razorpay Authentication Error (401): Invalid API credentials. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.`);
+      } else {
+        throw new Error(`Razorpay API Error (${razorpayError.statusCode || 'Unknown'}): ${razorpayError.message || 'Unknown error occurred'}`);
+      }
+    }
+
+    let emailSent = false;
+    let smsSent = false;
+    let emailError = null;
+    let smsError = null;
+
+    // Send email if email address is available
+    if (clientEmail) {
+      console.log("Attempting to send email to:", clientEmail);
+      try {
+        const emailTemplate = PaymentLinkTemplate({
+          clientName,
+          clientEmail,
+          invoiceNumber: invoice.invoice_number,
+          invoiceAmount: paymentAmount,
+          skuDetails: skuDetails || [],
+          paymentLink: paymentLink.short_url,
+          dueDate: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : null,
+          companyName: 'PackWorkX'
+        });
+
+        await sendEmail(
+          clientEmail,
+          `Payment Request - Invoice ${invoice.invoice_number}`,
+          emailTemplate
+        );
+
+        emailSent = true;
+        console.log("Email sent successfully to:", clientEmail);
+        logger.info(`Payment link email sent successfully to: ${clientEmail}`);
+      } catch (error) {
+        emailError = error.message;
+        console.error("Email sending failed:", error.message, error.stack);
+        logger.error(`Failed to send payment link email to: ${clientEmail}`, error);
+      }
+    } else {
+      console.log("No email address available for sending");
+    }
+
+    // Send SMS if mobile number is available
+    if (clientMobile) {
+      console.log("Attempting to send SMS to:", `+91${clientMobile}`);
+      try {
+        const smsMessage = `Hi ${clientName}, Payment link for Invoice ${invoice.invoice_number} (₹${parseFloat(paymentAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}): ${paymentLink.short_url}\n\nPackWorkX Team`;
+        console.log("SMS message:", smsMessage);
+
+        await twilioClient.messages.create({
+          body: smsMessage,
+          from: process.env.TWILIO_FROM_MOBILE_NUMBER,
+          to: `+91${clientMobile}`
+        });
+
+        smsSent = true;
+        console.log("SMS sent successfully to:", `+91${clientMobile}`);
+        logger.info(`Payment link SMS sent successfully to: +91${clientMobile}`);
+      } catch (error) {
+        smsError = error.message;
+        console.error("SMS sending failed:", error.message, error.stack);
+        logger.error(`Failed to send payment link SMS to: +91${clientMobile}`, error);
+      }
+    } else {
+      console.log("No mobile number available for sending SMS");
+    }
+
+    // Prepare response
+    console.log("Preparing response with results - Email sent:", emailSent, "SMS sent:", smsSent);
+    
+    const responseData = {
+      paymentLink: {
+        id: paymentLink.id,
+        short_url: paymentLink.short_url,
+        amount: paymentAmount,
+        currency: 'INR',
+        status: paymentLink.status
+      },
+      invoice: {
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        total_amount: invoice.total_amount,
+        client_name: clientName
+      },
+      contactInfo: {
+        inputType: contactInfo.type,
+        inputValue: contactInfo.value,
+        emailUsed: clientEmail,
+        mobileUsed: clientMobile
+      },
+      notifications: {
+        email: {
+          sent: emailSent,
+          recipient: clientEmail,
+          error: emailError
+        },
+        sms: {
+          sent: smsSent,
+          recipient: clientMobile ? `+91${clientMobile}` : null,
+          error: smsError
+        }
+      }
+    };
+
+    // Determine overall success
+    const overallSuccess = (clientEmail ? emailSent : true) && (clientMobile ? smsSent : true);
 
     res.status(201).json({
-      message: "Payment Link has been created successfully",
-      data: []
+      message: overallSuccess
+        ? "Payment link created and sent successfully"
+        : "Payment link created with some notification failures",
+      success: true,
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("Full error details:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      statusCode: error.statusCode
+    });
+    
+    logger.error("Error creating/sending payment link:", error);
+    
+    // Provide specific error messages based on error type
+    let errorMessage = "Internal Server Error";
+    let statusCode = 500;
+    
+    if (error.message?.includes('Authentication failed') || error.message?.includes('Invalid API key')) {
+      errorMessage = "Payment gateway configuration error. Please check Razorpay credentials.";
+      statusCode = 500;
+    } else if (error.message?.includes('SMTP') || error.message?.includes('Email')) {
+      errorMessage = "Email configuration error. Please check SMTP settings.";
+      statusCode = 500;
+    } else if (error.message?.includes('Twilio') || error.message?.includes('SMS')) {
+      errorMessage = "SMS configuration error. Please check Twilio settings.";
+      statusCode = 500;
+    } else if (error.name === 'SequelizeConnectionError') {
+      errorMessage = "Database connection error.";
+      statusCode = 500;
+    }
+    
+    res.status(statusCode).json({
+      message: errorMessage,
+      success: false,
+      error: error.message,
+      debug: process.env.NODE_ENV === 'development' ? {
+        name: error.name,
+        stack: error.stack,
+        code: error.code
+      } : undefined
+    });
+  }
+});
+
+// GET payment link status
+v1Router.get("/payment/link/status/:paymentLinkId", authenticateJWT, async (req, res) => {
+  const { paymentLinkId } = req.params;
+
+  try {
+    const paymentLink = await razorpay.paymentLink.fetch(paymentLinkId);
+
+    res.status(200).json({
+      message: "Payment link status fetched successfully",
+      success: true,
+      data: {
+        id: paymentLink.id,
+        status: paymentLink.status,
+        amount: paymentLink.amount / 100, // Convert from paise to rupees
+        currency: paymentLink.currency,
+        short_url: paymentLink.short_url,
+        created_at: paymentLink.created_at,
+        paid_at: paymentLink.paid_at,
+        cancelled_at: paymentLink.cancelled_at
+      }
     });
   } catch (error) {
-    logger.error("Error creating sending  payment Link :", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    logger.error("Error fetching payment link status:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST retry payment for an invoice
+v1Router.post("/payment/retry/:invoiceId", authenticateJWT, async (req, res) => {
+  const { invoiceId } = req.params;
+  const { emailOrMobileNumber, amount } = req.body;
+
+  try {
+    // Fetch invoice details
+    const invoice = await WorkOrderInvoice.findOne({
+      where: {
+        id: invoiceId,
+        company_id: req.user.company_id,
+        status: 'active'
+      },
+      include: [{
+        model: Client,
+        as: "Client",
+        attributes: [
+          "client_id", "display_name", "first_name", "last_name",
+          "company_name", "email", "work_phone", "mobile"
+        ]
+      }]
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+        success: false
+      });
+    }
+
+    // Calculate remaining amount
+    const remainingAmount = parseFloat(invoice.total_amount) - parseFloat(invoice.received_amount || 0);
+    
+    if (remainingAmount <= 0) {
+      return res.status(400).json({
+        message: "This invoice is already fully paid",
+        success: false
+      });
+    }
+
+    // Use the remaining amount or provided amount (whichever is smaller)
+    const paymentAmount = amount ? Math.min(parseFloat(amount), remainingAmount) : remainingAmount;
+    const amountInPaise = Math.round(paymentAmount * 100);
+
+    // Get client details
+    const clientName = invoice.Client?.display_name ||
+      invoice.Client?.company_name ||
+      `${invoice.Client?.first_name || ''} ${invoice.Client?.last_name || ''}`.trim() ||
+      invoice.client_name ||
+      'Valued Customer';
+
+    // Determine contact details
+    let clientEmail = emailOrMobileNumber && emailOrMobileNumber.includes('@') ? emailOrMobileNumber : invoice.Client?.email;
+    let clientMobile = emailOrMobileNumber && !emailOrMobileNumber.includes('@') ? emailOrMobileNumber : invoice.Client?.mobile;
+
+    // Create new payment link
+    const paymentLinkData = {
+      amount: amountInPaise,
+      currency: 'INR',
+      accept_partial: false,
+      description: `Retry Payment for Invoice ${invoice.invoice_number}`,
+      customer: {
+        name: clientName,
+        email: clientEmail,
+        contact: clientMobile ? `+91${clientMobile}` : undefined
+      },
+      notify: {
+        sms: !!clientMobile,
+        email: !!clientEmail
+      },
+      reminder_enable: true,
+      notes: {
+        invoice_id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        company_id: req.user.company_id,
+        retry_payment: 'true'
+      },
+      callback_url: `${req.protocol}://${req.get('host')}/api/work-order-invoice/payment/callback?invoice_id=${invoice.id}`,
+      callback_method: 'get'
+    };
+
+    const paymentLink = await razorpay.paymentLink.create(paymentLinkData);
+
+    logger.info(`Retry payment link created for invoice ${invoice.invoice_number}: ${paymentLink.short_url}`);
+
+    res.status(201).json({
+      message: "Retry payment link created successfully",
+      success: true,
+      data: {
+        paymentLink: {
+          id: paymentLink.id,
+          short_url: paymentLink.short_url,
+          amount: paymentAmount,
+          currency: 'INR',
+          status: paymentLink.status
+        },
+        invoice: {
+          id: invoice.id,
+          invoice_number: invoice.invoice_number,
+          total_amount: invoice.total_amount,
+          received_amount: invoice.received_amount || 0,
+          remaining_amount: remainingAmount,
+          client_name: clientName
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error("Error creating retry payment link:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET payment callback URL handler (for redirects from Razorpay)
+v1Router.get("/payment/callback", async (req, res) => {
+  try {
+    const {
+      invoice_id,
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_reference_id,
+      razorpay_payment_link_status,
+      razorpay_signature
+    } = req.query;
+
+    logger.info('Payment callback received:', {
+      invoice_id,
+      payment_id: razorpay_payment_id,
+      payment_link_id: razorpay_payment_link_id,
+      status: razorpay_payment_link_status
+    });
+
+    // Check if required parameters are present
+    if (!invoice_id) {
+      return res.status(400).send('<h1>Error: Invoice ID missing from callback</h1>');
+    }
+
+    // Fetch invoice details
+    const invoice = await WorkOrderInvoice.findOne({
+      where: { id: invoice_id, status: 'active' },
+      attributes: ['id', 'invoice_number', 'total_amount', 'company_id', 'received_amount']
+    });
+
+    if (!invoice) {
+      return res.status(404).send('<h1>Error: Invoice not found</h1>');
+    }
+
+    let templateData = {
+      invoiceNumber: invoice.invoice_number,
+      amount: parseFloat(invoice.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }),
+      paymentId: razorpay_payment_id || 'N/A',
+      paymentMethod: 'Online Payment',
+      transactionDate: new Date().toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      attemptDate: new Date().toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    // Check payment status and handle accordingly
+    if (razorpay_payment_link_status === 'paid' && razorpay_payment_id) {
+      // Payment successful
+      try {
+        // Check if this payment has already been processed
+        const existingPayment = await PartialPayment.findOne({
+          where: {
+            reference_number: razorpay_payment_id,
+            work_order_invoice_id: invoice_id
+          }
+        });
+
+        if (!existingPayment) {
+          // Get payment amount - fetch from Razorpay or use invoice amount
+          let paymentAmount = invoice.total_amount;
+          
+          try {
+            // Try to fetch payment details from Razorpay
+            const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
+            paymentAmount = paymentDetails.amount / 100; // Convert from paise
+            
+            logger.info(`Fetched payment details from Razorpay: ${paymentAmount}`);
+          } catch (razorpayError) {
+            logger.warn('Could not fetch payment details from Razorpay, using invoice amount:', razorpayError.message);
+          }
+
+          // Create payment record
+          await PartialPayment.create({
+            work_order_invoice_id: invoice_id,
+            payment_type: 'online',
+            reference_number: razorpay_payment_id,
+            amount: paymentAmount,
+            remarks: `Payment via Razorpay Payment Link - ${razorpay_payment_link_id}`,
+            status: 'completed',
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+
+          // Calculate total received amount
+          const totalReceived = parseFloat(invoice.received_amount || 0) + parseFloat(paymentAmount);
+          const invoiceTotal = parseFloat(invoice.total_amount);
+          
+          // Determine payment status
+          let paymentStatus = 'partial';
+          if (totalReceived >= invoiceTotal) {
+            paymentStatus = 'paid';
+          }
+
+          // Update invoice status
+          await WorkOrderInvoice.update({
+            payment_status: paymentStatus,
+            received_amount: totalReceived,
+            updated_at: new Date()
+          }, {
+            where: { id: invoice_id }
+          });
+
+          logger.info(`Payment processed successfully for invoice ${invoice.invoice_number}: ₹${paymentAmount}`);
+        } else {
+          logger.info(`Payment ${razorpay_payment_id} already processed for invoice ${invoice.invoice_number}`);
+        }
+
+        // Serve success page
+        const successHtml = await fs.readFile(
+          path.join(__dirname, '../../public/payment-callback/success.html'),
+          'utf8'
+        );
+        
+        // Replace template variables
+        let finalHtml = successHtml
+          .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
+          .replace(/{{amount}}/g, templateData.amount)
+          .replace(/{{paymentId}}/g, templateData.paymentId)
+          .replace(/{{paymentMethod}}/g, templateData.paymentMethod)
+          .replace(/{{transactionDate}}/g, templateData.transactionDate)
+          .replace(/{{frontendUrl}}/g, process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info')
+          .replace(/{{invoiceId}}/g, invoice_id);
+
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(finalHtml);
+
+      } catch (dbError) {
+        logger.error('Database error during payment processing:', dbError);
+        // Still show success to user, but log the error
+        const successHtml = await fs.readFile(
+          path.join(__dirname, '../../public/payment-callback/success.html'),
+          'utf8'
+        );
+        
+        let finalHtml = successHtml
+          .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
+          .replace(/{{amount}}/g, templateData.amount)
+          .replace(/{{paymentId}}/g, templateData.paymentId)
+          .replace(/{{paymentMethod}}/g, templateData.paymentMethod)
+          .replace(/{{transactionDate}}/g, templateData.transactionDate)
+          .replace(/{{frontendUrl}}/g, process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info')
+          .replace(/{{invoiceId}}/g, invoice_id);
+
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(finalHtml);
+      }
+    } else {
+      // Payment failed or cancelled
+      logger.warn(`Payment failed or cancelled for invoice ${invoice.invoice_number}:`, {
+        status: razorpay_payment_link_status,
+        payment_id: razorpay_payment_id
+      });
+
+      const failureHtml = await fs.readFile(
+        path.join(__dirname, '../../public/payment-callback/failure.html'),
+        'utf8'
+      );
+      
+      // Replace template variables
+      let finalHtml = failureHtml
+        .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
+        .replace(/{{amount}}/g, templateData.amount)
+        .replace(/{{attemptDate}}/g, templateData.attemptDate)
+        .replace(/{{frontendUrl}}/g, process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info')
+        .replace(/{{invoiceId}}/g, invoice_id);
+
+      res.setHeader('Content-Type', 'text/html');
+      return res.send(finalHtml);
+    }
+
+  } catch (error) {
+    logger.error('Error in payment callback:', error);
+    res.status(500).send(`
+      <h1>Payment Processing Error</h1>
+      <p>An error occurred while processing your payment callback.</p>
+      <p>Please contact support if you believe your payment was successful.</p>
+      <p>Error: ${error.message}</p>
+    `);
+  }
+});
+
+// POST webhook to handle Razorpay payment updates
+v1Router.post("/payment/webhook", async (req, res) => {
+  try {
+    const webhookSignature = req.headers['x-razorpay-signature'];
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    // Verify webhook signature (optional but recommended)
+    if (webhookSecret) {
+      const crypto = require('crypto');
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+
+      if (expectedSignature !== webhookSignature) {
+        return res.status(400).json({ message: 'Invalid webhook signature' });
+      }
+    }
+
+    const { event, payload } = req.body;
+
+    // Handle payment link events
+    if (event === 'payment_link.paid') {
+      const paymentLink = payload.payment_link.entity;
+      const notes = paymentLink.notes;
+
+      if (notes && notes.invoice_id) {
+        // Check if this payment has already been processed
+        const existingPayment = await PartialPayment.findOne({
+          where: {
+            reference_number: paymentLink.id,
+            work_order_invoice_id: notes.invoice_id
+          }
+        });
+
+        if (!existingPayment) {
+          // Update invoice payment status
+          await WorkOrderInvoice.update(
+            {
+              payment_status: 'paid',
+              received_amount: sequelize.literal(`received_amount + ${paymentLink.amount / 100}`),
+              updated_at: new Date()
+            },
+            { where: { id: notes.invoice_id } }
+          );
+
+          // Create payment record
+          await PartialPayment.create({
+            work_order_invoice_id: notes.invoice_id,
+            payment_type: 'online',
+            reference_number: paymentLink.id,
+            amount: paymentLink.amount / 100,
+            remarks: `Payment via Razorpay Payment Link - ${paymentLink.id}`,
+            status: 'completed',
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+
+          logger.info(`Payment completed via webhook for invoice ID: ${notes.invoice_id}, Amount: ${paymentLink.amount / 100}`);
+        } else {
+          logger.info(`Payment ${paymentLink.id} already processed via webhook`);
+        }
+      }
+    }
+
+    res.status(200).json({ message: 'Webhook processed successfully' });
+  } catch (error) {
+    logger.error("Error processing payment webhook:", error);
+    res.status(500).json({ message: "Webhook processing failed", error: error.message });
   }
 });
 
@@ -1416,7 +2124,8 @@ app.get("/health", (req, res) => {
 
 // Use Version 1 Router
 app.use("/api/work-order-invoice", v1Router);
-// await db.sequelize.sync();
+
+// Start the server
 const PORT = 3030;
 app.listen(process.env.PORT_WORK_INVOICE, '0.0.0.0', () => {
   console.log(`Work-Invoice Service running on port ${process.env.PORT_WORK_INVOICE}`);
