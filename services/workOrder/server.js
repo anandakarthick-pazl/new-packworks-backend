@@ -710,6 +710,7 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       clientName,
       progress,
       skuName,
+      payment_status, // Added payment_status parameter
       updateMissingQrCodes = "true",
       sortBy,
       sortOrder = "desc",
@@ -746,6 +747,19 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
     }
      if (progress) {
       whereClause.progress = progress;
+    }
+
+    // Payment status filtering - exclude 'Invoiced' or filter by specific status
+    if (payment_status) {
+      if (payment_status === "except_invoiced") {
+        // Exclude 'Invoiced' status, fetch all other statuses
+        whereClause.progress = {
+          [Op.ne]: "Invoiced" // Not equal to 'Invoiced'
+        };
+      } else {
+        // Normal filtering for specific payment status
+        whereClause.progress = payment_status;
+      }
     }
 
     // Date range filtering on created_at only
