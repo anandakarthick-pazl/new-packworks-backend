@@ -97,7 +97,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
         work_order_invoice_id: newInvoice.id,
         payment_type: "other",
         reference_number: invoice_number || null,
-        amount: invoiceDetails.amount,
+        amount: invoiceDetails.received_amount || 0.0,
         remarks: "Paid" || null,
         status: "completed",
         created_at: new Date(),
