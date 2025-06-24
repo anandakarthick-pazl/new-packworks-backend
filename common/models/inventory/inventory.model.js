@@ -29,12 +29,12 @@ const Inventory = sequelize.define("Inventory", {
   item_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
-    references: {
-      model: ItemMaster,
-      key: "id",
-    },
-    onUpdate: "CASCADE",
-    onDelete: "CASCADE",
+    // references: {
+    //   model: ItemMaster,
+    //   key: "id",
+    // },
+    // onUpdate: "CASCADE",
+    // onDelete: "CASCADE",
   },
   item_code: {
     type: DataTypes.STRING(50),
@@ -156,8 +156,8 @@ const Inventory = sequelize.define("Inventory", {
   timestamps: false,
 });
 
-ItemMaster.hasMany(Inventory, { foreignKey: "item_id" });
-Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" , as: 'item'  });
+// ItemMaster.hasMany(Inventory, { foreignKey: "item_id" });
+// Inventory.belongsTo(ItemMaster, { foreignKey: "item_id" , as: 'item'  });
 
 GRN.hasMany(Inventory, { foreignKey: "grn_id" });
 Inventory.belongsTo(GRN, { foreignKey: "grn_id" });

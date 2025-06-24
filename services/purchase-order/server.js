@@ -30,6 +30,7 @@ const Item = db.ItemMaster;
 const PurchaseOrderBilling = db.PurchaseOrderBilling;
 const Client = db.Client;
 const WalletHistory = db.WalletHistory;
+const PurchaseOrderPayment = db.PurchaseOrderPayment;
 
 
 dotenv.config();
@@ -436,8 +437,12 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 
 
     const use_this = poData.use_this;
-    const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
-    const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
+const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
+const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
+    const total_amount = parseFloat(poData.total_amount || 0);
+    
+    let paymentMode = "cash"; // default
+    let paymentAmount = total_amount;
 
     if (use_this === true) {
       const client = await Client.findOne({
@@ -509,6 +514,23 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       }, { transaction });
     }
 
+    // 🔁 Insert payment record
+    // await PurchaseOrderPayment.create({
+    //   po_id: newPO.id,
+    //   reference_no: "Wallet/Cash Purchase Order " + purchase_generate_id,
+    //   payment_date: new Date(),
+    //   amount: paymentAmount,
+    //   payment_mode: use_this === false ? paymentMode : "wallet",
+    //   status: "paid",
+    //   remark: use_this === false ? "Paid using wallet credit" : "Paid via cash",
+    //   company_id: req.user.company_id,
+    //   created_by: req.user.id,
+    //   updated_by: req.user.id,
+    //   created_at: new Date(),
+    //   updated_at: new Date()
+    // }, { transaction });
+
+
     await transaction.commit();
     return res.status(200).json({
       success: true,
@@ -524,6 +546,201 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+// create purchase payment
+v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const {
+      po_id,
+      paymentAmount,
+      payment_mode,
+      remark,
+      payment_date
+    } = req.body;
+
+    console.log("Payment Request Body:", req.body);
+    
+
+    // Use == null to allow 0 as a valid amount
+    if (po_id == null || paymentAmount == null || !payment_mode) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: po_id, paymentAmount, or payment_mode"
+      });
+    }
+
+    const purchaseOrder = await PurchaseOrder.findOne({ where: { id: po_id } });
+    if (!purchaseOrder) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Purchase order not found"
+      });
+    }
+    const orderTotal = purchaseOrder.total_amount || 0;
+    const purchase_payment_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderPayment,
+      "purchase_order_payment"
+    );
+
+    const payment = await PurchaseOrderPayment.create({
+      po_id,
+      purchase_payment_generate_id,
+      payment_date: payment_date ? payment_date : new Date(),
+      amount: paymentAmount,
+      payment_mode,
+      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+      remark,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      updated_by: req.user.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Purchase order payment created successfully",
+      data: payment
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create purchase order payment",
+      error: error.message
+    });
+  }
+});
+
+
+//update purchase payments 
+v1Router.put("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const paymentId = req.params.id;
+    const {
+      paymentAmount,
+      payment_mode,
+      remark,
+      payment_date
+    } = req.body;
+
+console.log("Update Payment Request Body:", req.params.id, req.body);
+
+
+    if (paymentAmount == null || !payment_mode) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: paymentAmount or payment_mode"
+      });
+    }
+
+    const payment = await PurchaseOrderPayment.findOne({
+      where: { id: paymentId },
+      transaction
+    });
+
+    if (!payment) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Payment record not found"
+      });
+    }
+
+    const purchaseOrder = await PurchaseOrder.findOne({
+      where: { id: payment.po_id },
+      transaction
+    });
+
+    if (!purchaseOrder) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Associated purchase order not found"
+      });
+    }
+
+    const orderTotal = purchaseOrder.total_amount || 0;
+
+    await payment.update({
+      amount: paymentAmount,
+      payment_mode,
+      remark,
+      payment_date: payment_date || new Date(),
+      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+      updated_by: req.user.id,
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Purchase order payment updated successfully",
+      data: payment
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update purchase order payment",
+      error: error.message
+    });
+  }
+});
+
+
+// get by id purchase order  payment details
+v1Router.get("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
+  try {
+    const paymentId = req.params.id;
+
+    const payment = await PurchaseOrderPayment.findOne({
+      where: { po_id: paymentId },
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchase_order",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"]
+        }
+      ]
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment record not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment record fetched successfully",
+      data: payment
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch payment record",
+      error: error.message
+    });
+  }
+});
+
+
+
 
 //get all po
 // v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
@@ -623,7 +840,7 @@ v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
 //get all Po
 v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
   try {
-    const { search = "", page = "1", limit = "10" } = req.query;
+    const { search = "", page = "1", limit = "50" } = req.query;
     const pageNumber = Math.max(1, parseInt(page));
     const limitNumber = Math.max(1, parseInt(limit));
     const offset = (pageNumber - 1) * limitNumber;
@@ -641,12 +858,41 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
       include: [{ model: PurchaseOrderItem }]  // Optional: include items
     });
 
+
+
+
+
+    // 2. Get all purchase order IDs
+    const poIds = data.map(po => po.id);
+
+    // 3. Fetch payments for these purchase orders
+    const payments = await PurchaseOrderPayment.findAll({
+      where: { po_id: poIds }
+    });
+
+    // 4. Group payments by po_id
+    const paymentsMap = {};
+    payments.forEach(payment => {
+      if (!paymentsMap[payment.po_id]) paymentsMap[payment.po_id] = [];
+      paymentsMap[payment.po_id].push(payment);
+    });
+
+    // 5. Attach payments to each purchase order
+    const dataWithPayments = data.map(po => {
+      const poJson = po.toJSON();
+      poJson.payments = paymentsMap[po.id] || [];
+      return poJson;
+    });
+
+
+
+
     const totalCount = await PurchaseOrder.count({ where });
 
     return res.status(200).json({
       success: true,
       message: "Purchase orders fetched",
-      data,
+      data:dataWithPayments,
       totalCount,
     });
 

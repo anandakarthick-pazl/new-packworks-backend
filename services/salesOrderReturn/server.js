@@ -13,6 +13,7 @@ import { Readable } from "stream";
 import axios from 'axios';
 import FormData from "form-data";
 import { create } from "domain";
+import SalesOrder from "../../common/models/salesOrder/salesOrder.model.js";
 
 dotenv.config();
 
@@ -32,6 +33,8 @@ app.get("/health", (req, res) => {
   });
 });
 const WorkOrderInvoice = db.WorkOrderInvoice;
+const Inventory = db.Inventory;
+
 
 // Sales Return Creation Endpoint
 v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
@@ -177,6 +180,50 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
 
     }
 
+    
+    
+    // 5. Always create a new Inventory row for each return item
+       let inventoryData = null;
+console.log("Return Items Data", returnItemsData);
+
+    for (const item of returnItemsData) {
+      const inventory_generate_id = await generateId(companyId, Inventory, 'inventory');
+      const rate = item.unit_price || 0;
+      const quantity_available = item.return_qty;
+      const tax_amount = item.tax_amount || 0;
+
+      const total_amount = quantity_available * rate;
+      const total_amount_inventory = total_amount + tax_amount;
+
+      const skuDetails = typeof item.sku_details === 'string'
+                          ? JSON.parse(item.sku_details)
+                          : item.sku_details;
+
+      const workOrderInvoice = await WorkOrderInvoice.findOne({
+        where: { sale_id: sales_order_id, company_id: companyId },
+        attributes: ["work_id","invoice_number"],
+      });
+console.log("Sales Return ID:", salesReturnHeader.id);
+
+       inventoryData = await Inventory.create({
+        inventory_generate_id,
+        company_id: companyId,
+        item_id: skuDetails?.sku_id || 0,
+        work_order_id: workOrderInvoice.work_id || null,
+        quantity_available,
+        rate,
+        total_amount: total_amount_inventory,
+        status: "active",
+        category: 2,
+        created_by: userId,
+        created_at: new Date(),
+        sales_return_id : salesReturnHeader.id,
+      }, { transaction });
+    }
+  
+
+
+
     // Commit transaction
     await transaction.commit();
 
@@ -188,7 +235,8 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
         return_header: salesReturnHeader,
         return_items: returnItemsData,
         credit_note: creditNote,
-        wallet_update: walletUpdate
+        wallet_update: walletUpdate,
+        inventoryData:inventoryData
       }
     };
 
