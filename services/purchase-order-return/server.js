@@ -8,7 +8,9 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import GRN from "../../common/models/grn/grn.model.js";
 import GRNItem from "../../common/models/grn/grn_item.model.js";
 import PurchaseOrderItem from "../../common/models/po/purchase_order_item.model.js";
+// import WalletHistory from "../../common/models/walletHistory.model.js";
 import "../../common/models/association.js";
+import { generateId } from "../../common/inputvalidation/generateId.js";
 const Company = db.Company;
 const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
@@ -17,6 +19,8 @@ const ItemMaster = db.ItemMaster;
 const grnItem = db.GRNItem;
 const purchase_order_item = db.PurchaseOrderItem;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
+const WalletHistory = db.WalletHistory;
+const Client = db.Client;
 
 dotenv.config();
 const app = express();
@@ -40,7 +44,7 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
     } = req.body;
 
     const user = req.user;
-
+    const companyId = req.user.company_id;
     // Validate GRN
     const grn = await GRN.findOne({ where: { id: grn_id } });
     if (!grn) throw new Error("GRN not found");
@@ -62,6 +66,12 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
     let total_qty = 0, cgst_amount = 0, sgst_amount = 0, amount = 0, tax_amount = 0, total_amount = 0;
 
     // Create Purchase Order Return
+    const purchase_return_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderReturn,
+      "purchase_return"
+
+    );
     const poReturn = await PurchaseOrderReturn.create({
       grn_id,
       po_id,
@@ -72,7 +82,8 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
       notes,
       created_by: user.id,
       updated_by: user.id,
-      company_id: user.company_id
+      company_id: companyId,
+      purchase_return_generate_id
     }, { transaction });
 
     // Process Return Items
@@ -81,12 +92,7 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
       if (!poItem) throw new Error(`PO Item not found for ID: ${item.po_item_id}`);
 
       // Generate purchase_return_generate_id
-          const purchase_return_generate_id = await generateId(
-            req.user.company_id,
-            PurchaseOrderReturn,
-            "purchase_order_returns"
-            
-          );
+
       const qty = item.return_qty;
       const unitPrice = poItem.unit_price;
       const itemAmount = qty * unitPrice;
@@ -99,7 +105,7 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
         po_return_id: poReturn.id,
         grn_item_id: item.grn_item_id,
         item_id: poItem.item_id,
-        company_id: user.company_id,
+        company_id: companyId,
         return_qty: qty,
         unit_price: unitPrice,
         cgst: poItem.cgst,
@@ -133,6 +139,28 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
       total_amount
     }, { transaction });
 
+    const client = await Client.findOne({
+      where: { id: po.supplier_id, company_id: companyId },
+      transaction
+    });
+    if (!client) throw new Error("supplier Id not found");
+
+    // Update debit_balance
+    client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount);
+    await client.save({ transaction });
+
+    // Insert wallet history record
+    await WalletHistory.create({
+      type: 'debit',
+      client_id: client.id,
+      amount: total_amount,
+      company_id: companyId,
+      refference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
+      created_by: user.id,
+      created_at: new Date()
+    }, { transaction });
+
+
     await transaction.commit();
 
     return res.status(201).json({
@@ -149,84 +177,6 @@ v1Router.post("/purchase-order-return", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-
-
-
-
-// v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
-//   try {
-//     const user = req.user;
-//     const { search = "", page = "1", limit = "10" } = req.query;
-
-//     const pageNumber = Math.max(1, parseInt(page));
-//     const limitNumber = Math.max(1, parseInt(limit));
-//     const offset = (pageNumber - 1) * limitNumber;
-
-//     let where = {
-//       company_id: user.company_id,
-//     };
-
-//     // Optional search on supplier_name or other fields
-//     if (search.trim()) {
-//       where.supplier_name = { [Op.like]: `%${search}%` };
-//     }
-
-//     const { count: totalCount, rows: allReturns } = await PurchaseOrderReturn.findAndCountAll({
-//       where,
-//       include: [
-//         {
-//           model: PurchaseOrderReturnItem,
-//           as: "items",
-//         }
-//       ],
-//       order: [['created_at', 'DESC']],
-//       limit: limitNumber,
-//       offset,
-//     });
-
-//     const userIds = new Set();
-//     allReturns.forEach(ret => {
-//       if (ret.created_by) userIds.add(ret.created_by);
-//       if (ret.updated_by) userIds.add(ret.updated_by);
-//     });
-
-//     // Fetch all users in one query
-//     const users = await User.findAll({
-//       where: { id: Array.from(userIds) },
-//       attributes: ['id', 'name', 'email']
-//     });
-//     const userMap = {};
-//     users.forEach(u => { userMap[u.id] = u; });
-
-//     // Attach user info to each return
-//     const returnsWithUsers = allReturns.map(ret => {
-//       const retJson = ret.toJSON();
-//       retJson.created_by_user = userMap[ret.created_by] || null;
-//       retJson.updated_by_user = userMap[ret.updated_by] || null;
-//       return retJson;
-//     });
-
-//     const approved = allReturns.filter(ret => ret.decision === 'approve');
-//     const disapproved = allReturns.filter(ret => ret.decision === 'disapprove');
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Purchase order returns fetched",
-//       approved,
-//       disapproved,
-//       totalCount,
-//     });
-
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: `Failed to fetch Purchase Order Returns: ${error.message}`
-//     });
-//   }
-// });
-
-
 
 v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
   try {
@@ -309,7 +259,7 @@ v1Router.get("/purchase-order-return", authenticateJWT, async (req, res) => {
 
 
 v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
-  
+
   try {
     const user = req.user;
     const returnId = req.params.id;
@@ -322,8 +272,13 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
       include: [
         {
           model: PurchaseOrderReturnItem,
-          as: "items",
-        }
+          as: "items"
+        },
+        {
+          model: PurchaseOrder,
+          as: "PurchaseOrder", // must match your model association alias
+          attributes: ["id", "purchase_generate_id"]
+        },      
       ]
     });
 
@@ -334,9 +289,32 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
       });
     }
 
-    return res.status(200).json({
+    const itemIds = purchaseOrderReturn.items.map(item => item.item_id);
+
+    // Step 3: Get all matching ItemMaster records
+    const itemMasterData = await ItemMaster.findAll({
+      where: { id: itemIds },
+      attributes: ["id", "item_generate_id", "item_name"]
+    });
+
+    // // Step 4: Map itemMasterData by id for fast lookup
+    // const itemMap = {};
+    // itemMasterData.forEach(item => {
+    //   itemMap[item.id] = item;
+    // });
+
+    // // Step 5: Append itemMaster info manually to each return item
+    // purchaseOrderReturn.items = purchaseOrderReturn.items.map(item => {
+    //   return {
+    //     ...item.toJSON(),
+    //     item_info: itemMap[item.item_id] || null
+    //   };
+    // });
+
+  return res.status(200).json({
       success: true,
-      data: purchaseOrderReturn
+      data: purchaseOrderReturn,
+      item_data : itemMasterData
     });
 
   } catch (error) {
@@ -349,11 +327,11 @@ v1Router.get("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
 
 
 v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => {
-   console.log("Update PO Request Body:", req.params.id);
+  console.log("Update PO Request Body:", req.params.id);
   const transaction = await sequelize.transaction();
 
   try {
-    const id  = parseInt(req.params.id);
+    const id = parseInt(req.params.id);
     console.log("Update PO Request ID:", id);
     const {
       grn_id,
@@ -373,7 +351,7 @@ v1Router.put("/purchase-order-return/:id", authenticateJWT, async (req, res) => 
     console.log("Request IF:", id);
 
     // Fetch and validate main record
-    const poReturn = await PurchaseOrderReturn.findOne({ where: { id : id }, transaction });
+    const poReturn = await PurchaseOrderReturn.findOne({ where: { id: id }, transaction });
     if (!poReturn) throw new Error("Purchase Order Return not found");
 
     console.log("PO Return:", poReturn);

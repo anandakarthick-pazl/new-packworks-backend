@@ -37,6 +37,21 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      use_this: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      debit_balance_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.00
+      },
+      debit_used_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.00
+      },
       supplier_name: {
         type: DataTypes.STRING(100)
       },
@@ -90,6 +105,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       po_status: {
         type: DataTypes.ENUM('created', 'partialy-recieved', 'received', 'amended', 'returned'),
         defaultValue: 'created',
+      },
+      payment_status: {
+        type: DataTypes.STRING(100),
+        defaultValue: 'pending',
       },
       decision: {
         type: DataTypes.ENUM('approve', 'disapprove'),

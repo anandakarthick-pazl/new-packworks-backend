@@ -23,6 +23,10 @@ const GRN = sequelize.define("GRN", {
     },
     onUpdate: "CASCADE",
   },
+  po_bill_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
@@ -80,6 +84,10 @@ const GRN = sequelize.define("GRN", {
     allowNull: false,
     defaultValue: "active",
   },
+  grn_status: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
@@ -107,7 +115,7 @@ const GRN = sequelize.define("GRN", {
 });
 
 PurchaseOrder.hasMany(GRN, { foreignKey: "po_id" });
-GRN.belongsTo(PurchaseOrder, { foreignKey: "po_id" });
+GRN.belongsTo(PurchaseOrder, { foreignKey: "po_id", as: 'purchase_order'});
 
 GRN.belongsTo(Company, { foreignKey: "company_id" });
 

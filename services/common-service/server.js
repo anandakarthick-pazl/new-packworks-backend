@@ -7,7 +7,16 @@ import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import Country from "../../common/models/country.model.js";
-
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { sendEmail } from "../../common/helper/emailService.js";
+import { DemoRequestCustomerTemplate } from "../../common/services/email/templates/demoRequestCustomer.js";
+import { DemoRequestAdminTemplate } from "../../common/services/email/templates/demoRequestAdmin.js";
+import { ForgotPasswordTemplate } from "../../common/services/email/templates/forgotPassword.js";
+import { PasswordResetSuccessTemplate } from "../../common/services/email/templates/passwordResetSuccess.js";
+import { ContactFormCustomerTemplate } from "../../common/services/email/templates/contactFormCustomer.js";
+import { ContactFormAdminTemplate } from "../../common/services/email/templates/contactFormAdmin.js";
+import { Sequelize } from "sequelize";
 dotenv.config();
 
 const app = express();
@@ -28,6 +37,10 @@ const States = db.States;
 const Color = db.Color;
 const WorkOrderStatus = db.WorkOrderStatus;
 const User = db.User;
+const Package = db.Package;
+const DemoRequest = db.DemoRequest;
+const ContactMessage = db.ContactMessage;
+const PasswordReset = db.PasswordReset;
 
 // Middleware to extract user details from token
 const extractUserDetails = (req, res, next) => {
@@ -982,6 +995,508 @@ v1Router.get("/work-order-status", authenticateJWT, async (req, res) => {
   }
 });
 
+// ============ NEW API ENDPOINTS ============
+
+// GET /packages - Fetch all packages
+v1Router.get("/packages", async (req, res) => {
+  try {
+    const packages = await Package.findAll({
+      where: { status: "active" },
+      attributes: [
+        "id",
+        "name",
+        "description",
+        "monthly_price",
+        "annual_price",
+        "module_in_package",
+        "is_recommended"
+      ],
+      include: [
+        {
+          model: Currency,
+          as: "currency",
+          attributes: ["currency_symbol"],
+          required: false
+        }
+      ],
+      order: [["created_at", "DESC"]]
+    });
+
+    // ✅ Parse `module_in_package` string to array
+    const parsedPackages = packages.map(pkg => {
+      return {
+        ...pkg.toJSON(),
+        module_in_package: JSON.parse(pkg.module_in_package)
+      };
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "Packages fetched successfully",
+      data: parsedPackages
+    });
+  } catch (error) {
+    logger.error("Error fetching packages:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+});
+
+// POST /demo-request - Create demo request
+v1Router.post("/demo-request", async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const {
+      company_name,
+      full_name,
+      email,
+      phone,
+      role,
+      preferred_demo_time,
+      needs_description
+    } = req.body;
+
+    // Validate required fields
+    if (!company_name || !full_name || !email || !phone) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Missing required fields: company_name, full_name, email, and phone are required"
+      });
+    }
+
+    // Create demo request
+    const demoRequest = await DemoRequest.create({
+      company_name,
+      full_name,
+      email,
+      phone,
+      role: role || "",
+      preferred_demo_time: preferred_demo_time || "",
+      needs_description: needs_description || "",
+      source: "website_form",
+      status: "pending",
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Send demo request customer email (async, non-blocking)
+    try {
+      const customerEmailTemplate = DemoRequestCustomerTemplate({
+        fullName,
+        companyName: company_name,
+        email,
+        phone,
+        role,
+        preferredDemoTime: preferred_demo_time,
+        needsDescription: needs_description,
+        requestId: demoRequest.id
+      });
+
+      await sendEmail(
+        email,
+        "Demo Request Confirmation - PackWorkX",
+        customerEmailTemplate
+      );
+
+      logger.info(`📧 Demo request customer email sent successfully to: ${email}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send demo request customer email to: ${email}`, {
+        error: emailError.message,
+        requestId: demoRequest.id
+      });
+    }
+
+    // Send demo request admin notification email (async, non-blocking)
+    try {
+      const adminEmailTemplate = DemoRequestAdminTemplate({
+        fullName: full_name,
+        companyName: company_name,
+        email,
+        phone,
+        role,
+        preferredDemoTime: preferred_demo_time,
+        needsDescription: needs_description,
+        requestId: demoRequest.id,
+        userAgent: req.headers['user-agent'] || 'unknown',
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        requestDate: new Date().toISOString()
+      });
+
+      const adminEmail = process.env.ADMIN_EMAIL || "admin@packworkx.com";
+      await sendEmail(
+        adminEmail,
+        `New Demo Request from ${company_name}`,
+        adminEmailTemplate
+      );
+
+      logger.info(`📧 Demo request admin notification sent for: ${company_name}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send demo request admin notification`, {
+        error: emailError.message,
+        requestId: demoRequest.id
+      });
+    }
+
+    return res.status(201).json({
+      status: true,
+      message: "Demo request submitted successfully. We'll contact you soon!",
+      data: {
+        id: demoRequest.id,
+        company_name,
+        full_name,
+        email,
+        emailStatus: "sent"
+      }
+    });
+
+  } catch (error) {
+    // Only rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    logger.error("Error creating demo request:", error);
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+      data: []
+    });
+  }
+});
+
+// POST /forgot-password - Handle forgot password
+v1Router.post("/forgot-password", async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Email is required"
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({
+      where: { email },
+      transaction
+    });
+
+    if (!user) {
+      await transaction.rollback();
+      return res.status(404).json({
+        status: false,
+        message: "User with this email does not exist"
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save or update password reset record
+    await PasswordReset.upsert({
+      email,
+      token: resetToken,
+      expires_at: tokenExpiry,
+      used: false,
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Send password reset email (async, non-blocking)
+    try {
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${email}`;
+      const forgotPasswordTemplate = ForgotPasswordTemplate({
+        userName: user.name,
+        email,
+        resetUrl,
+        expiryTime: "1 hour",
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        requestTime: new Date().toISOString()
+
+      });
+
+      await sendEmail(
+        email,
+        "Password Reset Request - PackWorkX",
+        forgotPasswordTemplate
+      );
+
+      logger.info(`📧 Password reset email sent successfully to: ${email}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send password reset email to: ${email}`, {
+        error: emailError.message
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Password reset instructions have been sent to your email",
+      data: {
+        email,
+        emailStatus: "sent"
+      }
+    });
+
+  } catch (error) {
+    // Only rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    logger.error("Error processing forgot password:", error);
+    return res.status(500).json({
+      status: false,
+      message: error.message
+    });
+  }
+});
+
+// POST /reset-password - Handle password reset
+v1Router.post("/reset-password", async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { email, token, newPassword, confirmPassword } = req.body;
+
+    // Validate required fields
+    if (!email || !token || !newPassword || !confirmPassword) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "All fields are required: email, token, newPassword, confirmPassword"
+      });
+    }
+
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Passwords do not match"
+      });
+    }
+
+    // Validate password strength (minimum 6 characters)
+    if (newPassword.length < 6) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Password must be at least 6 characters long"
+      });
+    }
+
+    // Check if reset token is valid
+    const resetRecord = await PasswordReset.findOne({
+      where: {
+        email,
+        token,
+        used: false,
+        expires_at: { [Op.gt]: new Date() }
+      },
+      transaction
+    });
+
+    if (!resetRecord) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Invalid or expired reset token"
+      });
+    }
+
+    // Find the user
+    const user = await User.findOne({
+      where: { email },
+      transaction
+    });
+
+    if (!user) {
+      await transaction.rollback();
+      return res.status(404).json({
+        status: false,
+        message: "User not found"
+      });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    await user.update({
+      password: hashedPassword,
+      updated_at: new Date()
+    }, { transaction });
+
+    // Mark reset token as used
+    await resetRecord.update({
+      used: true,
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Send password reset success email (async, non-blocking)
+    try {
+      const passwordResetSuccessTemplate = PasswordResetSuccessTemplate({
+        userName: user.name,
+        resetDate: new Date(),
+        loginUrl: `${process.env.FRONTEND_URL}/login`
+      });
+
+      await sendEmail(
+        email,
+        "Password Reset Successful - PackWorkX",
+        passwordResetSuccessTemplate
+      );
+
+      logger.info(`📧 Password reset confirmation email sent to: ${email}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send password reset confirmation email to: ${email}`, {
+        error: emailError.message
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Password has been reset successfully. You can now login with your new password.",
+      data: {
+        email,
+        passwordResetAt: new Date(),
+        emailStatus: "sent"
+      }
+    });
+
+  } catch (error) {
+    // Only rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    logger.error("Error resetting password:", error);
+    return res.status(500).json({
+      status: false,
+      message: error.message
+    });
+  }
+});
+
+// POST /contact-message - Handle contact form submissions
+v1Router.post("/contact-message", async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { name, email, company, subject, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !message) {
+      await transaction.rollback();
+      return res.status(400).json({
+        status: false,
+        message: "Missing required fields: name, email, and message are required"
+      });
+    }
+
+    // Create contact message
+    const contactMessage = await ContactMessage.create({
+      name,
+      email,
+      company: company || "",
+      subject: subject || "Contact Form Submission",
+      message,
+      status: "new",
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Send contact form customer confirmation email (async, non-blocking)
+    try {
+      const customerTemplate = ContactFormCustomerTemplate({
+        name,
+        email,
+        subject: subject || "Contact Form Submission",
+        message,
+        submittedAt: new Date()
+      });
+
+      await sendEmail(
+        email,
+        "Thank you for contacting us - PackWorkX",
+        customerTemplate
+      );
+
+      logger.info(`📧 Contact form confirmation email sent to: ${email}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send contact form confirmation email to: ${email}`, {
+        error: emailError.message,
+        contactId: contactMessage.id
+      });
+    }
+
+    // Send contact form admin notification email (async, non-blocking)
+    try {
+      const adminTemplate = ContactFormAdminTemplate({
+        name,
+        email,
+        company: company || "Not specified",
+        subject: subject || "Contact Form Submission",
+        message,
+        submittedAt: new Date(),
+        contactId: contactMessage.id
+      });
+
+      const adminEmail = process.env.ADMIN_EMAIL || "admin@packworkx.com";
+      await sendEmail(
+        adminEmail,
+        `New Contact Form Submission from ${name}`,
+        adminTemplate
+      );
+
+      logger.info(`📧 Contact form admin notification sent for message ID: ${contactMessage.id}`);
+    } catch (emailError) {
+      logger.error(`📧 Failed to send contact form admin notification`, {
+        error: emailError.message,
+        contactId: contactMessage.id
+      });
+    }
+
+    return res.status(201).json({
+      status: true,
+      message: "Your message has been sent successfully. We'll get back to you soon!",
+      data: {
+        id: contactMessage.id,
+        name,
+        email,
+        subject,
+        emailStatus: "sent"
+      }
+    });
+
+  } catch (error) {
+    // Only rollback if transaction hasn't been committed
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    logger.error("Error creating contact message:", error);
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+      data: []
+    });
+  }
+});
 
 // Basic Health Check Endpoint
 app.get("/health", (req, res) => {
@@ -997,7 +1512,7 @@ app.use("/api/common-service", v1Router);
 // Start the server
 // await db.sequelize.sync();
 const PORT = 3008;
-app.listen(process.env.PORT_COMMON,'0.0.0.0', () => {
+app.listen(process.env.PORT_COMMON, '0.0.0.0', () => {
   console.log(`Common Service running on port ${process.env.PORT_COMMON}`);
 });
 

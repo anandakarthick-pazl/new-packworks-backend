@@ -90,13 +90,13 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
       attributes: [
         'id',
         'quantity_available',
-        
+        'quantity_blocked',
       ],
       where: whereCondition,
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: [
             'default_custom_fields'
           ],
@@ -232,7 +232,7 @@ v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: ['item_generate_id', 'item_name', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status'],
           required: false,
           include: [
@@ -341,9 +341,39 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     };
 
     //products
-    results.products = await ItemMaster.findOne({
+    // results.products = await ItemMaster.findOne({
+    //   where: { id: itemId },
+    // });
+
+
+    const product = await ItemMaster.findOne({
       where: { id: itemId },
     });
+
+    if (product) {
+      const parsedProduct = product.toJSON();
+
+      if (typeof parsedProduct.custom_fields === 'string') {
+        try {
+          parsedProduct.custom_fields = JSON.parse(parsedProduct.custom_fields);
+        } catch {
+          parsedProduct.custom_fields = {};
+        }
+      }
+
+      if (typeof parsedProduct.default_custom_fields === 'string') {
+        try {
+          parsedProduct.default_custom_fields = JSON.parse(parsedProduct.default_custom_fields);
+        } catch {
+          parsedProduct.default_custom_fields = {};
+        }
+      }
+
+      results.products = parsedProduct;
+    } else {
+      results.products = null;
+    }
+
 
 
     // Purchase Orders
@@ -385,7 +415,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         {
           model: GRN,
           as: "grn",
-          attributes: ["id", "grn_generate_id", "grn_date", "invoice_no", "invoice_date", "received_by",
+          attributes: ["id", "po_id","grn_generate_id", "grn_date", "invoice_no", "invoice_date", "received_by",
             "delivery_note_no", "created_at", "status"],
           include: [
             {
@@ -472,18 +502,16 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
 });
 
 
-
-
-
-
+//selva
 //get Inventory
-v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
   try {
     const {
       search = "",
       page = "1",
       limit = "10",
-      categoryId,
+      // categoryId = "1",  
+       categoryId,  
       subCategoryId
     } = req.query;
 
@@ -542,7 +570,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
       // 🔍 Category name match
       const matchingCategory = await Categories.findAll({
-        attributes: ['id'],
+        attributes: ['id',],
         where: {
           category_name: { [Op.like]: `%${search}%` }
         }
@@ -568,7 +596,6 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         andConditions.push({ [Op.or]: searchConditions });
       }
     }
-
     // 🔍 Filter by selected dropdowns
     if (categoryId) {
       andConditions.push({ category: categoryId });
@@ -587,15 +614,16 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const subCategoryQuantities = await Inventory.findAll({
       attributes: [
         'sub_category',
-        [Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],
+        'category'
+        // [Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],
       ],
-      where: whereCondition,
+      // where: whereCondition,
       group: ['Inventory.sub_category', 'sub_category_info.id'],
       include: [
         {
           model: Sub_categories,
           as: 'sub_category_info',
-          attributes: ['id', 'sub_category_name'],
+          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
           required: false,
           on: Sequelize.where(
             Sequelize.col('Inventory.sub_category'),
@@ -624,20 +652,29 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     // get inventory data
     const inventory = await Inventory.findAll({
       attributes: [
+        //  'id',
         'item_id',
         [fn('SUM', col('quantity_available')), 'total_quantity'],
-        'sub_category',
+        [fn('SUM', col('total_amount')), 'total_amount'],
+        // 'sub_category',
         'location',
+        //  'rate',
         'status',
         'created_at',
         'updated_at',
+        [Sequelize.literal(`(
+      SELECT rate FROM inventory AS i2
+      WHERE i2.item_id = Inventory.item_id
+      ORDER BY i2.created_at DESC
+      LIMIT 1
+    )`), 'rate'],
       ],
       where: whereCondition,
-      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+      group: ['Inventory.item_id', 'item_info.id', 'item_info->category_info.id', 'item_info->sub_category_info.id'],
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
           required: false,
           include: [
@@ -647,7 +684,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
               attributes: ['category_name'],
               required: false,
               on: {
-                col1: Sequelize.where(Sequelize.col('item.category'), '=', Sequelize.col('item->category_info.id'))
+                col1: Sequelize.where(Sequelize.col('item_info.category'), '=', Sequelize.col('item_info->category_info.id'))
               }
             },
             {
@@ -656,7 +693,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
               attributes: ['sub_category_name'],
               required: false,
               on: {
-                col1: Sequelize.where(Sequelize.col('item.sub_category'), '=', Sequelize.col('item->sub_category_info.id'))
+                col1: Sequelize.where(Sequelize.col('item_info.sub_category'), '=', Sequelize.col('item_info->sub_category_info.id'))
               }
             }
           ]
@@ -674,19 +711,299 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       where: whereCondition,
       group: ['item_id']
     });
+    const totalAmount = await Inventory.findOne({
+      attributes: [[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+      where: whereCondition,
+      // group: ['item_id']
+    });
 
 
     // Parse JSON fields for each item in the result
+    // const inventoryData = inventory.map(inv => {
+    //   const raw = inv.toJSON();
+    //   if (raw.item) {
+    //     raw.item.default_custom_fields = raw.item.default_custom_fields
+    //       ? JSON.parse(raw.item.default_custom_fields) : {};
+    //     raw.item.custom_fields = raw.item.custom_fields
+    //       ? JSON.parse(raw.item.custom_fields) : {};
+    //   }
+    //   return raw;
+    // });
+
     const inventoryData = inventory.map(inv => {
       const raw = inv.toJSON();
-      if (raw.item) {
-        raw.item.default_custom_fields = raw.item.default_custom_fields
-          ? JSON.parse(raw.item.default_custom_fields) : {};
-        raw.item.custom_fields = raw.item.custom_fields
-          ? JSON.parse(raw.item.custom_fields) : {};
+
+      if (raw.item_info) {
+        if (typeof raw.item_info.default_custom_fields === 'string') {
+          try {
+            raw.item_info.default_custom_fields = JSON.parse(raw.item_info.default_custom_fields);
+          } catch {
+            raw.item_info.default_custom_fields = {};
+          }
+        }
+
+        if (typeof raw.item_info.custom_fields === 'string') {
+          try {
+            raw.item_info.custom_fields = JSON.parse(raw.item_info.custom_fields);
+          } catch {
+            raw.item_info.custom_fields = {};
+          }
+        }
       }
+
       return raw;
     });
+
+    const totalCount = totalCountResult.length;
+    const totalPages = Math.ceil(totalCount / limitNumber);
+
+    return res.status(200).json({
+      success: true,
+      message: "Grouped Inventory data fetched successfully",
+      data: { inventoryData, subCategoryQuantities },
+      pagination: {
+        currentPage: pageNumber,
+        perPage: limitNumber,
+        totalCount,
+        totalPages,
+        totalAmount: totalAmount.total_amount || 0
+      },
+      totalCount: totalCount
+    });
+  } catch (error) {
+    console.error(error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Inventory fetch error: ${error.message}`,
+    });
+  }
+});
+
+
+
+
+v1Router.get("/inventory", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      search = "",
+      page = "1",
+      limit = "10",
+      categoryId,  
+      subCategoryId
+    } = req.query;
+
+    const pageNumber = parseInt(page) || 1;
+    const limitNumber = parseInt(limit) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+
+    let andConditions = [
+      { company_id: req.user.company_id }
+    ];
+
+    if (search.trim() !== "") {
+      const searchConditions = [
+        { id: { [Op.like]: `%${search}%` } },
+        { item_id: { [Op.like]: `%${search}%` } },
+        { location: { [Op.like]: `%${search}%` } },
+      ];
+
+      // 🔍 Item name or generate ID match
+      const matchingItems = await ItemMaster.findAll({
+        attributes: ['id'],
+        where: {
+          [Op.or]: [
+            { item_generate_id: { [Op.like]: `%${search}%` } },
+            { item_name: { [Op.like]: `%${search}%` } },
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.bf'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.gsm'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.size'),
+              { [Op.like]: `%${search}%` }
+            ),
+            Sequelize.where(
+              Sequelize.json('default_custom_fields.color'),
+              { [Op.like]: `%${search}%` }
+            )
+          ]
+        }
+      });
+      if (matchingItems.length > 0) {
+        const itemIds = matchingItems.map(item => item.id);
+        searchConditions.push({ item_id: { [Op.in]: itemIds } });
+      }
+
+      // 🔍 Category name match
+      const matchingCategory = await Categories.findAll({
+        attributes: ['id',],
+        where: {
+          category_name: { [Op.like]: `%${search}%` }
+        }
+      });
+      if (matchingCategory.length > 0) {
+        const categoryIds = matchingCategory.map(category => category.id);
+        searchConditions.push({ category: { [Op.in]: categoryIds } });
+      }
+
+      // 🔍 Subcategory name match
+      const matchingSubCategory = await Sub_categories.findAll({
+        attributes: ['id'],
+        where: {
+          sub_category_name: { [Op.like]: `%${search}%` }
+        }
+      });
+      if (matchingSubCategory.length > 0) {
+        const subCategoryIds = matchingSubCategory.map(sub => sub.id);
+        searchConditions.push({ sub_category: { [Op.in]: subCategoryIds } });
+      }
+
+      if (searchConditions.length > 0) {
+        andConditions.push({ [Op.or]: searchConditions });
+      }
+    }
+    // 🔍 Filter by selected dropdowns
+    if (categoryId) {
+      andConditions.push({ category: categoryId });
+    }
+
+    if (subCategoryId) {
+      andConditions.push({ sub_category: subCategoryId });
+    }
+
+    // ✅ Final where condition
+    const whereCondition = { [Op.and]: andConditions };
+
+
+
+    // get a subcategory data
+    const subCategoryQuantities = await Inventory.findAll({
+      attributes: [
+        'sub_category',
+        'category'
+      ],
+      // where: whereCondition,
+      group: ['Inventory.sub_category', 'sub_category_info.id'],
+      include: [
+        {
+          model: Sub_categories,
+          as: 'sub_category_info',
+          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          required: false,
+          on: Sequelize.where(
+            Sequelize.col('Inventory.sub_category'),
+            '=',
+            Sequelize.col('sub_category_info.id')
+          )
+        },
+        {
+          model: ItemMaster,
+          as: 'item_info',
+          attributes: [
+            'item_name',
+            'item_generate_id'
+          ],
+          required: false,
+          on: Sequelize.where(
+            Sequelize.col('Inventory.item_id'),
+            '=',
+            Sequelize.col('item_info.id')
+          )
+        }
+      ]
+    });
+
+
+    // get inventory data
+    const inventory = await Inventory.findAll({
+  attributes: [
+    'id',
+    'item_id',
+    'quantity_available',
+    'total_amount',
+    'location',
+    'rate',
+    'status',
+    'created_at',
+    'updated_at'
+  ],
+  where: whereCondition,
+  include: [
+    {
+      model: ItemMaster,
+      as: 'item_info',
+      attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+      required: false,
+      include: [
+        {
+          model: Categories,
+          as: 'category_info',
+          attributes: ['category_name'],
+          required: false
+        },
+        {
+          model: Sub_categories,
+          as: 'sub_category_info',
+          attributes: ['sub_category_name'],
+          required: false
+        }
+      ]
+    }
+  ],
+  order: [['created_at', 'DESC']],
+  limit: limitNumber,
+  offset: offset,
+});
+
+
+
+    // Get total count of unique item_ids (for pagination)
+    const totalCountResult = await Inventory.findAll({
+      attributes: ['item_id'],
+      where: whereCondition,
+      // group: ['item_id']
+    });
+
+
+    // Parse JSON fields for each item in the result
+    // const inventoryData = inventory.map(inv => {
+    //   const raw = inv.toJSON();
+    //   if (raw.item) {
+    //     raw.item.default_custom_fields = raw.item.default_custom_fields
+    //       ? JSON.parse(raw.item.default_custom_fields) : {};
+    //     raw.item.custom_fields = raw.item.custom_fields
+    //       ? JSON.parse(raw.item.custom_fields) : {};
+    //   }
+    //   return raw;
+    // });
+
+    const inventoryData = inventory.map(inv => {
+  const raw = inv.toJSON();
+
+  if (raw.item_info) {
+    if (typeof raw.item_info.default_custom_fields === 'string') {
+      try {
+        raw.item_info.default_custom_fields = JSON.parse(raw.item_info.default_custom_fields);
+      } catch {
+        raw.item_info.default_custom_fields = {};
+      }
+    }
+
+    if (typeof raw.item_info.custom_fields === 'string') {
+      try {
+        raw.item_info.custom_fields = JSON.parse(raw.item_info.custom_fields);
+      } catch {
+        raw.item_info.custom_fields = {};
+      }
+    }
+  }
+
+  return raw;
+});
 
     const totalCount = totalCountResult.length;
     const totalPages = Math.ceil(totalCount / limitNumber);

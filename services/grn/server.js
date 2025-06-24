@@ -17,6 +17,7 @@ const PurchaseOrderItem = db.PurchaseOrderItem;
 const Inventory = db.Inventory;
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 
 dotenv.config();
@@ -32,10 +33,226 @@ const v1Router = Router();
 
 
 
+// v1Router.post("/grn", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
+//     const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
+//     console.log("inventory_generate_id :", inventory_generate_id);
+    
+//     const { items, ...grnData } = req.body;
+
+//     grnData.created_by = req.user.id;
+//     grnData.updated_by = req.user.id;
+//     grnData.grn_generate_id = grn_generate_id;
+//     grnData.company_id = req.user.company_id;
+
+//     const validatePo = await PurchaseOrder.findOne({
+//       where: { id: grnData.po_id, status: "active" },
+//       transaction
+//     });
+
+//     if (!validatePo) {
+//       throw new Error("Invalid or inactive Purchase Order.");
+//     }
+//     let newGRN = null;
+
+//     for (const item of items) {
+//       const {
+//         po_item_id, item_id, item_code, grn_item_name, description,
+//         quantity_ordered, quantity_received, accepted_quantity,
+//         rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
+//       } = item;
+
+
+//       const poItem = await PurchaseOrderItem.findOne({
+//         where: { id: po_item_id },
+//         attributes: ['quantity'],
+//         transaction
+//       });
+//       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
+
+//       const grnStatus = (parseFloat(accepted_quantity) === parseFloat(poItem.quantity))
+//         ? "fully_received"
+//         : "partially_received";
+
+
+//       if (!newGRN) {
+//         grnData.grn_status = grnStatus;
+//         newGRN = await GRN.create(grnData, { transaction });
+//       }
+
+//       // const newGRN = await GRN.create(grnData, { transaction });
+
+
+//       const itemMaster = await ItemMaster.findOne({
+//         where: { id: item_id },
+//         transaction
+//       });
+//       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
+
+//       const category = itemMaster.category;
+//       const sub_category = itemMaster.sub_category;
+
+//       const newGRNItem = await GRNItem.create({
+//         grn_id: newGRN.id,
+//         po_item_id,
+//         item_id,
+//         item_code,
+//         grn_item_name,
+//         description,
+//         quantity_ordered,
+//         quantity_received,
+//         accepted_quantity,
+//         rejected_quantity,
+//         unit_price,
+//         notes,
+//         work_order_no,
+//         batch_no,
+//         location,
+//         cgst, 
+//         cgst_amount, 
+//         sgst, 
+//         sgst_amount, 
+//         amount, 
+//         tax_amount, 
+//         total_amount,
+//         created_by: req.user.id,
+//         updated_by: req.user.id,
+//         company_id: req.user.company_id,
+//         grn_item_status: grnStatus,
+//       }, { transaction });
+
+//       const acceptedQty = parseFloat(accepted_quantity) || 0;
+
+//       // const existingInventory = await Inventory.findOne({
+//       //   where: {
+//       //     item_id,
+//       //     batch_no: batch_no || null,
+//       //     location: location || null,
+//       //     status: 'active'
+//       //   },
+//       //   transaction
+//       // });
+
+//       // if (existingInventory) {
+       
+//       //   // existingInventory.quantity_available =
+//       //   //   (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
+//       //   // existingInventory.updated_by = req.user.id;
+//       //   // await existingInventory.save({ transaction });
+        
+//       //   const updatedQuantity = (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
+        
+//       //   await Inventory.create({
+//       //     company_id: req.user.company_id,
+//       //     item_id,
+//       //     item_code,
+//       //     grn_id: newGRN.id,
+//       //     grn_item_id: newGRNItem.id,
+//       //     po_id: grnData.po_id,
+//       //     category:category,
+//       //     sub_category:sub_category,
+//       //     // inventory_type: itemType,
+//       //     work_order_no,
+//       //     description,
+//       //     quantity_available: updatedQuantity,
+//       //     batch_no,
+//       //     location,
+//       //     status: 'active',
+//       //     created_by: req.user.id,
+//       //     updated_by: req.user.id
+//       //   }, { transaction });
+//       // } else {
+//         await Inventory.create({
+//           inventory_generate_id :inventory_generate_id,
+//           company_id: req.user.company_id,
+//           item_id,
+//           item_code,
+//           grn_id: newGRN.id,
+//           grn_item_id: newGRNItem.id,
+//           po_id: grnData.po_id,
+//           category:category,
+//           sub_category:sub_category,
+//           po_item_id:po_item_id,
+//           // inventory_type: itemType,
+//           work_order_no,
+//           description,
+//           quantity_available: acceptedQty,
+//           rate :newGRNItem.amount,
+//           total_amount: acceptedQty * newGRNItem.amount,
+//           batch_no,
+//           location,
+//           status: 'active',
+//           created_by: req.user.id,
+//           updated_by: req.user.id
+//         }, { transaction });
+//       }
+//     // }
+
+//     const allPoItems = await PurchaseOrderItem.findAll({
+//       where: { po_id: grnData.po_id },
+//       transaction
+//     });
+
+//     const allGrns = await GRN.findAll({
+//       where: { po_id: grnData.po_id },
+//       transaction
+//     });
+//     const allGrnIds = allGrns.map(grn => grn.id);
+
+//     const allGrnItems = await GRNItem.findAll({
+//       where: { grn_id: allGrnIds },
+//       transaction
+//     });
+
+//     // const allReceived = allPoItems.every(poItem =>
+//     //   allGrnItems.some(grnItem => grnItem.po_item_id === poItem.id)
+//     // );
+
+//     const allReceived = allPoItems.every(poItem =>
+//       allGrnItems
+//         .filter(grnItem => grnItem.po_item_id === poItem.id)
+//         .reduce((total, grnItem) => total + parseFloat(grnItem.quantity_received || 0), 0) >= parseFloat(poItem.quantity || 0)
+//     );
+
+//     await PurchaseOrder.update(
+//       { po_status: allReceived ? "received" : "partialy-recieved" },
+//       { where: { id: grnData.po_id }, transaction }      
+//     );
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "GRN and inventory updated successfully",
+//       data: newGRN
+//     });
+
+//   } catch (error) {
+//     await transaction.rollback();
+//     console.error("GRN creation error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: `GRN creation failed: ${error.message}`
+//     });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
 v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
+    const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
     const { items, ...grnData } = req.body;
 
     grnData.created_by = req.user.id;
@@ -48,29 +265,48 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
       transaction
     });
 
-    if (!validatePo) {
-      throw new Error("Invalid or inactive Purchase Order.");
-    }
+    if (!validatePo) throw new Error("Invalid or inactive Purchase Order.");
 
-    const newGRN = await GRN.create(grnData, { transaction });
+    let newGRN = null;
 
     for (const item of items) {
       const {
         po_item_id, item_id, item_code, grn_item_name, description,
         quantity_ordered, quantity_received, accepted_quantity,
-        rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
+        rejected_quantity, notes, unit_price,
+        cgst, cgst_amount, sgst, sgst_amount,
+        amount, tax_amount, total_amount,
+        work_order_no, batch_no, location
       } = item;
 
       const poItem = await PurchaseOrderItem.findOne({
         where: { id: po_item_id },
+        attributes: ['quantity'],
         transaction
       });
+
       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
 
-      const itemMaster = await ItemMaster.findOne({
-        where: { id: item_id },
+      // Calculate cumulative accepted quantity across all GRNs
+      const existingGrns = await GRNItem.findAll({
+        where: { po_item_id },
+        attributes: ['accepted_quantity'],
         transaction
       });
+
+      const previouslyAcceptedQty = existingGrns.reduce((sum, item) => sum + parseFloat(item.accepted_quantity || 0), 0);
+      const totalAcceptedQty = previouslyAcceptedQty + parseFloat(accepted_quantity || 0);
+
+      const grnStatus = (totalAcceptedQty >= parseFloat(poItem.quantity))
+        ? "fully_received"
+        : "partially_received";
+
+      if (!newGRN) {
+        grnData.grn_status = grnStatus;
+        newGRN = await GRN.create(grnData, { transaction });
+      }
+
+      const itemMaster = await ItemMaster.findOne({ where: { id: item_id }, transaction });
       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
 
       const category = itemMaster.category;
@@ -92,130 +328,66 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         work_order_no,
         batch_no,
         location,
-        cgst, 
-        cgst_amount, 
-        sgst, 
-        sgst_amount, 
-        amount, 
-        tax_amount, 
-        total_amount,
+        cgst, cgst_amount, sgst, sgst_amount,
+        amount, tax_amount, total_amount,
         created_by: req.user.id,
         updated_by: req.user.id,
-        company_id: req.user.company_id
+        company_id: req.user.company_id,
+        grn_item_status: grnStatus
       }, { transaction });
 
-      const acceptedQty = parseFloat(accepted_quantity) || 0;
-
-      // const existingInventory = await Inventory.findOne({
-      //   where: {
-      //     item_id,
-      //     batch_no: batch_no || null,
-      //     location: location || null,
-      //     status: 'active'
-      //   },
-      //   transaction
-      // });
-
-      // if (existingInventory) {
-       
-      //   // existingInventory.quantity_available =
-      //   //   (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
-      //   // existingInventory.updated_by = req.user.id;
-      //   // await existingInventory.save({ transaction });
-        
-      //   const updatedQuantity = (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
-        
-      //   await Inventory.create({
-      //     company_id: req.user.company_id,
-      //     item_id,
-      //     item_code,
-      //     grn_id: newGRN.id,
-      //     grn_item_id: newGRNItem.id,
-      //     po_id: grnData.po_id,
-      //     category:category,
-      //     sub_category:sub_category,
-      //     // inventory_type: itemType,
-      //     work_order_no,
-      //     description,
-      //     quantity_available: updatedQuantity,
-      //     batch_no,
-      //     location,
-      //     status: 'active',
-      //     created_by: req.user.id,
-      //     updated_by: req.user.id
-      //   }, { transaction });
-      // } else {
-        await Inventory.create({
-          company_id: req.user.company_id,
-          item_id,
-          item_code,
-          grn_id: newGRN.id,
-          grn_item_id: newGRNItem.id,
-          po_id: grnData.po_id,
-          category:category,
-          sub_category:sub_category,
-          po_item_id:po_item_id,
-          // inventory_type: itemType,
-          work_order_no,
-          description,
-          quantity_available: acceptedQty,
-          batch_no,
-          location,
-          status: 'active',
-          created_by: req.user.id,
-          updated_by: req.user.id
-        }, { transaction });
-      }
-    // }
-
-    const allPoItems = await PurchaseOrderItem.findAll({
-      where: { po_id: grnData.po_id },
-      transaction
-    });
-
-    const allGrns = await GRN.findAll({
-      where: { po_id: grnData.po_id },
-      transaction
-    });
+      await Inventory.create({
+        inventory_generate_id: inventory_generate_id,
+        company_id: req.user.company_id,
+        item_id,
+        item_code,
+        grn_id: newGRN.id,
+        grn_item_id: newGRNItem.id,
+        po_id: grnData.po_id,
+        category,
+        sub_category,
+        po_item_id,
+        work_order_no,
+        description,
+        quantity_available: parseFloat(accepted_quantity),
+        rate: newGRNItem.unit_price,
+        total_amount: parseFloat(accepted_quantity) * newGRNItem.unit_price,
+        batch_no,
+        location,
+        status: 'active',
+        created_by: req.user.id,
+        updated_by: req.user.id
+      }, { transaction });
+    }
+    const allPoItems = await PurchaseOrderItem.findAll({ where: { po_id: grnData.po_id }, transaction });
+    const allGrns = await GRN.findAll({ where: { po_id: grnData.po_id }, transaction });
     const allGrnIds = allGrns.map(grn => grn.id);
-
-    const allGrnItems = await GRNItem.findAll({
-      where: { grn_id: allGrnIds },
-      transaction
-    });
-
-    // const allReceived = allPoItems.every(poItem =>
-    //   allGrnItems.some(grnItem => grnItem.po_item_id === poItem.id)
-    // );
+    const allGrnItems = await GRNItem.findAll({ where: { grn_id: allGrnIds }, transaction });
 
     const allReceived = allPoItems.every(poItem =>
       allGrnItems
         .filter(grnItem => grnItem.po_item_id === poItem.id)
-        .reduce((total, grnItem) => total + parseFloat(grnItem.quantity_received || 0), 0) >= parseFloat(poItem.quantity || 0)
+        .reduce((total, grnItem) => total + parseFloat(grnItem.accepted_quantity || 0), 0) >= parseFloat(poItem.quantity || 0)
     );
 
     await PurchaseOrder.update(
       { po_status: allReceived ? "received" : "partialy-recieved" },
-      { where: { id: grnData.po_id }, transaction }      
+      { where: { id: grnData.po_id }, transaction }
     );
 
     await transaction.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: "GRN and inventory updated successfully",
-      data: newGRN
-    });
+    return res.status(200).json({ success: true, message: "GRN and inventory updated successfully", data: newGRN });
 
   } catch (error) {
     await transaction.rollback();
     console.error("GRN creation error:", error);
-    return res.status(500).json({
-      success: false,
-      message: `GRN creation failed: ${error.message}`
-    });
+    return res.status(500).json({ success: false, message: `GRN creation failed: ${error.message}` });
   }
 });
+
+
+
+
 
 
 
@@ -256,10 +428,17 @@ whereCondition.status="active"
       where: whereCondition,
       limit: limitNumber,
       offset,
-      include: [{ model: GRNItem }],
+      include: [
+        { model: GRNItem },
+        {
+        model: PurchaseOrder,
+        as: 'purchase_order',
+        attributes: ['id', 'purchase_generate_id'], // fetch only what's needed
+        required: false
+        }
+      ],
       order: [['updated_at', 'DESC']] 
     });
-    console.log("grns",grns);
     
 
     const totalCount = await GRN.count({ where: whereCondition });
@@ -300,9 +479,19 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
               model: ItemMaster,
               as: "item_info", // Alias from GRNItem → ItemMaster association
               attributes: ["id", "item_generate_id"]
+            },
+          ]
+          },
+          {
+          model: PurchaseOrder,
+          as: "purchase_order",
+          include: [
+            {
+              model: PurchaseOrderItem,
+              as: "PurchaseOrderItems"
             }
           ]
-          }
+        }
         ]
       });
   
@@ -312,11 +501,24 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
           message: "GRN not found"
         });
       }
+
+      const po = grn.purchase_order; // this is the PurchaseOrder instance
+      const poId = po?.id;
+
+      if (!poId) {
+        return res.status(404).json({ success: false, message: "Purchase Order not found in GRN" });
+      }
+
+      const bills = await PurchaseOrderBilling.findAll({
+        where: { purchase_order_id: poId },
+        attributes: ["id", "bill_generate_id"]
+      });
   
       return res.status(200).json({
         success: true,
         message: "GRN fetched successfully",
-        data: grn
+        data: grn,
+        bills:bills
       });
     } catch (error) {
       console.error("Fetch GRN error:", error.message);
@@ -393,6 +595,20 @@ v1Router.put("/grn/:id", authenticateJWT, async (req, res) => {
         { where: { id: poId }, transaction }
       );
 
+      const currentGrnItems = await GRNItem.findAll({ where: { grn_id: grnId }, transaction });
+      for (const grnItem of currentGrnItems) {
+        const totalAccepted = allGrnItems
+          .filter(g => g.po_item_id === grnItem.po_item_id)
+          .reduce((sum, g) => sum + parseFloat(g.accepted_quantity || 0), 0);
+
+        const poItem = allPoItems.find(p => p.id === grnItem.po_item_id);
+        const expectedQty = parseFloat(poItem?.quantity || 0);
+
+        const status = totalAccepted >= expectedQty ? "fully_received" : "partially_received";
+
+        await grnItem.update({ grn_item_status: status }, { transaction });
+      }
+
       console.log("allReceived", allReceived);
   
       await transaction.commit();
@@ -441,6 +657,46 @@ v1Router.delete("/grn/:id", authenticateJWT, async (req, res) => {
       return res.status(500).json({ success: false, message: error.message });
     }
   });
+
+
+
+  v1Router.get("/grn/bill/:id", authenticateJWT, async (req, res) => {
+  try {
+    const grnId = req.params.id;
+    
+
+    // Find the corresponding purchase order
+    const po = await PurchaseOrder.findOne({
+      where: { id: grnId },
+      attributes: ["id"]
+    });
+
+    if (!po) {
+      return res.status(404).json({
+        success: false,
+        message: "Purchase Order not found"
+      });
+    }    
+
+    const bills = await PurchaseOrderBilling.findAll({
+      where: { purchase_order_id: po.id },
+      attributes: ["id", "bill_generate_id"]
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: bills
+    });
+
+  } catch (error) {
+    console.error("Error fetching GRN bill:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase order billing"
+    });
+  }
+});
+
   
   
 

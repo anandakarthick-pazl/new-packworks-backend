@@ -4,7 +4,7 @@ import Company from "./company.model.js";
 import User from "./user.model.js";
 import BaseModel from "./base.model.js";
 
-class Client extends BaseModel {}
+class Client extends BaseModel { }
 
 Client.init(
   {
@@ -132,6 +132,17 @@ Client.init(
     facebook: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    credit_balance: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0
+    }
+    ,
+    debit_balance: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0
     },
     created_at: {
       type: DataTypes.DATE,

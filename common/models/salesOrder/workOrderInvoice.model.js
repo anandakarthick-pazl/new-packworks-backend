@@ -36,15 +36,15 @@ const WorkOrderInvoice = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-    sku_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
-      references: {
-        model: Sku,
-        key: "id",
-      },
-    },
-     sku_version_id: {
+    // sku_id: {
+    //   type: DataTypes.INTEGER.UNSIGNED,
+    //   allowNull: true,
+    //   references: {
+    //     model: Sku,
+    //     key: "id",
+    //   },
+    // },
+    sku_version_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
       references: {
@@ -81,6 +81,7 @@ const WorkOrderInvoice = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
@@ -114,12 +115,31 @@ const WorkOrderInvoice = sequelize.define(
     total: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      defaultValue: 0.00,
+      defaultValue: 0.0,
     },
     balance: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      defaultValue: 0.00,
+      defaultValue: 0.0,
+    },
+    received_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.0,
+    },
+    credit_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.0,
+    },
+    rate_per_qty: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true, 
+      defaultValue: 0.0,
+    },
+    invoice_pdf: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
     payment_expected_date: {
       type: DataTypes.DATEONLY,
@@ -136,20 +156,40 @@ const WorkOrderInvoice = sequelize.define(
     discount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      defaultValue: 0.00,
+      defaultValue: 0.0,
     },
     total_tax: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      defaultValue: 0.00,
+      defaultValue: 0.0,
     },
     total_amount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      defaultValue: 0.00,
+      defaultValue: 0.0,
     },
     payment_status: {
       type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    quantity: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    sku_details: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
+    client_name: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    client_email: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    client_phone: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
   },
@@ -166,11 +206,11 @@ WorkOrderInvoice.belongsTo(Company, { foreignKey: "company_id" });
 Client.hasMany(WorkOrderInvoice, { foreignKey: "client_id" });
 WorkOrderInvoice.belongsTo(Client, { foreignKey: "client_id" });
 
-Sku.hasMany(WorkOrderInvoice, { foreignKey: "sku_id" });
-WorkOrderInvoice.belongsTo(Sku, { foreignKey: "sku_id" });
+// Sku.hasMany(WorkOrderInvoice, { foreignKey: "sku_id" });
+// WorkOrderInvoice.belongsTo(Sku, { foreignKey: "sku_id" });
 
 SkuVersion.hasMany(WorkOrderInvoice, { foreignKey: "sku_version_id" });
-WorkOrderInvoice.belongsTo(SkuVersion, { foreignKey: "sku_version_id" }); 
+WorkOrderInvoice.belongsTo(SkuVersion, { foreignKey: "sku_version_id" });
 
 SalesOrder.hasMany(WorkOrderInvoice, {
   foreignKey: "sale_id",
@@ -190,7 +230,13 @@ WorkOrderInvoice.belongsTo(WorkOrder, {
   as: "workOrder",
 });
 
-WorkOrderInvoice.belongsTo(User, { foreignKey: "created_by", as: "creator_invoice" });
-WorkOrderInvoice.belongsTo(User, { foreignKey: "updated_by", as: "updater_invoice" });
+WorkOrderInvoice.belongsTo(User, {
+  foreignKey: "created_by",
+  as: "creator_invoice",
+});
+WorkOrderInvoice.belongsTo(User, {
+  foreignKey: "updated_by",
+  as: "updater_invoice",
+});
 
 export default WorkOrderInvoice;

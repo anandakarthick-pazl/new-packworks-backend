@@ -4,18 +4,20 @@ import { Op } from "sequelize";
 import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
+import logger from "../../common/helper/logger.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import HtmlTemplate  from "../../common/models/purchaseOrderTemplate.model.js";
+import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
+import addWalletHistory from "../../common/helper/walletHelper.js";
 
 const Company = db.Company;
-const User =db.User;
+const User = db.User;
 const PurchaseOrder = db.PurchaseOrder;
 const PurchaseOrderItem = db.PurchaseOrderItem;
 const ItemMaster = db.ItemMaster;
@@ -25,12 +27,401 @@ const GRNItem = db.GRNItem;
 const GRN = db.GRN;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const Item = db.ItemMaster;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
+const Client = db.Client;
+const WalletHistory = db.WalletHistory;
+const PurchaseOrderPayment = db.PurchaseOrderPayment;
+
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+
+// billings
+
+// POST create new purchase order billing
+v1Router.post("/purchase-order/bill-create", authenticateJWT, async (req, res) => {
+  const billingDetails = req.body;
+
+  if (!billingDetails) {
+    return res.status(400).json({ message: "Invalid input data" });
+  }
+
+  // Validate required fields
+  if (!billingDetails.purchase_order_id) {
+    return res.status(400).json({ message: "Purchase Order ID is required" });
+  }
+
+  if (!billingDetails.bill_date) {
+    return res.status(400).json({ message: "Bill date is required" });
+  }
+
+  if (!billingDetails.remarks) {
+    return res.status(400).json({ message: "Remarks are required" });
+  }
+
+  try {
+    const bill_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderBilling,
+      "billings"
+    );
+
+    // Create Purchase Order Billing
+    const newBilling = await PurchaseOrderBilling.create({
+      bill_generate_id: bill_generate_id,
+      company_id: req.user.company_id,
+      purchase_order_id: billingDetails.purchase_order_id,
+      bill_reference_number: billingDetails.bill_reference_number || null,
+      bill_date: billingDetails.bill_date,
+      remarks: billingDetails.remarks,
+      status: billingDetails.status || "active",
+      created_by: req.user.id,
+      updated_by: req.user.id,
+    });
+
+    res.status(201).json({
+      message: "Purchase Order Billing created successfully",
+      data: newBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error creating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET all purchase order billings with pagination, filtering, and search
+v1Router.get("/purchase-order/bill-get", authenticateJWT, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      purchase_order_id,
+      status = "active", // Default to 'active' status
+      search = "", // Add search parameter
+      bill_date_from,
+      bill_date_to,
+    } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for filtering
+    const whereClause = {
+      company_id: req.user.company_id, // Add company filter for security
+    };
+
+    // Status filtering - default to active, but allow override
+    if (status === "all") {
+      // Don't filter by status if 'all' is specified
+    } else {
+      whereClause.status = status;
+    }
+
+    if (purchase_order_id) {
+      whereClause.purchase_order_id = purchase_order_id;
+    }
+
+    // Date range filtering
+    if (bill_date_from && bill_date_to) {
+      whereClause.bill_date = {
+        [Op.between]: [bill_date_from, bill_date_to]
+      };
+    } else if (bill_date_from) {
+      whereClause.bill_date = {
+        [Op.gte]: bill_date_from
+      };
+    } else if (bill_date_to) {
+      whereClause.bill_date = {
+        [Op.lte]: bill_date_to
+      };
+    }
+
+    // Add search functionality if search parameter is provided
+    if (search && search.trim() !== "") {
+      const searchTerm = `%${search.trim()}%`; // Add wildcards for partial matching
+
+      // Define search condition to look across multiple fields
+      const searchCondition = {
+        [Op.or]: [
+          // Search in PurchaseOrderBilling fields
+          { bill_generate_id: { [Op.like]: searchTerm } },
+          { bill_reference_number: { [Op.like]: searchTerm } },
+          { remarks: { [Op.like]: searchTerm } },
+          { bill_date: { [Op.like]: searchTerm } },
+
+          // Search in related PurchaseOrder fields using Sequelize's nested include where
+          // { "$purchaseOrder.purchase_order_number$": { [Op.like]: searchTerm } },
+          // { "$purchaseOrder.supplier_name$": { [Op.like]: searchTerm } },
+        ],
+      };
+
+      // Add search condition to where clause
+      whereClause[Op.and] = whereClause[Op.and] || [];
+      whereClause[Op.and].push(searchCondition);
+    }
+
+    // Fetch from database with pagination, filters, and search
+    const { count, rows } = await PurchaseOrderBilling.findAndCountAll({
+      where: whereClause,
+      limit: limitNum,
+      offset: offset,
+      order: [["updated_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id", "email"],
+        },
+      ],
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(count / limitNum);
+
+    res.json({
+      billings: rows.map((billing) => billing.get({ plain: true })),
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching purchase order billings:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET specific purchase order billing by ID
+v1Router.get("/purchase-order/bill-get/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billing = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "email"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id", "email"],
+        },
+      ],
+    });
+
+    if (!billing) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    const result = billing.get({ plain: true });
+    res.json(result);
+  } catch (error) {
+    logger.error("Error fetching purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// PUT update purchase order billing
+v1Router.put("/purchase-order/bill-update/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    if (!updateData) {
+      return res.status(400).json({ message: "Invalid input data" });
+    }
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Prepare update object
+    const updateObject = {
+      ...updateData,
+      updated_by: req.user.id,
+      updated_at: new Date(),
+    };
+
+    // Remove fields that shouldn't be updated
+    delete updateObject.id;
+    delete updateObject.bill_generate_id;
+    delete updateObject.company_id;
+    delete updateObject.created_by;
+    delete updateObject.created_at;
+
+    // Update the billing
+    await PurchaseOrderBilling.update(updateObject, {
+      where: whereClause,
+    });
+
+    // Fetch updated billing with associations
+    const updatedBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"],
+        },
+        {
+          model: User,
+          as: "updatedBy",
+          attributes: ["id", "email"],
+        },
+      ],
+    });
+
+    res.json({
+      message: "Purchase Order Billing updated successfully",
+      data: updatedBilling.get({ plain: true }),
+    });
+  } catch (error) {
+    logger.error("Error updating purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// DELETE purchase order billing (soft delete)
+v1Router.delete("/purchase-order/bill-delete/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const whereClause = {
+      id: id,
+      company_id: req.user.company_id,
+    };
+
+    // Check if billing exists
+    const existingBilling = await PurchaseOrderBilling.findOne({
+      where: whereClause,
+    });
+
+    if (!existingBilling) {
+      return res.status(404).json({ message: "Purchase Order Billing not found" });
+    }
+
+    // Soft delete by updating status to inactive
+    await PurchaseOrderBilling.update(
+      {
+        status: "inactive",
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      },
+      {
+        where: whereClause,
+      }
+    );
+
+    res.json({
+      message: "Purchase Order Billing deleted successfully",
+    });
+  } catch (error) {
+    logger.error("Error deleting purchase order billing:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+// GET purchase order billings by purchase order ID
+v1Router.get("/by-purchase-order/:purchase_order_id", authenticateJWT, async (req, res) => {
+  try {
+    const { purchase_order_id } = req.params;
+    const { status = "active" } = req.query;
+
+    const whereClause = {
+      purchase_order_id: purchase_order_id,
+      company_id: req.user.company_id,
+    };
+
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const billings = await PurchaseOrderBilling.findAll({
+      where: whereClause,
+      order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          attributes: ["id", "purchase_order_number", "supplier_name", "total_amount", "status"],
+        },
+        {
+          model: User,
+          as: "createdBy",
+          attributes: ["id", "first_name", "last_name", "email"],
+        },
+      ],
+    });
+
+    res.json({
+      billings: billings.map((billing) => billing.get({ plain: true })),
+      total: billings.length,
+    });
+  } catch (error) {
+    logger.error("Error fetching billings by purchase order:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
 
 //Create Po
 v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
@@ -42,6 +433,67 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
     poData.created_by = req.user.id;
     poData.updated_by = req.user.id;
     poData.company_id = req.user.company_id;
+
+
+    const use_this = poData.use_this;
+    const debit_balance_amount = parseFloat(poData.debit_balance_amount || 0);
+    const debit_used_amount = parseFloat(poData.debit_used_amount || 0);
+    const total_amount = parseFloat(poData.total_amount || 0);
+
+    let paymentMode = "cash"; // default
+    let paymentAmount = total_amount;
+
+    if (use_this === true) {
+      const client = await Client.findOne({
+        where: { client_id: poData.supplier_id },
+        attributes: ['client_id', 'debit_balance']
+      });
+
+      if (!client) {
+        return res.status(404).json({ success: false, message: "Client not found" });
+      }
+
+      console.log("client :", client);
+
+      const currentDebit = parseFloat(client.debit_balance || 0);
+
+      // If client has enough debit balance to cover this
+      if (debit_balance_amount > 0 && currentDebit >= debit_balance_amount) {
+        const updatedDebitBalance = currentDebit - debit_balance_amount;
+
+        console.log("updatedDebitNote :", updatedDebitBalance);
+
+        await addWalletHistory({
+          type: 'credit',
+          client_id: client.client_id,
+          amount: debit_balance_amount,
+          company_id: req.user.company_id,
+          reference_number: "Purchase Order " + purchase_generate_id,
+          created_by: req.user.id,
+        });
+
+        await Client.update(
+          { debit_balance: updatedDebitBalance },
+          { where: { client_id: poData.supplier_id } }
+        );
+      } else {
+        // Not enough balance or amount is zero
+        await addWalletHistory({
+          type: 'credit',
+          client_id: client.client_id,
+          amount: 0,
+          company_id: req.user.company_id,
+          reference_number: "Purchase Order " + purchase_generate_id,
+          created_by: req.user.id,
+        });
+
+        await Client.update(
+          { debit_balance: 0 },
+          { where: { client_id: poData.supplier_id } }
+        );
+      }
+    }
+
 
     const newPO = await PurchaseOrder.create(poData, { transaction });
     for (const item of items) {
@@ -61,6 +513,23 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       }, { transaction });
     }
 
+    // 🔁 Insert payment record
+    // await PurchaseOrderPayment.create({
+    //   po_id: newPO.id,
+    //   reference_no: "Wallet/Cash Purchase Order " + purchase_generate_id,
+    //   payment_date: new Date(),
+    //   amount: paymentAmount,
+    //   payment_mode: use_this === false ? paymentMode : "wallet",
+    //   status: "paid",
+    //   remark: use_this === false ? "Paid using wallet credit" : "Paid via cash",
+    //   company_id: req.user.company_id,
+    //   created_by: req.user.id,
+    //   updated_by: req.user.id,
+    //   created_at: new Date(),
+    //   updated_at: new Date()
+    // }, { transaction });
+
+
     await transaction.commit();
     return res.status(200).json({
       success: true,
@@ -77,33 +546,302 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
   }
 });
 
-//get all po
-v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
+
+// create purchase payment
+v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
+    const {
+      po_id,
+      paymentAmount,
+      payment_mode,
+      remark,
+      payment_date
+    } = req.body;
+
+
+
+    // Use == null to allow 0 as a valid amount
+    if (po_id == null || paymentAmount == null || !payment_mode) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: po_id, paymentAmount, or payment_mode"
+      });
+    }
+
+    const purchaseOrder = await PurchaseOrder.findOne({ where: { id: po_id } });
+    if (!purchaseOrder) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Purchase order not found"
+      });
+    }
+    const orderTotal = purchaseOrder.total_amount || 0;
+    const purchase_payment_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderPayment,
+      "purchase_order_payment"
+    );
+
+    const payment = await PurchaseOrderPayment.create({
+      po_id,
+      purchase_payment_generate_id,
+      payment_date: payment_date ? payment_date : new Date(),
+      amount: paymentAmount,
+      payment_mode,
+      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+      remark,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      updated_by: req.user.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+   // 🔄 Recalculate total paid amount for the PO
+    const paidResult = await PurchaseOrderPayment.findOne({
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('amount')), 'totalPaid']
+      ],
+      where: { po_id },
+      raw: true
+    });
+
+    const totalPaid = Number(paidResult.totalPaid || 0);
+
+    // 🧮 Compare with total order amount
+    const paymentStatus = totalPaid >= orderTotal ? "completed" : "partial";
+
+    // 🔁 Update the PO payment status
+    await PurchaseOrder.update(
+      { payment_status: paymentStatus },
+      { where: { id: po_id }, transaction }
+    );
+
+
+    await transaction.commit(); 
+
+    return res.status(201).json({
+      success: true,
+      message: "Purchase order payment created successfully",
+      data: payment
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create purchase order payment",
+      error: error.message
+    });
+  }
+});
+
+
+//update purchase payments 
+// v1Router.put("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
+//   const transaction = await sequelize.transaction();
+//   try {
+//     const  = req.params.id;
+//     const {
+//       paymentAmount,
+//       payment_mode,
+//       remark,
+//       payment_date
+//     } = req.body;
+
+//     console.log("Update Payment Request Body:", req.params.id, req.body);
+
+
+//     if (paymentAmount == null || !payment_mode) {
+//       await transaction.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields: paymentAmount or payment_mode"
+//       });
+//     }
+
+//     const payment = await PurchaseOrderPayment.findOne({
+//       where: { id: paymentId },
+//       transaction
+//     });
+
+//     if (!payment) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Payment record not found"
+//       });
+//     }
+
+//     const purchaseOrder = await PurchaseOrder.findOne({
+//       where: { id: payment.po_id },
+//       transaction
+//     });
+
+//     if (!purchaseOrder) {
+//       await transaction.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Associated purchase order not found"
+//       });
+//     }
+
+//     const orderTotal = purchaseOrder.total_amount || 0;
+
+//     await payment.update({
+//       amount: paymentAmount,
+//       payment_mode,
+//       remark,
+//       payment_date: payment_date || new Date(),
+//       status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+//       updated_by: req.user.id,
+//       updated_at: new Date()
+//     }, { transaction });
+
+//     await transaction.commit();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase order payment updated successfully",
+//       data: payment
+//     });
+
+//   } catch (error) {
+//     await transaction.rollback();
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update purchase order payment",
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// get by id purchase order  payment details
+v1Router.get("/purchase-order/payment/details/:id", authenticateJWT, async (req, res) => {
+  try {
+    const po_id = req.params.id;
+
+    const payment = await PurchaseOrderPayment.findAll({
+      where: { po_id: po_id },
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchase_order",
+          attributes: ["id", "purchase_generate_id", "supplier_name", "total_amount"]
+        }
+      ]
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment record not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment record fetched successfully",
+      data: payment
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch payment record",
+      error: error.message
+    });
+  }
+});
+
+
+
+
+//get all po
+// v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
+//   try {
+//     const usedPoIds = await GRN.findAll({
+//       attributes: ['po_id'],
+//       where: {
+//         grn_status:"fully_received",
+//         status:"active"
+//       },
+//       raw: true,
+//     });
+
+//     const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+
+
+
+//     const orders = await PurchaseOrder.findAll({
+//       attributes: ["id", "purchase_generate_id"],
+//       where: {
+//         company_id: req.user.company_id,
+//         decision:"approve",
+//         status:"active",
+//         id: {
+//           [Op.notIn]: poIdList
+//         }
+//       }
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: orders,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch purchase orders",
+//     });
+//   }
+// });
+
+v1Router.get("/purchase-order/ids", authenticateJWT, async (req, res) => {
+  try {
+    const { search } = req.query; // Get search term from query string
+
+    // Step 1: Find fully received PO IDs to exclude
     const usedPoIds = await GRN.findAll({
       attributes: ['po_id'],
+      where: {
+        grn_status: "fully_received",
+        status: "active"
+      },
       raw: true,
     });
 
-    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean); // remove nulls if any
+    const poIdList = usedPoIds.map(g => g.po_id).filter(Boolean);
 
+    // Step 2: Build where clause dynamically
+    const whereClause = {
+      company_id: req.user.company_id,
+      decision: "approve",
+      status: "active",
+      id: { [Op.notIn]: poIdList },
+    };
 
+    if (search) {
+      // Add case-insensitive LIKE search on `purchase_generate_id`
+      whereClause.purchase_generate_id = { [Op.like]: `%${search}%` };
+    }
 
+    // Step 3: Query Purchase Orders
     const orders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
-      where: {
-        company_id: req.user.company_id,
-        decision:"approve",
-        id: {
-          [Op.notIn]: poIdList
-        }
-      }
+      where: whereClause,
     });
 
     return res.status(200).json({
       success: true,
       data: orders,
     });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -117,10 +855,11 @@ v1Router.get("/purchase-orders/ids", authenticateJWT, async (req, res) => {
 
 
 
+
 //get all Po
 v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
   try {
-    const { search = "", page = "1", limit = "10" } = req.query;
+    const { search = "", page = "1", limit = "50" } = req.query;
     const pageNumber = Math.max(1, parseInt(page));
     const limitNumber = Math.max(1, parseInt(limit));
     const offset = (pageNumber - 1) * limitNumber;
@@ -129,7 +868,7 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
     if (search.trim()) {
       where.supplier_name = { [Op.like]: `%${search}%` };
     }
-    where.status="active";
+    where.status = "active";
     const data = await PurchaseOrder.findAll({
       where,
       limit: limitNumber,
@@ -138,12 +877,41 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
       include: [{ model: PurchaseOrderItem }]  // Optional: include items
     });
 
+
+
+
+
+    // 2. Get all purchase order IDs
+    const poIds = data.map(po => po.id);
+
+    // 3. Fetch payments for these purchase orders
+    const payments = await PurchaseOrderPayment.findAll({
+      where: { po_id: poIds }
+    });
+
+    // 4. Group payments by po_id
+    const paymentsMap = {};
+    payments.forEach(payment => {
+      if (!paymentsMap[payment.po_id]) paymentsMap[payment.po_id] = [];
+      paymentsMap[payment.po_id].push(payment);
+    });
+
+    // 5. Attach payments to each purchase order
+    const dataWithPayments = data.map(po => {
+      const poJson = po.toJSON();
+      poJson.payments = paymentsMap[po.id] || [];
+      return poJson;
+    });
+
+
+
+
     const totalCount = await PurchaseOrder.count({ where });
 
     return res.status(200).json({
       success: true,
       message: "Purchase orders fetched",
-      data,
+      data: dataWithPayments,
       totalCount,
     });
 
@@ -156,28 +924,91 @@ v1Router.get("/purchase-order", authenticateJWT, async (req, res) => {
 });
 
 //get one po
-v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+// v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
+//   try {
+//     const po = await PurchaseOrder.findOne({
+//       where: { id: req.params.id, status: "active" },
+//       include: [{ 
+//         model: PurchaseOrderItem,
+//         include: [
+//               {
+//                 model: ItemMaster,
+//                 as: "item_info", // Alias from GRNItem → ItemMaster association
+//                 attributes: ["id", "item_generate_id","item_name"]
+//               }
+//             ] 
+//         }],
+//     });
+
+//     if (!po) return res.status(404).json({ success: false, message: "Not found" });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase Order fetched",
+//       data: po,
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// });
+
+// Updated GET API for Purchase Order with Received Qty Calculation
+v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
   try {
+    const poId = req.params.id;
+
     const po = await PurchaseOrder.findOne({
-      where: { id: req.params.id, status: "active" },
-      include: [{ 
-        model: PurchaseOrderItem,
-        include: [
-              {
-                model: ItemMaster,
-                as: "item_info", // Alias from GRNItem → ItemMaster association
-                attributes: ["id", "item_generate_id"]
-              }
-            ] 
-        }],
+      where: { id: poId, status: "active" },
+      include: [
+        {
+          model: PurchaseOrderItem,
+          as: "PurchaseOrderItems",
+          include: [
+            {
+              model: ItemMaster,
+              as: "item_info",
+              attributes: ["id", "item_generate_id", "item_name"]
+            }
+          ]
+        }
+      ]
     });
 
-    if (!po) return res.status(404).json({ success: false, message: "Not found" });
+    if (!po) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    const grns = await GRN.findAll({ where: { po_id: poId } });
+    const grnIds = grns.map(grn => grn.id);
+
+    const grnItems = await GRNItem.findAll({
+      where: { grn_id: grnIds }
+    });
+
+    const itemReceivedMap = {};
+    grnItems.forEach(item => {
+      const key = item.po_item_id;
+      itemReceivedMap[key] = (itemReceivedMap[key] || 0) + parseFloat(item.accepted_quantity || 0);
+    });
+
+    // Attach received quantity info to each PO item
+    const updatedItems = po.PurchaseOrderItems.map(item => {
+      const received = itemReceivedMap[item.id] || 0;
+      return {
+        ...item.toJSON(),
+        received_quantity: received,
+        status: received >= parseFloat(item.quantity || 0) ? "fully_received" : "pending"
+      };
+    });
 
     return res.status(200).json({
       success: true,
       message: "Purchase Order fetched",
-      data: po,
+      data: {
+        ...po.toJSON(),
+        PurchaseOrderItems: updatedItems
+      }
     });
 
   } catch (error) {
@@ -185,68 +1016,70 @@ v1Router.get("/purchase-order/:id", authenticateJWT,async (req, res) => {
   }
 });
 
+
+
 //update po
 v1Router.put("/purchase-order/:id", authenticateJWT, async (req, res) => {
   console.log("Update PO Request Body:", req.params.id, req.body);
-  
-    const transaction = await sequelize.transaction();
-    try {
-      const { items, ...poData } = req.body;
-      const poId = req.params.id;
-  
-      const po = await PurchaseOrder.findOne({
-        where: { id: poId },
-        transaction
-      });
-  
-      if (!po) {
-        return res.status(404).json({
-          success: false,
-          message: "Purchase Order not found"
-        });
-      }
-  
-      // Update purchase order
-      poData.updated_by = req.user.id;
-      await po.update(poData, { transaction });
-  
-      console.log("po Id ", poId)
-      // Delete old purchase order items
-     const deletePOId= await PurchaseOrderItem.destroy({
-        where: { po_id: poId },
-        transaction
-      });
-      console.log(" Delete po Id ", deletePOId)
-  
-      // Recreate new purchase order items
-      for (const item of items) {
-        await PurchaseOrderItem.create({
-          ...item,
-          po_id: poId,
-          company_id: req.user.company_id,
-          created_by: req.user.id,
-          updated_by: req.user.id
-        }, { transaction });
-      }
-  
-      await transaction.commit();
-  
-      return res.status(200).json({
-        success: true,
-        message: "Purchase Order and Items updated successfully",
-        data: po
-      });
-  
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Update Error:", error.message);
-      return res.status(500).json({
+
+  const transaction = await sequelize.transaction();
+  try {
+    const { items, ...poData } = req.body;
+    const poId = req.params.id;
+
+    const po = await PurchaseOrder.findOne({
+      where: { id: poId },
+      transaction
+    });
+
+    if (!po) {
+      return res.status(404).json({
         success: false,
-        message: `Update failed: ${error.message}`
+        message: "Purchase Order not found"
       });
     }
-  });
-  
+
+    // Update purchase order
+    poData.updated_by = req.user.id;
+    await po.update(poData, { transaction });
+
+    console.log("po Id ", poId)
+    // Delete old purchase order items
+    const deletePOId = await PurchaseOrderItem.destroy({
+      where: { po_id: poId },
+      transaction
+    });
+    console.log(" Delete po Id ", deletePOId)
+
+    // Recreate new purchase order items
+    for (const item of items) {
+      await PurchaseOrderItem.create({
+        ...item,
+        po_id: poId,
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        updated_by: req.user.id
+      }, { transaction });
+    }
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Purchase Order and Items updated successfully",
+      data: po
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Update Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: `Update failed: ${error.message}`
+    });
+  }
+});
+
 
 // delete po
 v1Router.delete("/purchase-order/:id", authenticateJWT, async (req, res) => {
@@ -273,7 +1106,7 @@ v1Router.get("/purchase-order/details/po", authenticateJWT, async (req, res) => 
   try {
     const { po_id, grn_id } = req.query;
     console.log("PO ID:", po_id, "GRN ID:", grn_id);
-    
+
 
     if (!po_id || !grn_id) {
       return res.status(400).json({ error: 'po_id and grn_id are required.' });
@@ -552,7 +1385,7 @@ v1Router.post("/purchase-order/return/po", authenticateJWT, async (req, res) => 
 
 
 v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res) => {
-  const { po_id, grn_id, items, reason, payment_terms, notes } = req.body;
+  const { po_id, grn_id, items, reason, payment_terms, notes,auto_Debit_Note, return_type } = req.body;
   console.log(" req.body : ", req.body);
 
   try {
@@ -621,39 +1454,39 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
       const sgst_amount = (amount * sgst) / 100;
       const tax_amount = cgst_amount + sgst_amount;
       const total_amount = amount + tax_amount;
-      
- // Calculate total available quantity
-let totalAvailable = inventories.reduce(
-  (sum, inv) => sum + parseFloat(inv.quantity_available || 0),
-  0
-);
 
-if (totalAvailable < return_qty) {
-  return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
-}
+      // Calculate total available quantity
+      let totalAvailable = inventories.reduce(
+        (sum, inv) => sum + parseFloat(inv.quantity_available || 0),
+        0
+      );
 
-// ✅ Declare this before the loop
-let remainingToDeduct = return_qty;
+      if (totalAvailable < return_qty) {
+        return res.status(400).json({ error: `Not enough stock for item ${item_id}` });
+      }
 
-const deductionLog = [];
+      // ✅ Declare this before the loop
+      let remainingToDeduct = return_qty;
 
-for (const inventory of inventories) {
-  let available = parseFloat(inventory.quantity_available);
+      const deductionLog = [];
 
-  if (available >= remainingToDeduct) {
-    inventory.quantity_available = available - remainingToDeduct;
-    await inventory.save();
-    deductionLog.push({ id: inventory.id, deducted: remainingToDeduct });
-    break;
-  } else {
-    inventory.quantity_available = 0;
-    await inventory.save();
-    deductionLog.push({ id: inventory.id, deducted: available });
-    remainingToDeduct -= available;
-  }
-}
+      for (const inventory of inventories) {
+        let available = parseFloat(inventory.quantity_available);
 
-console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
+        if (available >= remainingToDeduct) {
+          inventory.quantity_available = available - remainingToDeduct;
+          await inventory.save();
+          deductionLog.push({ id: inventory.id, deducted: remainingToDeduct });
+          break;
+        } else {
+          inventory.quantity_available = 0;
+          await inventory.save();
+          deductionLog.push({ id: inventory.id, deducted: available });
+          remainingToDeduct -= available;
+        }
+      }
+
+      console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
 
 
       // await inventory.save();
@@ -688,7 +1521,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     }
 
     // 5. Generate purchase return ID
-    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "poReturn");
+    const purchase_return_generate_id = await generateId(req.user.company_id, PurchaseOrderReturn, "purchase_return");
 
     // 6. Create PO Return
     const poReturn = await PurchaseOrderReturn.create({
@@ -714,11 +1547,37 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
     // 7. Save return items
     for (const item of returnItems) {
       item.po_return_id = poReturn.id;
-      await PurchaseOrderReturnItem.create(item); 
-      
+      await PurchaseOrderReturnItem.create(item);
+
+
+
+      const inventory = await Inventory.findOne({
+        where: {
+          item_id: item.item_id,
+          po_id: poReturn.po_id,
+          company_id: req.user.company_id
+        }
+      });
+
+
+      if (!inventory) {
+        return res.status(404).json({
+          success: false,
+          message: `Inventory record not found for item ${item.item_id}`
+        });
+      }
+
+      // 2. Compute total_amount
+      const quantity = parseFloat(inventory.quantity_available || 0);
+      const rate = parseFloat(inventory.rate || 0);
+      const total_amount = quantity * rate;
+
       ///
       await Inventory.update(
-        { po_return_id: poReturn.id },
+        {
+          po_return_id: poReturn.id,
+          total_amount: total_amount
+        },
         {
           where: {
             item_id: item.item_id,
@@ -728,7 +1587,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
         }
       );
       ///
-      
+
     }
 
     // 8. Check if all received items are fully returned
@@ -770,7 +1629,7 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
         .filter(retItem => retItem.item_id === poItem.item_id)
         .reduce((sum, retItem) => sum + parseFloat(retItem.return_qty || 0), 0);
 
-        // Debug log for troubleshooting
+      // Debug log for troubleshooting
       console.log(`Item ${poItem.item_id}: totalReceived=${totalReceived}, totalReturned=${totalReturned}`);
 
       // Use a small epsilon for float comparison
@@ -785,6 +1644,74 @@ console.log(`Inventory deduction log for item ${item_id}:`, deductionLog);
       { po_status: allReturned ? "returned" : "amended" },
       { where: { id: po_id } }
     );
+
+
+    // client
+    // const client = await Client.findOne({
+    //   where: { client_id: purchaseOrder.supplier_id, company_id: req.user.company_id },
+    // });
+    // if (!client) throw new Error("supplier Id not found");
+
+    // // Update debit_balance
+    // client.debit_balance = parseFloat(client.debit_balance || 0) + parseFloat(total_amount_total);
+    // await client.save();
+
+    // // Insert wallet history record
+    // await addWalletHistory({
+    //   type: 'debit',
+    //   client_id: client.client_id,
+    //   amount: total_amount_total,
+    //   company_id: req.user.company_id,
+    //   reference_number: "Purchase Order Return " + purchase_return_generate_id, // or use a better reference like poReturn.purchase_return_generate_id
+    //   created_by: req.user.id,
+    // });
+    let creditNote = null;
+    if (auto_Debit_Note === "yes") {
+      // const credit_note_number = `CN-${Date.now()}`;
+
+      creditNote = await db.DebitNote.create({
+        debit_note_generate_id: await generateId(req.user.company_id, db.DebitNote, 'debit_note'),
+        supplier_id: purchaseOrder.supplier_id,
+        po_return_id: poReturn.id,
+        work_order_invoice_number: sale_order_number,
+        reference_id: poReturn.purchase_return_generate_id,
+        remark: `Debit Note for Purchase Return ${poReturn.purchase_return_generate_id}`,
+        total_amount: total_amount_total,
+        status: "active",
+        created_by: req.user.id,
+        company_id: req.user.company_id,
+        created_at: new Date(),
+        debit_note_date: new Date(),
+      });
+    }
+
+    // 4. Handle Wallet Update (if return_type is "wallet")
+    let walletUpdate = null;
+    if (return_type === "wallet") {
+      console.log("Return Type is Wallet", total_amount_total, purchaseOrder.supplier_id);
+
+      // Update client's credit balance
+      const result = await db.Client.increment(
+        { debit_balance: total_amount_total },
+        {
+          where: { client_id: purchaseOrder.supplier_id }, // ✅ Use the correct column
+        }
+      );
+      console.log("Decrement result:", result);
+
+      // Create wallet history entry
+      walletUpdate = await db.WalletHistory.create({
+        client_id: purchaseOrder.supplier_id,
+        type: "credit",
+        company_id: req.user.company_id,
+        created_by: req.user.id,
+        amount: total_amount_total,
+        refference_number: `Purchase return credit to wallet for return ID ${poReturn.purchase_return_generate_id}`,
+        created_at: new Date()
+      });
+
+
+    }
 
     return res.status(201).json({
       message: 'Purchase Order Return created successfully.',
@@ -1014,16 +1941,16 @@ v1Router.get("/purchase-order/:id/download", async (req, res) => {
       return res.status(404).json({ success: false, message: "Purchase Order not found" });
     }
 
-  //   let poTemplateId = req.query.template_id 
-  // ? parseInt(req.query.template_id, 10) 
-  // : (purchaseOrder.po_template_id || 1);
+    //   let poTemplateId = req.query.template_id 
+    // ? parseInt(req.query.template_id, 10) 
+    // : (purchaseOrder.po_template_id || 1);
 
     // Try to fetch HTML template, fallback to default if not found
     let htmlTemplate = await HtmlTemplate.findOne({
-      where: { 
+      where: {
         company_id: purchaseOrder.company_id,
         // po_template_id: poTemplateId,
-        status: "active" 
+        status: "active"
       }
     });
 
@@ -1215,15 +2142,15 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
       return res.status(404).send('<h1>Purchase Order not found</h1>');
     }
 
-// let poTemplateId = req.query.template_id 
-//   ? parseInt(req.query.template_id, 10) 
-//   : (purchaseOrder.po_template_id || 1);
+    // let poTemplateId = req.query.template_id 
+    //   ? parseInt(req.query.template_id, 10) 
+    //   : (purchaseOrder.po_template_id || 1);
 
     let htmlTemplate = await HtmlTemplate.findOne({
-      where: { 
+      where: {
         company_id: purchaseOrder.company_id,
         // po_template_id : poTemplateId,
-        status: "active" 
+        status: "active"
       }
     });
 
@@ -1291,7 +2218,10 @@ v1Router.get("/purchase-order/:id/view", async (req, res) => {
 
 v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
   try {
-    const templates = await HtmlTemplate.findAll({ order: [['id', 'ASC']] });
+    const templates = await HtmlTemplate.findAll({
+      where: { template: "purchase_order" },
+      order: [['id', 'ASC']]
+    });
 
     if (!templates || templates.length === 0) {
       return res.status(404).send("<h1>No HTML templates found</h1>");
@@ -1351,8 +2281,15 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
       return `
         <div class="template-block">
-          <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
-          ${renderedHTML}
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <div class="template-info"><strong>Template ID:</strong> ${template.id}</div>
+            <div class="template-info">
+              <strong>Template Status:</strong>
+              <span style="color: ${template.status === "active" ? "green" : "red"};">
+                ${template.status === "active" ? "Active" : "Inactive"}
+              </span>
+            </div>          
+          </div>          ${renderedHTML}
         </div>
         ${index !== templates.length - 1 ? '<hr/>' : ''}
       `;
@@ -1394,19 +2331,19 @@ v1Router.get("/purchase-order/templates/rendered", async (req, res) => {
 
 // ACtivate template
 v1Router.get("/purchase-order/activate/:id", async (req, res) => {
-  const templateId = req.params.id;
+  const templateId = parseInt(req.params.id);
 
   try {
     // 1. Set the selected template to active
     await HtmlTemplate.update(
       { status: "active" },
-      { where: { id: templateId } }
+      { where: { id: templateId, template: "purchase_order" } }
     );
 
     // 2. Set all other templates to inactive
     await HtmlTemplate.update(
       { status: "inactive" },
-      { where: { id: { [Op.ne]: templateId } } }
+      { where: { id: { [Op.ne]: templateId }, template: "purchase_order" } }
     );
 
     return res.status(200).json({
@@ -1435,18 +2372,48 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
   try {
     const purchaseOrders = await PurchaseOrder.findAll({
       attributes: ["id", "purchase_generate_id"],
-       where: {
-          status: "active",
-          po_status: {
-            [Op.notIn]: ['created', 'returned', 'amended']
-          }
-        },
+      where: {
+        status: "active",
+        po_status: {
+          [Op.notIn]: ['created', 'returned', 'amended']
+        }
+      },
       order: [["id", "DESC"]]
     });
 
     res.status(200).json({
       success: true,
       data: purchaseOrders
+    });
+  } catch (error) {
+    console.error("Error fetching purchase order IDs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch purchase order IDs"
+    });
+  }
+});
+
+
+
+//po_id based grn_id
+v1Router.get("/purchase-order/grn/:id", async (req, res) => {
+  try {
+
+    const poId = req.params.id;
+
+    const grnData = await GRN.findAll({
+      attributes: ["id", "grn_generate_id"],
+      where: {
+        po_id: poId,
+        status: "active",
+      },
+      order: [["id", "DESC"]]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: grnData
     });
   } catch (error) {
     console.error("Error fetching purchase order IDs:", error);
@@ -1468,6 +2435,6 @@ v1Router.get("/purchase-order/get/id", async (req, res) => {
 app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = process.env.PORT_PURCHASE;
-app.listen(process.env.PORT_PURCHASE,'0.0.0.0', () => {
+app.listen(process.env.PORT_PURCHASE, '0.0.0.0', () => {
   console.log(`Purchase running on port ${process.env.PORT_PURCHASE}`);
 });

@@ -43,15 +43,24 @@ import WorkOrderInvoice from "./salesOrder/workOrderInvoice.model.js";
 import MachineRouteProcess from "./route/machineRouteProcess.model.js";
 import stockAdjustment from "./stockAdjustment/stock_adjustment.model.js";
 import stockAdjustmentItem from "./stockAdjustment/stock_adjustment_item.model.js";
-import DebitNote from "./debit/debit_note.model.js";
-import CreditNote from "./credit/credit_note.model.js"; 
+import DebitNote from "./debit/debitNote.model.js";
 import WorkOrderStatus from "./commonModel/workOrderStatus.js";
+import CreditNote from "./credit/creditNote.model.js";
 import Categories from "./category/category.model.js";
 import Sub_categories from "./category/sub_category.model.js";
 import ProductionGroup from "./Production/productionGroup.model.js";
 import Notification from "./notification.model.js";
-import PurchaseOrderTemplate from "./purchaseOrderTemplate.model.js";
+import HtmlTemplate from "./htmlTemplate.model.js";
 import AllocationHistory from "./Production/allocationHistory.model.js";
+import DemoRequest from "./demoRequest.model.js";
+import PasswordReset from "./passwordReset.model.js";
+import ContactMessage from "./contactMessage.model.js";
+import PurchaseOrderBilling from "./po/purchaseOrderBilling.model.js";
+import WalletHistory from "./walletHistory.model.js";
+import PartialPayment from "./salesOrder/partialPayment.model.js";
+import SalesReturn  from "./sales_return/sales_return.model.js";
+import SalesReturnItem  from "./sales_return/sales_return_item.model.js";
+import PurchaseOrderPayment from "./po/PurchaseOrderPayment.model.js";
 
 const db = {
   sequelize,
@@ -101,13 +110,23 @@ const db = {
   stockAdjustment,
   stockAdjustmentItem,
   DebitNote,
-  CreditNote,
   Categories,
+  CreditNote,
   Sub_categories,
   ProductionGroup,
   Notification,
-  PurchaseOrderTemplate,
-  AllocationHistory
+  HtmlTemplate,
+  AllocationHistory,
+  DemoRequest,
+  PasswordReset,
+  ContactMessage,
+  PurchaseOrderBilling,
+  WalletHistory,
+  PartialPayment,
+  SalesReturnItem,
+  SalesReturn,
+  PurchaseOrderPayment
+
 
 };
 

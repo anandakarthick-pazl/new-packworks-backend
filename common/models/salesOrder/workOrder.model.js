@@ -81,6 +81,10 @@ const WorkOrder = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    pending_invoice_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     edd: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -105,10 +109,14 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    production:{
-      type: DataTypes.ENUM('created','in_production','removed_from_production'),
+    production: {
+      type: DataTypes.ENUM(
+        "created",
+        "in_production",
+        "removed_from_production"
+      ),
       allowNull: true,
-      defaultValue: 'created',
+      defaultValue: "created",
     },
     priority: {
       type: DataTypes.ENUM("High", "Medium", "Low"),
@@ -141,7 +149,7 @@ const WorkOrder = sequelize.define(
       allowNull: true,
       defaultValue: 0,
     },
-    stage:{
+    stage: {
       type: DataTypes.STRING(200),
       allowNull: true,
       defaultValue: "Production",

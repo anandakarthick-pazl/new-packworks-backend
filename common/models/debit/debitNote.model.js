@@ -14,11 +14,11 @@ const DebitNote = sequelize.define('DebitNote', {
     primaryKey: true
   },
 
-  debit_note_number: {
-    type: DataTypes.STRING(200),
-    allowNull: false,
-    unique: true
-  },
+  // debit_note_number: {
+  //   type: DataTypes.STRING(200),
+  //   allowNull: false,
+  //   unique: true
+  // },
   debit_note_generate_id:{
         type: DataTypes.STRING(200),
         allowNull: true,
@@ -53,10 +53,10 @@ const DebitNote = sequelize.define('DebitNote', {
 
 
  
-  rate: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true
-  },
+  // rate: {
+  //   type: DataTypes.DECIMAL(10, 2),
+  //   allowNull: true
+  // },
 
  
   amount: {
@@ -64,15 +64,15 @@ const DebitNote = sequelize.define('DebitNote', {
     allowNull: true
   },
 
-  sub_total: {
-    type: DataTypes.DECIMAL(15, 2),
-    allowNull: true
-  },
+  // sub_total: {
+  //   type: DataTypes.DECIMAL(15, 2),
+  //   allowNull: true
+  // },
 
-  adjustment: {
-    type: DataTypes.DECIMAL(15, 2),
-    allowNull: true
-  },
+  // adjustment: {
+  //   type: DataTypes.DECIMAL(15, 2),
+  //   allowNull: true
+  // },
    supplier_id: {
         type: DataTypes.INTEGER,
         allowNull: false
