@@ -1015,27 +1015,41 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   if (!work_order_invoice_id || !payment_type || !amount) {
     return res.status(400).json({ message: "Missing required fields" });
   }
-  const totalInvoiceAmount = await WorkOrderInvoice.findOne({
-    where: { id: work_order_invoice_id },
-    attributes: ["total_amount"]
-  });
-  const paymentAmountPaid = await PartialPayment.findOne({
-    where: { work_order_invoice_id },
-    attributes: [[fn("SUM", col("amount")), "total_paid"]],
-    raw: true,
-  }) || { total_paid: 0 }; // Default to 0 if no payments found
-  if (totalInvoiceAmount == paymentAmountPaid.total_paid) {
-    var paymentStatus = "paid";
-  } else if (paymentAmountPaid.total_paid < totalInvoiceAmount) {
-    var paymentStatus = "partial";
-  } else if (paymentAmountPaid.total_paid > totalInvoiceAmount) {
-    res.status(201).json({
-      message: "Trying to make a an already paid invoice"
-    });
-    //var paymentStatus = "overpaid";
-  }
 
   try {
+    // Fetch total invoice amount
+    const invoice = await WorkOrderInvoice.findOne({
+      where: { id: work_order_invoice_id },
+      attributes: ["total_amount"]
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    const totalInvoiceAmount = parseFloat(invoice.total_amount);
+
+    // Get total paid amount so far
+    const paid = await PartialPayment.findOne({
+      where: { work_order_invoice_id },
+      attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
+      raw: true
+    });
+
+    const totalPaid = parseFloat(paid.total_paid) || 0;
+    const newTotalPaid = totalPaid + parseFloat(amount);
+
+    if (newTotalPaid > totalInvoiceAmount) {
+      return res.status(400).json({ message: "Trying to overpay the invoice" });
+    }
+
+    // Determine updated payment status
+    let paymentStatus = "partial";
+    if (newTotalPaid === totalInvoiceAmount) {
+      paymentStatus = "paid";
+    }
+
+    // Create new partial payment
     const newPartialPayment = await PartialPayment.create({
       work_order_invoice_id,
       payment_type,
@@ -1047,24 +1061,27 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       updated_at: new Date(),
     });
 
-    // Update the work order invoice with the new partial payment
+    // Update invoice with new received amount and payment status
     await WorkOrderInvoice.update(
       {
         received_amount: sequelize.literal(`received_amount + ${amount}`),
         updated_at: new Date(),
-        payment_status: paymentStatus // Update payment status to partial
+        payment_status: paymentStatus
       },
       { where: { id: work_order_invoice_id } }
     );
-    res.status(201).json({
+
+    return res.status(201).json({
       message: "Partial payment created successfully",
-      data: newPartialPayment.get({ plain: true })
+      data: newPartialPayment
     });
+
   } catch (error) {
     logger.error("Error creating partial payment:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
