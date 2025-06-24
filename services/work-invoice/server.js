@@ -115,6 +115,252 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+// // GET all work order invoices with pagination, filtering, and search
+// v1Router.get("/get", authenticateJWT, async (req, res) => {
+//   try {
+//     const {
+//       page = 1,
+//       limit = 10,
+//       work_id,
+//       sale_id,
+//       payment_status,
+//       status = "active", // Default to 'active' status
+//       search = "", // Add search parameter
+//     } = req.query;
+
+//     const pageNum = parseInt(page, 10);
+//     const limitNum = parseInt(limit, 10);
+//     const offset = (pageNum - 1) * limitNum;
+
+//     // Build where clause for filtering
+//     const whereClause = {
+//       company_id: req.user.company_id, // Add company filter for security
+//     };
+
+//     // Status filtering - default to active, but allow override
+//     if (status === "all") {
+//       // Don't filter by status if 'all' is specified
+//     } else {
+//       whereClause.status = status;
+//     }
+
+//     if (work_id) {
+//       whereClause.work_id = work_id;
+//     }
+//     if (sale_id) {
+//       whereClause.sale_id = sale_id;
+//     }
+//     if (payment_status) {
+//       whereClause.payment_status = payment_status;
+//     }
+
+//     // Add search functionality if search parameter is provided
+//     if (search && search.trim() !== "") {
+//       const searchTerm = `%${search.trim()}%`; // Add wildcards for partial matching
+
+//       // Define search condition to look across multiple fields
+//       const searchCondition = {
+//         [Op.or]: [
+//           // Search in WorkOrderInvoice fields
+//           { invoice_number: { [Op.like]: searchTerm } },
+//           //   { description: { [Op.like]: searchTerm } },
+//           { due_date: { [Op.like]: searchTerm } },
+
+//           // Search in related WorkOrder fields using Sequelize's nested include where
+//           { "$workOrder.work_generate_id$": { [Op.like]: searchTerm } },
+//           { "$workOrder.sku_name$": { [Op.like]: searchTerm } },
+
+//           // Search in related SalesOrder fields
+//           { "$salesOrder.sales_generate_id$": { [Op.like]: searchTerm } },
+//         ],
+//       };
+
+//       // Add search condition to where clause
+//       whereClause[Op.and] = whereClause[Op.and] || [];
+//       whereClause[Op.and].push(searchCondition);
+//     }
+
+//     // Fetch from database with pagination, filters, and search
+//     const { count, rows } = await WorkOrderInvoice.findAndCountAll({
+//       where: whereClause,
+//       limit: limitNum,
+//       offset: offset,
+//       order: [["updated_at", "DESC"]],
+//       include: [
+//         {
+//           model: WorkOrder,
+//           as: "workOrder",
+//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+//         },
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_generate_id", "status"],
+//         },
+//       ],
+//     });
+
+//     // Calculate pagination metadata
+//     const totalPages = Math.ceil(count / limitNum);
+
+//     res.json({
+//       // invoices: rows.map((invoice) => invoice.get({ plain: true })),
+
+//       invoices: rows.map((invoice) => {
+//         const plain = invoice.get({ plain: true });
+//         if (plain.sku_details && typeof plain.sku_details === "string") {
+//           try {
+//             plain.sku_details = JSON.parse(plain.sku_details);
+//           } catch (err) {
+//             plain.sku_details = null; // fallback if JSON invalid
+//           }
+//         }
+//         // Add received_amount to response (if not present)
+//         if (typeof plain.received_amount === 'undefined') {
+//           plain.received_amount = 0.0;
+//         }
+//         // Add credit_amount to response (if not present)
+//         if (typeof plain.credit_amount === 'undefined') {
+//           plain.credit_amount = 0.0;
+//         }
+//         // Add rate_per_qty to response (if not present)
+//         if (typeof plain.rate_per_qty === 'undefined') {
+//           plain.rate_per_qty = 0.0;
+//         }
+//         return plain;
+//       }),
+
+//       pagination: {
+//         total: count,
+//         page: pageNum,
+//         limit: limitNum,
+//         totalPages,
+//       },
+//     });
+//   } catch (error) {
+//     logger.error("Error fetching work order invoices:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
+// // GET specific work order invoice by ID
+// v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status = "active" } = req.query;
+
+//     const whereClause = {
+//       id: id,
+//       company_id: req.user.company_id,
+//     };
+
+//     if (status !== "all") {
+//       whereClause.status = status;
+//     }
+
+//     const invoice = await WorkOrderInvoice.findOne({
+//       where: whereClause,
+//       include: [
+//         {
+//           model: WorkOrder,
+//           as: "workOrder",
+//           attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+//         },
+//         {
+//           model: SalesOrder,
+//           as: "salesOrder",
+//           attributes: ["id", "sales_generate_id", "status"],
+//         },
+//       ],
+//     });
+
+//     if (!invoice) {
+//       return res.status(404).json({ message: "Invoice not found" });
+//     }
+
+//     const result = invoice.get({ plain: true });
+
+//     if (typeof result.sku_details === "string") {
+//       try {
+//         result.sku_details = JSON.parse(result.sku_details);
+//       } catch (e) {
+//         result.sku_details = null; // fallback if parsing fails
+//       }
+//     }
+//     // Add received_amount to response (if not present)
+//     if (typeof result.received_amount === 'undefined') {
+//       result.received_amount = 0.0;
+//     }
+//     // Add credit_amount to response (if not present)
+//     if (typeof result.credit_amount === 'undefined') {
+//       result.credit_amount = 0.0;
+//     }
+//     // Add rate_per_qty to response (if not present)
+//     if (typeof result.rate_per_qty === 'undefined') {
+//       result.rate_per_qty = 0.0;
+//     }
+
+//     res.json(result);
+//   } catch (error) {
+//     logger.error("Error fetching work order invoice:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
+// Helper function to update received_amount for invoices
+const updateReceivedAmountForInvoices = async (invoiceIds) => {
+  try {
+    // Get sum of payments for each invoice
+    const paymentSums = await PartialPayment.findAll({
+      attributes: [
+        'work_order_invoice_id',
+        [sequelize.fn('SUM', sequelize.col('amount')), 'total_received']
+      ],
+      where: {
+        work_order_invoice_id: {
+          [Op.in]: invoiceIds
+        }
+      },
+      group: ['work_order_invoice_id'],
+      raw: true
+    });
+
+    // Update each invoice with its calculated received_amount
+    for (const payment of paymentSums) {
+      await WorkOrderInvoice.update(
+        { received_amount: payment.total_received || 0.0 },
+        {
+          where: {
+            id: payment.work_order_invoice_id
+          }
+        }
+      );
+    }
+
+    // Also update invoices that have no payments to 0.0
+    const invoicesWithPayments = paymentSums.map(p => p.work_order_invoice_id);
+    const invoicesWithoutPayments = invoiceIds.filter(id => !invoicesWithPayments.includes(id));
+    
+    if (invoicesWithoutPayments.length > 0) {
+      await WorkOrderInvoice.update(
+        { received_amount: 0.0 },
+        {
+          where: {
+            id: {
+              [Op.in]: invoicesWithoutPayments
+            }
+          }
+        }
+      );
+    }
+  } catch (error) {
+    logger.error("Error updating received amounts:", error);
+    // Don't throw error to avoid breaking the main API call
+  }
+};
+
 // GET all work order invoices with pagination, filtering, and search
 v1Router.get("/get", authenticateJWT, async (req, res) => {
   try {
@@ -200,13 +446,39 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
       ],
     });
 
+    // Update received_amount for all fetched invoices
+    const invoiceIds = rows.map(invoice => invoice.id);
+    if (invoiceIds.length > 0) {
+      await updateReceivedAmountForInvoices(invoiceIds);
+    }
+
+    // Re-fetch the updated data to get the latest received_amount values
+    const updatedRows = await WorkOrderInvoice.findAll({
+      where: {
+        id: {
+          [Op.in]: invoiceIds
+        }
+      },
+      order: [["updated_at", "DESC"]],
+      include: [
+        {
+          model: WorkOrder,
+          as: "workOrder",
+          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+        },
+        {
+          model: SalesOrder,
+          as: "salesOrder",
+          attributes: ["id", "sales_generate_id", "status"],
+        },
+      ],
+    });
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(count / limitNum);
 
     res.json({
-      // invoices: rows.map((invoice) => invoice.get({ plain: true })),
-
-      invoices: rows.map((invoice) => {
+      invoices: updatedRows.map((invoice) => {
         const plain = invoice.get({ plain: true });
         if (plain.sku_details && typeof plain.sku_details === "string") {
           try {
@@ -215,15 +487,13 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
             plain.sku_details = null; // fallback if JSON invalid
           }
         }
-        // Add received_amount to response (if not present)
-        if (typeof plain.received_amount === 'undefined') {
+        // Ensure default values for missing fields
+        if (typeof plain.received_amount === 'undefined' || plain.received_amount === null) {
           plain.received_amount = 0.0;
         }
-        // Add credit_amount to response (if not present)
         if (typeof plain.credit_amount === 'undefined') {
           plain.credit_amount = 0.0;
         }
-        // Add rate_per_qty to response (if not present)
         if (typeof plain.rate_per_qty === 'undefined') {
           plain.rate_per_qty = 0.0;
         }
@@ -244,6 +514,7 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 // GET specific work order invoice by ID
 v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
   try {
@@ -279,7 +550,27 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    const result = invoice.get({ plain: true });
+    // Update received_amount for this specific invoice
+    await updateReceivedAmountForInvoices([invoice.id]);
+
+    // Re-fetch the invoice to get the updated received_amount
+    const updatedInvoice = await WorkOrderInvoice.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: WorkOrder,
+          as: "workOrder",
+          attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
+        },
+        {
+          model: SalesOrder,
+          as: "salesOrder",
+          attributes: ["id", "sales_generate_id", "status"],
+        },
+      ],
+    });
+
+    const result = updatedInvoice.get({ plain: true });
 
     if (typeof result.sku_details === "string") {
       try {
@@ -288,15 +579,14 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
         result.sku_details = null; // fallback if parsing fails
       }
     }
-    // Add received_amount to response (if not present)
-    if (typeof result.received_amount === 'undefined') {
+    
+    // Ensure default values for missing fields
+    if (typeof result.received_amount === 'undefined' || result.received_amount === null) {
       result.received_amount = 0.0;
     }
-    // Add credit_amount to response (if not present)
     if (typeof result.credit_amount === 'undefined') {
       result.credit_amount = 0.0;
     }
-    // Add rate_per_qty to response (if not present)
     if (typeof result.rate_per_qty === 'undefined') {
       result.rate_per_qty = 0.0;
     }
@@ -309,7 +599,6 @@ v1Router.get("/get/:id", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // Define your specific invoice storage path
 const INVOICE_STORAGE_PATH = path.join(process.cwd(), 'public', 'invoice');
 // Updated generateOriginalInvoicePDF function
