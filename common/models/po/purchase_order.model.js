@@ -106,6 +106,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         type: DataTypes.ENUM('created', 'partialy-recieved', 'received', 'amended', 'returned'),
         defaultValue: 'created',
       },
+      payment_status: {
+        type: DataTypes.STRING(100),
+        defaultValue: 'pending',
+      },
       decision: {
         type: DataTypes.ENUM('approve', 'disapprove'),
         allowNull: false,
