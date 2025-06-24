@@ -92,7 +92,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       rate_per_qty: invoiceDetails.rate_per_qty || 0.0,
       invoice_pdf: invoiceDetails.invoice_pdf || null,
     });
-    if (payment_status !== 'pending') {
+    if (invoiceDetails.payment_status !== 'pending') {
       await PartialPayment.create({
         work_order_invoice_id: newInvoice.id,
         payment_type: "other",
