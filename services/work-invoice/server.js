@@ -1249,6 +1249,86 @@ v1Router.get("/activate/:id", async (req, res) => {
 });
 
 // POST create new partial payment
+// v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
+//   const {
+//     work_order_invoice_id,
+//     payment_type,
+//     reference_number,
+//     amount,
+//     remarks,
+//     status
+//   } = req.body;
+
+//   if (!work_order_invoice_id || !payment_type || !amount) {
+//     return res.status(400).json({ message: "Missing required fields" });
+//   }
+
+//   try {
+//     // Fetch total invoice amount
+//     const invoice = await WorkOrderInvoice.findOne({
+//       where: { id: work_order_invoice_id },
+//       attributes: ["total_amount"]
+//     });
+
+//     if (!invoice) {
+//       return res.status(404).json({ message: "Invoice not found" });
+//     }
+
+//     const totalInvoiceAmount = parseFloat(invoice.total_amount);
+
+//     // Get total paid amount so far
+//     const paid = await PartialPayment.findOne({
+//       where: { work_order_invoice_id },
+//       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
+//       raw: true
+//     });
+
+//     const totalPaid = parseFloat(paid.total_paid) || 0;
+//     const newTotalPaid = totalPaid + parseFloat(amount);
+
+//     if (newTotalPaid > totalInvoiceAmount) {
+//       return res.status(400).json({ message: "Trying to overpay the invoice" });
+//     }
+
+//     // Determine updated payment status
+//     let paymentStatus = "partial";
+//     if (newTotalPaid === totalInvoiceAmount) {
+//       paymentStatus = "paid";
+//     }
+
+//     // Create new partial payment
+//     const newPartialPayment = await PartialPayment.create({
+//       work_order_invoice_id,
+//       payment_type,
+//       reference_number: reference_number || null,
+//       amount,
+//       remarks: remarks || null,
+//       status: status || "completed",
+//       created_at: new Date(),
+//       updated_at: new Date(),
+//     });
+
+//     // Update invoice with new received amount and payment status
+//     await WorkOrderInvoice.update(
+//       {
+//         received_amount: sequelize.literal(`received_amount + ${amount}`),
+//         updated_at: new Date(),
+//         payment_status: paymentStatus
+//       },
+//       { where: { id: work_order_invoice_id } }
+//     );
+
+//     return res.status(201).json({
+//       message: "Partial payment created successfully",
+//       data: newPartialPayment
+//     });
+
+//   } catch (error) {
+//     logger.error("Error creating partial payment:", error);
+//     return res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
+
 v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   const {
     work_order_invoice_id,
@@ -1256,21 +1336,26 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
     reference_number,
     amount,
     remarks,
-    status
+    status,
+    credit_amount // Add this field to handle credit amount for partial payments
   } = req.body;
 
   if (!work_order_invoice_id || !payment_type || !amount) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  // Start a transaction to ensure data consistency
+  const transaction = await sequelize.transaction();
+
   try {
-    // Fetch total invoice amount
+    // Fetch invoice details including client_id and company_id
     const invoice = await WorkOrderInvoice.findOne({
       where: { id: work_order_invoice_id },
-      attributes: ["total_amount"]
+      attributes: ["total_amount", "client_id", "company_id", "invoice_number"]
     });
 
     if (!invoice) {
+      await transaction.rollback();
       return res.status(404).json({ message: "Invoice not found" });
     }
 
@@ -1280,13 +1365,15 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
     const paid = await PartialPayment.findOne({
       where: { work_order_invoice_id },
       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
-      raw: true
+      raw: true,
+      transaction
     });
 
     const totalPaid = parseFloat(paid.total_paid) || 0;
     const newTotalPaid = totalPaid + parseFloat(amount);
 
     if (newTotalPaid > totalInvoiceAmount) {
+      await transaction.rollback();
       return res.status(400).json({ message: "Trying to overpay the invoice" });
     }
 
@@ -1306,7 +1393,7 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       status: status || "completed",
       created_at: new Date(),
       updated_at: new Date(),
-    });
+    }, { transaction });
 
     // Update invoice with new received amount and payment status
     await WorkOrderInvoice.update(
@@ -1315,15 +1402,66 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
         updated_at: new Date(),
         payment_status: paymentStatus
       },
-      { where: { id: work_order_invoice_id } }
+      { where: { id: work_order_invoice_id } },
+      { transaction }
     );
+
+    // Create WalletHistory entry if credit_amount exists
+    const creditAmountValue = parseFloat(credit_amount) || 0.0;
+    if (creditAmountValue > 0) {
+      // Generate a reference number for wallet history (you can modify this logic)
+      const walletReferenceNumber = reference_number || `${invoice.invoice_number}-PP-${Date.now()}`;
+      
+      await WalletHistory.create({
+        type: "credit",
+        amount: creditAmountValue,
+        client_id: invoice.client_id,
+        company_id: invoice.company_id,
+        refference_number: walletReferenceNumber,
+        created_by: req.user.id,
+        updated_by: req.user.id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }, { transaction });
+
+      // Update client's credit balance
+      await Client.decrement('credit_balance', {
+        by: creditAmountValue,
+        where: {
+          id: invoice.client_id,
+          company_id: invoice.company_id
+        },
+        transaction
+      });
+
+      // Also update the invoice's credit_amount if you want to track it
+      await WorkOrderInvoice.update(
+        {
+          credit_amount: sequelize.literal(`credit_amount + ${creditAmountValue}`),
+        },
+        { 
+          where: { id: work_order_invoice_id },
+          transaction 
+        }
+      );
+    }
+
+    // Commit the transaction
+    await transaction.commit();
 
     return res.status(201).json({
       message: "Partial payment created successfully",
-      data: newPartialPayment
+      data: {
+        partial_payment: newPartialPayment,
+        credit_amount_used: creditAmountValue,
+        payment_status: paymentStatus
+      }
     });
 
   } catch (error) {
+    // Rollback the transaction in case of error
+    await transaction.rollback();
+    
     logger.error("Error creating partial payment:", error);
     return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
