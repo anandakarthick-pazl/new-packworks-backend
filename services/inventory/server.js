@@ -341,9 +341,39 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     };
 
     //products
-    results.products = await ItemMaster.findOne({
+    // results.products = await ItemMaster.findOne({
+    //   where: { id: itemId },
+    // });
+
+
+    const product = await ItemMaster.findOne({
       where: { id: itemId },
     });
+
+    if (product) {
+      const parsedProduct = product.toJSON();
+
+      if (typeof parsedProduct.custom_fields === 'string') {
+        try {
+          parsedProduct.custom_fields = JSON.parse(parsedProduct.custom_fields);
+        } catch {
+          parsedProduct.custom_fields = {};
+        }
+      }
+
+      if (typeof parsedProduct.default_custom_fields === 'string') {
+        try {
+          parsedProduct.default_custom_fields = JSON.parse(parsedProduct.default_custom_fields);
+        } catch {
+          parsedProduct.default_custom_fields = {};
+        }
+      }
+
+      results.products = parsedProduct;
+    } else {
+      results.products = null;
+    }
+
 
 
     // Purchase Orders
@@ -640,7 +670,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
     )`), 'rate'],
       ],
       where: whereCondition,
-      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+      group: ['Inventory.item_id', 'item_info.id', 'item_info->category_info.id', 'item_info->sub_category_info.id'],
       include: [
         {
           model: ItemMaster,
@@ -654,7 +684,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
               attributes: ['category_name'],
               required: false,
               on: {
-                col1: Sequelize.where(Sequelize.col('item.category'), '=', Sequelize.col('item->category_info.id'))
+                col1: Sequelize.where(Sequelize.col('item_info.category'), '=', Sequelize.col('item_info->category_info.id'))
               }
             },
             {
@@ -663,7 +693,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
               attributes: ['sub_category_name'],
               required: false,
               on: {
-                col1: Sequelize.where(Sequelize.col('item.sub_category'), '=', Sequelize.col('item->sub_category_info.id'))
+                col1: Sequelize.where(Sequelize.col('item_info.sub_category'), '=', Sequelize.col('item_info->sub_category_info.id'))
               }
             }
           ]
@@ -689,14 +719,38 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
 
 
     // Parse JSON fields for each item in the result
+    // const inventoryData = inventory.map(inv => {
+    //   const raw = inv.toJSON();
+    //   if (raw.item) {
+    //     raw.item.default_custom_fields = raw.item.default_custom_fields
+    //       ? JSON.parse(raw.item.default_custom_fields) : {};
+    //     raw.item.custom_fields = raw.item.custom_fields
+    //       ? JSON.parse(raw.item.custom_fields) : {};
+    //   }
+    //   return raw;
+    // });
+
     const inventoryData = inventory.map(inv => {
       const raw = inv.toJSON();
-      if (raw.item) {
-        raw.item.default_custom_fields = raw.item.default_custom_fields
-          ? JSON.parse(raw.item.default_custom_fields) : {};
-        raw.item.custom_fields = raw.item.custom_fields
-          ? JSON.parse(raw.item.custom_fields) : {};
+
+      if (raw.item_info) {
+        if (typeof raw.item_info.default_custom_fields === 'string') {
+          try {
+            raw.item_info.default_custom_fields = JSON.parse(raw.item_info.default_custom_fields);
+          } catch {
+            raw.item_info.default_custom_fields = {};
+          }
+        }
+
+        if (typeof raw.item_info.custom_fields === 'string') {
+          try {
+            raw.item_info.custom_fields = JSON.parse(raw.item_info.custom_fields);
+          } catch {
+            raw.item_info.custom_fields = {};
+          }
+        }
       }
+
       return raw;
     });
 
@@ -916,16 +970,40 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 
     // Parse JSON fields for each item in the result
+    // const inventoryData = inventory.map(inv => {
+    //   const raw = inv.toJSON();
+    //   if (raw.item) {
+    //     raw.item.default_custom_fields = raw.item.default_custom_fields
+    //       ? JSON.parse(raw.item.default_custom_fields) : {};
+    //     raw.item.custom_fields = raw.item.custom_fields
+    //       ? JSON.parse(raw.item.custom_fields) : {};
+    //   }
+    //   return raw;
+    // });
+
     const inventoryData = inventory.map(inv => {
-      const raw = inv.toJSON();
-      if (raw.item) {
-        raw.item.default_custom_fields = raw.item.default_custom_fields
-          ? JSON.parse(raw.item.default_custom_fields) : {};
-        raw.item.custom_fields = raw.item.custom_fields
-          ? JSON.parse(raw.item.custom_fields) : {};
+  const raw = inv.toJSON();
+
+  if (raw.item_info) {
+    if (typeof raw.item_info.default_custom_fields === 'string') {
+      try {
+        raw.item_info.default_custom_fields = JSON.parse(raw.item_info.default_custom_fields);
+      } catch {
+        raw.item_info.default_custom_fields = {};
       }
-      return raw;
-    });
+    }
+
+    if (typeof raw.item_info.custom_fields === 'string') {
+      try {
+        raw.item_info.custom_fields = JSON.parse(raw.item_info.custom_fields);
+      } catch {
+        raw.item_info.custom_fields = {};
+      }
+    }
+  }
+
+  return raw;
+});
 
     const totalCount = totalCountResult.length;
     const totalPages = Math.ceil(totalCount / limitNumber);
