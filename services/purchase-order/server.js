@@ -472,6 +472,10 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
           created_by: req.user.id,
         });
 
+        
+
+
+
         await Client.update(
           { debit_balance: updatedDebitBalance },
           { where: { client_id: poData.supplier_id } }
@@ -494,7 +498,7 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       }
     }
 
-
+    let PurchaseOrderItems = [];
     const newPO = await PurchaseOrder.create(poData, { transaction });
     for (const item of items) {
       const isValid = await ItemMaster.findOne({
@@ -504,7 +508,7 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
 
       if (!isValid) throw new Error(`Item ID ${item.item_id} is invalid or inactive`);
 
-      await PurchaseOrderItem.create({
+      PurchaseOrderItems = await PurchaseOrderItem.create({
         ...item,
         po_id: newPO.id,
         company_id: poData.company_id,
@@ -513,28 +517,50 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       }, { transaction });
     }
 
-    // 🔁 Insert payment record
-    // await PurchaseOrderPayment.create({
-    //   po_id: newPO.id,
-    //   reference_no: "Wallet/Cash Purchase Order " + purchase_generate_id,
-    //   payment_date: new Date(),
-    //   amount: paymentAmount,
-    //   payment_mode: use_this === false ? paymentMode : "wallet",
-    //   status: "paid",
-    //   remark: use_this === false ? "Paid using wallet credit" : "Paid via cash",
-    //   company_id: req.user.company_id,
-    //   created_by: req.user.id,
-    //   updated_by: req.user.id,
-    //   created_at: new Date(),
-    //   updated_at: new Date()
-    // }, { transaction });
 
+    let purchasePaymentStatus = null;
+    // If use_this is true, we will insert a payment record
+    if (use_this === true) {
+
+    const purchase_payment_generate_id = await generateId(
+      req.user.company_id,
+      PurchaseOrderPayment,
+      "purchase_order_payment"
+    );
+
+    const paymentStatus = Number(debit_balance_amount) >= Number(total_amount) ? "paid" : "partial";
+
+    purchasePaymentStatus = await PurchaseOrderPayment.create({
+      po_id: newPO.id,
+      purchase_payment_generate_id,
+      payment_date: new Date(),
+      amount: debit_balance_amount,
+      payment_mode: "wallet",
+      status: paymentStatus,
+      remark: "Paid using wallet credit",
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      updated_by: req.user.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    }, { transaction });
+
+
+    await PurchaseOrder.update(
+      { payment_status: paymentStatus },
+      { where: { id: newPO.id }, transaction }
+    );
+  }
+
+   
 
     await transaction.commit();
     return res.status(200).json({
       success: true,
       message: "Purchase Order with items created successfully",
-      data: newPO
+      data: newPO,
+      PurchaseOrderItems:PurchaseOrderItems,
+      paymentStatus:purchasePaymentStatus
     });
 
   } catch (error) {
@@ -591,7 +617,7 @@ v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, re
       payment_date: payment_date ? payment_date : new Date(),
       amount: paymentAmount,
       payment_mode,
-      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "pending",
+      status: Number(paymentAmount) === Number(orderTotal) ? "paid" : "partial",
       remark,
       company_id: req.user.company_id,
       created_by: req.user.id,
@@ -606,13 +632,20 @@ v1Router.post("/purchase-order/payment/details", authenticateJWT, async (req, re
         [sequelize.fn('SUM', sequelize.col('amount')), 'totalPaid']
       ],
       where: { po_id },
-      raw: true
+      raw: true,
+      transaction 
     });
 
     const totalPaid = Number(paidResult.totalPaid || 0);
 
     // 🧮 Compare with total order amount
     const paymentStatus = totalPaid >= orderTotal ? "completed" : "partial";
+
+    // console.log("Total Paid Amount:", totalPaid);
+    // console.log("Order Total Amount:", orderTotal);
+    // console.log("Payment Status:", paymentStatus);
+    
+    
 
     // 🔁 Update the PO payment status
     await PurchaseOrder.update(
@@ -978,6 +1011,9 @@ v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
     if (!po) {
       return res.status(404).json({ success: false, message: "Not found" });
     }
+    const payments = await PurchaseOrderPayment.findAll({
+      where: { po_id: poId }
+    });
 
     const grns = await GRN.findAll({ where: { po_id: poId } });
     const grnIds = grns.map(grn => grn.id);
@@ -1007,7 +1043,8 @@ v1Router.get("/purchase-order/:id", authenticateJWT, async (req, res) => {
       message: "Purchase Order fetched",
       data: {
         ...po.toJSON(),
-        PurchaseOrderItems: updatedItems
+        PurchaseOrderItems: updatedItems,
+        payments: payments || []
       }
     });
 
