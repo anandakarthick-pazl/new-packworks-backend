@@ -83,7 +83,7 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
    const totalItems = await ItemMaster.count({where:whereCondition});
    return res.status(200).json({
     success : true,
-    message : "Items fetched Successfully",
+    message : "Product fetched Successfully",
     data : parsedItems,
     totalItems : totalItems
    });
@@ -91,7 +91,7 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
     console.error(error.message);
     return res.status(500).json({
       success:false,
-      message:"Items not fount"
+      message:"Product not fount"
     })
   }
 });
@@ -183,7 +183,7 @@ v1Router.get("/items/:id", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Item data fetched successfully",
+      message: "Product data fetched successfully",
       data: parsedItem,
     });
   } catch (error) {
@@ -290,7 +290,7 @@ v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: "Item updated successfully",
+      message: "Product updated successfully",
       data: responseData,
     });
   } catch (error) {
@@ -298,7 +298,7 @@ v1Router.put("/items/:id", authenticateJWT, async (req, res) => {
     console.error(error.message);
     return res.status(500).json({
       success: false,
-      message: `Item update error: ${error.message}`,
+      message: `Product update error: ${error.message}`,
     });
   }
 });
@@ -309,14 +309,14 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
     if(!itemId){
       return res.status(400).json({
         success:false,
-        message:"item id is required"
+        message:"Product id is required"
       })
     }
     const items= await ItemMaster.findOne({where:{ id:itemId }});
     if(!items){
       return res.status(404).json({
         success:false,
-        message : "item id is mismatch"
+        message : "Product id is mismatch"
       })
     }
     const deletedItem =await ItemMaster.update({
@@ -329,7 +329,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
 
     return res.status(200).json({
       success : true,
-      message : "item deleted successfully",
+      message : "Product deleted successfully",
       data : []
     });
 
@@ -337,7 +337,7 @@ v1Router.delete("/items/delete/:id",authenticateJWT,async(req,res)=>{
       console.error(error.message);
       return res.status(500).json({
         success:false,
-        message:`Item deleted error : ${error.message}`
+        message:`Product deleted error : ${error.message}`
       });
       
     }
