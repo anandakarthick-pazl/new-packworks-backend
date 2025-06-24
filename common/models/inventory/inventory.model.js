@@ -27,7 +27,7 @@ const Inventory = sequelize.define("Inventory", {
     onUpdate: "CASCADE",
   },
   item_id: {
-    type: DataTypes.INTEGER.UNSIGNED,
+    type: DataTypes.INTEGER,
     allowNull: false,
     // references: {
     //   model: ItemMaster,

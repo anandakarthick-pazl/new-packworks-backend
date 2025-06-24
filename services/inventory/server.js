@@ -96,7 +96,7 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: [
             'default_custom_fields'
           ],
@@ -232,7 +232,7 @@ v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: ['item_generate_id', 'item_name', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status'],
           required: false,
           include: [
@@ -644,7 +644,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
       include: [
         {
           model: ItemMaster,
-          as: 'item',
+          as: 'item_info',
           attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
           required: false,
           include: [
@@ -881,7 +881,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   include: [
     {
       model: ItemMaster,
-      as: 'item',
+      as: 'item_info',
       attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
       required: false,
       include: [
