@@ -517,9 +517,11 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
     const {
       page = 1,
       limit = 10,
-      search, // Single search parameter like clients API
+      search, 
       status = "active",
       production,
+      clientName,
+      skuName,
       updateMissingQrCodes = "true",
       sortBy,
       sortOrder = "desc",
@@ -544,6 +546,12 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
     // Production filtering - filter by production stage if provided
     if (production) {
       whereClause.production = production;
+    }
+     if (clientName) {
+      whereClause.client_id = clientName;
+    }
+    if (skuName) {
+      whereClause.sku_name = skuName;
     }
 
     // Add unified search if provided - search across multiple fields
