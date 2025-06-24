@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, fn, col } from "sequelize";
 import express, { json, Router } from "express";
 import cors from "cors";
 import db from "../../common/models/index.js";
@@ -89,10 +89,21 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       client_phone: invoiceDetails.client_phone || null,
       received_amount: invoiceDetails.received_amount || 0.0,
       credit_amount: invoiceDetails.credit_amount || 0.0,
-      rate_per_qty: invoiceDetails.rate_per_qty || 0.0, 
-      invoice_pdf: invoiceDetails.invoice_pdf || null, 
+      rate_per_qty: invoiceDetails.rate_per_qty || 0.0,
+      invoice_pdf: invoiceDetails.invoice_pdf || null,
     });
-
+    if (invoiceDetails.payment_status !== 'pending') {
+      await PartialPayment.create({
+        work_order_invoice_id: newInvoice.id,
+        payment_type: "other",
+        reference_number: invoice_number || null,
+        amount: invoiceDetails.received_amount || 0.0,
+        remarks: "Paid" || null,
+        status: "completed",
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    }
     res.status(201).json({
       message: "Work Order Invoice created successfully",
       data: newInvoice.get({ plain: true }),
@@ -196,28 +207,28 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
       // invoices: rows.map((invoice) => invoice.get({ plain: true })),
 
       invoices: rows.map((invoice) => {
-          const plain = invoice.get({ plain: true });
-          if (plain.sku_details && typeof plain.sku_details === "string") {
-            try {
-              plain.sku_details = JSON.parse(plain.sku_details);
-            } catch (err) {
-              plain.sku_details = null; // fallback if JSON invalid
-            }
+        const plain = invoice.get({ plain: true });
+        if (plain.sku_details && typeof plain.sku_details === "string") {
+          try {
+            plain.sku_details = JSON.parse(plain.sku_details);
+          } catch (err) {
+            plain.sku_details = null; // fallback if JSON invalid
           }
-          // Add received_amount to response (if not present)
-          if (typeof plain.received_amount === 'undefined') {
-            plain.received_amount = 0.0;
-          }
-          // Add credit_amount to response (if not present)
-          if (typeof plain.credit_amount === 'undefined') {
-            plain.credit_amount = 0.0;
-          }
-          // Add rate_per_qty to response (if not present)
-          if (typeof plain.rate_per_qty === 'undefined') {
-            plain.rate_per_qty = 0.0;
-          }
-          return plain;
-        }),
+        }
+        // Add received_amount to response (if not present)
+        if (typeof plain.received_amount === 'undefined') {
+          plain.received_amount = 0.0;
+        }
+        // Add credit_amount to response (if not present)
+        if (typeof plain.credit_amount === 'undefined') {
+          plain.credit_amount = 0.0;
+        }
+        // Add rate_per_qty to response (if not present)
+        if (typeof plain.rate_per_qty === 'undefined') {
+          plain.rate_per_qty = 0.0;
+        }
+        return plain;
+      }),
 
       pagination: {
         total: count,
@@ -306,32 +317,32 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    
+
     const fileName = `work-order-invoice-${workOrderInvoice.invoice_number}.pdf`;
-    
+
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-    
+
     // Create a buffer to store the PDF data
     const buffers = [];
     doc.on('data', buffers.push.bind(buffers));
-    
+
     // Generate PDF content
     doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
     doc.text(`Date: ${workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString() : ''}`, 40);
-    
+
     // Updated to use client details
-    const clientName = workOrderInvoice.Client?.display_name || 
-                      workOrderInvoice.Client?.company_name || 
-                      workOrderInvoice.client_name ||                       
-                      workOrderInvoice.salesOrder?.Client?.display_name || 
-                      workOrderInvoice.salesOrder?.Client?.company_name || 
-                      `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() || 
-                      `${workOrderInvoice.salesOrder?.Client?.first_name || ''} ${workOrderInvoice.salesOrder?.Client?.last_name || ''}`.trim() || '';
-    
+    const clientName = workOrderInvoice.Client?.display_name ||
+      workOrderInvoice.Client?.company_name ||
+      workOrderInvoice.client_name ||
+      workOrderInvoice.salesOrder?.Client?.display_name ||
+      workOrderInvoice.salesOrder?.Client?.company_name ||
+      `${workOrderInvoice.Client?.first_name || ''} ${workOrderInvoice.Client?.last_name || ''}`.trim() ||
+      `${workOrderInvoice.salesOrder?.Client?.first_name || ''} ${workOrderInvoice.salesOrder?.Client?.last_name || ''}`.trim() || '';
+
     doc.text(`Client: ${clientName}`, 40);
     doc.moveDown(1);
     doc.text(`Total Amount: ${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
@@ -339,27 +350,27 @@ async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
     // Handle PDF completion
     doc.on('end', async () => {
       const pdfData = Buffer.concat(buffers);
-      
+
       // Use your specific path
       const fullFilePath = path.join(INVOICE_STORAGE_PATH, fileName);
 
       try {
         // Create directory if it doesn't exist
         await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
-        
+
         // Save PDF to file
         await fs.writeFile(fullFilePath, pdfData);
-        
+
         console.log(`PDF saved successfully at: ${fullFilePath}`);
-        
+
         // Store the full path in database
         await WorkOrderInvoice.update(
           { invoice_pdf: fullFilePath },
           { where: { id: workOrderInvoice.id } }
         );
-        
+
         console.log(`Database updated with PDF path: ${fullFilePath}`);
-        
+
       } catch (saveError) {
         console.error('Error saving PDF to directory or updating database:', saveError);
         // Continue with response even if saving fails
@@ -402,14 +413,14 @@ v1Router.get("/download/:id", async (req, res) => {
               model: Client,
               as: "Client",
               attributes: [
-                "client_id", 
-                "display_name", 
-                "first_name", 
-                "last_name", 
-                "company_name", 
-                "email", 
-                "work_phone", 
-                "mobile", 
+                "client_id",
+                "display_name",
+                "first_name",
+                "last_name",
+                "company_name",
+                "email",
+                "work_phone",
+                "mobile",
                 "customer_type",
                 "salutation",
                 "PAN",
@@ -423,14 +434,14 @@ v1Router.get("/download/:id", async (req, res) => {
           model: Client,
           as: "Client",
           attributes: [
-            "client_id", 
-            "display_name", 
-            "first_name", 
-            "last_name", 
-            "company_name", 
-            "email", 
-            "work_phone", 
-            "mobile", 
+            "client_id",
+            "display_name",
+            "first_name",
+            "last_name",
+            "company_name",
+            "email",
+            "work_phone",
+            "mobile",
             "customer_type",
             "salutation",
             "PAN",
@@ -482,9 +493,9 @@ v1Router.get("/download/:id", async (req, res) => {
     }));
 
     // Get client details from different possible sources
-    const clientDetails = workOrderInvoice.Client || 
-                         workOrderInvoice.salesOrder?.Client || 
-                         null;
+    const clientDetails = workOrderInvoice.Client ||
+      workOrderInvoice.salesOrder?.Client ||
+      null;
 
     const templateData = {
       workOrderInvoice: {
@@ -492,10 +503,10 @@ v1Router.get("/download/:id", async (req, res) => {
         invoice_number: workOrderInvoice.invoice_number,
         due_date: workOrderInvoice.due_date,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
-        client_name: clientDetails?.display_name || 
-                    clientDetails?.company_name || 
-                    `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() || 
-                    workOrderInvoice.client_name || '',
+        client_name: clientDetails?.display_name ||
+          clientDetails?.company_name ||
+          `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() ||
+          workOrderInvoice.client_name || '',
         status: workOrderInvoice.status,
         total: workOrderInvoice.total || 0,
         total_tax: workOrderInvoice.total_tax || 0,
@@ -576,20 +587,20 @@ v1Router.get("/download/:id", async (req, res) => {
     try {
       // Create directory if it doesn't exist
       await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
-      
+
       // Save PDF to file
       await fs.writeFile(fullFilePath, pdf);
-      
+
       console.log(`PDF saved successfully at: ${fullFilePath}`);
-      
+
       // Store the full path in database
       await WorkOrderInvoice.update(
         { invoice_pdf: fullFilePath },
         { where: { id: workOrderInvoice.id } }
       );
-      
+
       console.log(`Database updated with PDF path: ${fullFilePath}`);
-      
+
     } catch (saveError) {
       console.error('Error saving PDF to directory or updating database:', saveError);
       // Continue with response even if saving fails
@@ -603,7 +614,7 @@ v1Router.get("/download/:id", async (req, res) => {
 
   } catch (error) {
     if (browser) {
-      try { await browser.close(); } catch {}
+      try { await browser.close(); } catch { }
     }
     return res.status(500).json({
       success: false,
@@ -617,40 +628,40 @@ v1Router.get("/download/:id", async (req, res) => {
 v1Router.get("/pdf/:id", authenticateJWT, async (req, res) => {
   try {
     const invoiceId = req.params.id;
-    
+
     // Find the invoice with the stored PDF path
     const workOrderInvoice = await WorkOrderInvoice.findOne({
-      where: { 
-        id: invoiceId, 
+      where: {
+        id: invoiceId,
         company_id: req.user.company_id,
-        status: "active" 
+        status: "active"
       },
       attributes: ["id", "invoice_number", "invoice_pdf"]
     });
 
     if (!workOrderInvoice) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Work Order Invoice not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Work Order Invoice not found"
       });
     }
 
     if (!workOrderInvoice.invoice_pdf) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "PDF file not found for this invoice" 
+      return res.status(404).json({
+        success: false,
+        message: "PDF file not found for this invoice"
       });
     }
 
     // Use the stored full path directly
     const fullPath = workOrderInvoice.invoice_pdf;
-    
+
     // Check if file exists
     try {
       await fs.access(fullPath);
     } catch (error) {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         message: "PDF file not found on server",
         path: fullPath
       });
@@ -658,21 +669,21 @@ v1Router.get("/pdf/:id", authenticateJWT, async (req, res) => {
 
     // Get file stats for content length
     const stats = await fs.stat(fullPath);
-    
+
     // Set headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `inline; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-    
+
     // Stream the file
     const fileStream = require('fs').createReadStream(fullPath);
     fileStream.pipe(res);
-    
+
   } catch (error) {
     logger.error("Error serving PDF file:", error);
-    res.status(500).json({ 
-      message: "Internal Server Error", 
-      error: error.message 
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message
     });
   }
 });
@@ -698,14 +709,14 @@ v1Router.get("/view/:id", async (req, res) => {
               model: Client,
               as: "Client",
               attributes: [
-                "client_id", 
-                "display_name", 
-                "first_name", 
-                "last_name", 
-                "company_name", 
-                "email", 
-                "work_phone", 
-                "mobile", 
+                "client_id",
+                "display_name",
+                "first_name",
+                "last_name",
+                "company_name",
+                "email",
+                "work_phone",
+                "mobile",
                 "customer_type",
                 "salutation",
                 "PAN",
@@ -719,14 +730,14 @@ v1Router.get("/view/:id", async (req, res) => {
           model: Client,
           as: "Client",
           attributes: [
-            "client_id", 
-            "display_name", 
-            "first_name", 
-            "last_name", 
-            "company_name", 
-            "email", 
-            "work_phone", 
-            "mobile", 
+            "client_id",
+            "display_name",
+            "first_name",
+            "last_name",
+            "company_name",
+            "email",
+            "work_phone",
+            "mobile",
             "customer_type",
             "salutation",
             "PAN",
@@ -763,10 +774,10 @@ v1Router.get("/view/:id", async (req, res) => {
     // Parse sku_details if it's a string
     let skuDetails = workOrderInvoice.sku_details;
     if (typeof skuDetails === "string") {
-      try { 
-        skuDetails = JSON.parse(skuDetails); 
-      } catch { 
-        skuDetails = []; 
+      try {
+        skuDetails = JSON.parse(skuDetails);
+      } catch {
+        skuDetails = [];
       }
     }
 
@@ -781,19 +792,19 @@ v1Router.get("/view/:id", async (req, res) => {
     }));
 
     // Get client details from different possible sources
-    const clientDetails = workOrderInvoice.Client || 
-                         workOrderInvoice.salesOrder?.Client || 
-                         null;
+    const clientDetails = workOrderInvoice.Client ||
+      workOrderInvoice.salesOrder?.Client ||
+      null;
 
     const templateData = {
       workOrderInvoice: {
         id: workOrderInvoice.id,
         invoice_number: workOrderInvoice.invoice_number,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
-        client_name: clientDetails?.display_name || 
-                    clientDetails?.company_name || 
-                    `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() || 
-                    workOrderInvoice.client_name || '',
+        client_name: clientDetails?.display_name ||
+          clientDetails?.company_name ||
+          `${clientDetails?.first_name || ''} ${clientDetails?.last_name || ''}`.trim() ||
+          workOrderInvoice.client_name || '',
         status: workOrderInvoice.status,
         total: workOrderInvoice.total || 0,
         total_tax: workOrderInvoice.total_tax || 0,
@@ -856,58 +867,58 @@ v1Router.get("/templates/rendered", async (req, res) => {
 
     // Dummy data to render inside template
 
-  // Updated sample data with correct property names
-const sampleData = {
-  workOrderInvoice: {
-    invoice_number: "INV-2024-001",
-    due_date_formatted: "12/06/2025",
-    client_name: "Sample Client",
-    status: "active",
-    total: 1500,
-    total_tax: 250,
-    total_amount: 1650,
-    payment_status: "pending",
-    description: "Sample work order invoice",
-    quantity: 100,
-    discount: 5,
-    discount_type: "bulk qty",
-    payment_expected_date: "12/12/2025",
-    transaction_type: "UPI",
-    balance: 100,
-    received_amount: 0.0,
-    credit_amount: 0.0,
-    rate_per_qty: 0.0, // <-- Added
-  },
-  workOrder: {
-    work_generate_id: "WO-2024-001",
-    sku_name: "60ml",
-    qty: 100,
-    status: "active"
-  },
-  salesOrder: {
-    sales_generate_id: "SO-2024-001",
-    status: "active"
-  },
-  sku_details: [
-    {
-      serial_number: 1,
-      item_name: "60ml Bottle",           // Changed from 'sku'
-      quantity: 100,                      // Changed from 'quantity_required'
-      unit_price: 15,                     // Changed from 'rate_per_sku'
-      tax_percentage: 12,                 // Changed from 'gst'
-      total_amount: 1680                  // Changed from 'total_incl_gst'
-    },
-    {
-      serial_number: 2,
-      item_name: "30ml Bottle",
-      quantity: 50,
-      unit_price: 10,
-      tax_percentage: 12,
-      total_amount: 560
-    }
-  ],
-  current_date: new Date().toLocaleDateString('en-IN')
-};
+    // Updated sample data with correct property names
+    const sampleData = {
+      workOrderInvoice: {
+        invoice_number: "INV-2024-001",
+        due_date_formatted: "12/06/2025",
+        client_name: "Sample Client",
+        status: "active",
+        total: 1500,
+        total_tax: 250,
+        total_amount: 1650,
+        payment_status: "pending",
+        description: "Sample work order invoice",
+        quantity: 100,
+        discount: 5,
+        discount_type: "bulk qty",
+        payment_expected_date: "12/12/2025",
+        transaction_type: "UPI",
+        balance: 100,
+        received_amount: 0.0,
+        credit_amount: 0.0,
+        rate_per_qty: 0.0, // <-- Added
+      },
+      workOrder: {
+        work_generate_id: "WO-2024-001",
+        sku_name: "60ml",
+        qty: 100,
+        status: "active"
+      },
+      salesOrder: {
+        sales_generate_id: "SO-2024-001",
+        status: "active"
+      },
+      sku_details: [
+        {
+          serial_number: 1,
+          item_name: "60ml Bottle",           // Changed from 'sku'
+          quantity: 100,                      // Changed from 'quantity_required'
+          unit_price: 15,                     // Changed from 'rate_per_sku'
+          tax_percentage: 12,                 // Changed from 'gst'
+          total_amount: 1680                  // Changed from 'total_incl_gst'
+        },
+        {
+          serial_number: 2,
+          item_name: "30ml Bottle",
+          quantity: 50,
+          unit_price: 10,
+          tax_percentage: 12,
+          total_amount: 560
+        }
+      ],
+      current_date: new Date().toLocaleDateString('en-IN')
+    };
 
     // Render all templates
     const renderedBlocks = templates.map((template, index) => {
@@ -1006,6 +1017,39 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   }
 
   try {
+    // Fetch total invoice amount
+    const invoice = await WorkOrderInvoice.findOne({
+      where: { id: work_order_invoice_id },
+      attributes: ["total_amount"]
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    const totalInvoiceAmount = parseFloat(invoice.total_amount);
+
+    // Get total paid amount so far
+    const paid = await PartialPayment.findOne({
+      where: { work_order_invoice_id },
+      attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
+      raw: true
+    });
+
+    const totalPaid = parseFloat(paid.total_paid) || 0;
+    const newTotalPaid = totalPaid + parseFloat(amount);
+
+    if (newTotalPaid > totalInvoiceAmount) {
+      return res.status(400).json({ message: "Trying to overpay the invoice" });
+    }
+
+    // Determine updated payment status
+    let paymentStatus = "partial";
+    if (newTotalPaid === totalInvoiceAmount) {
+      paymentStatus = "paid";
+    }
+
+    // Create new partial payment
     const newPartialPayment = await PartialPayment.create({
       work_order_invoice_id,
       payment_type,
@@ -1016,12 +1060,59 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       created_at: new Date(),
       updated_at: new Date(),
     });
+
+    // Update invoice with new received amount and payment status
+    await WorkOrderInvoice.update(
+      {
+        received_amount: sequelize.literal(`received_amount + ${amount}`),
+        updated_at: new Date(),
+        payment_status: paymentStatus
+      },
+      { where: { id: work_order_invoice_id } }
+    );
+
+    return res.status(201).json({
+      message: "Partial payment created successfully",
+      data: newPartialPayment
+    });
+
+  } catch (error) {
+    logger.error("Error creating partial payment:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const newPartialPayment = await PartialPayment.findAll({
+      where: { work_order_invoice_id: id },
+      attributes: [
+        "payment_type", "reference_number", "amount", "remarks", "status", "created_at"
+      ],
+      order: [['created_at', 'DESC']],
+    });
     res.status(201).json({
       message: "Partial payment created successfully",
-      data: newPartialPayment.get({ plain: true })
+      data: newPartialPayment
     });
   } catch (error) {
     logger.error("Error creating partial payment:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
+  const { id, mobileNumber, emailId, amount } = req.body;
+  try {
+
+    res.status(201).json({
+      message: "Payment Link has been created successfully",
+      data: []
+    });
+  } catch (error) {
+    logger.error("Error creating sending  payment Link :", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });

@@ -140,7 +140,7 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
         client_name,
         work_order_invoice_id: sales_order_id,
         work_order_invoice_number: sale_order_number,
-        credit_reference_id: return_id,
+        credit_reference_id: salesReturnHeader.id,
         subject: `Credit Note for Sales Return ${return_id}`,
         invoice_total_amout: total_amount,
         credit_total_amount: total_amount,
@@ -299,7 +299,7 @@ v1Router.get("/sales-return/:return_id", authenticateJWT, async (req, res) => {
     // 3. Find Client Info
     const client = await db.Client.findOne({
       where: { client_id: salesReturn.client_id },
-      attributes: ["client_id", "first_name", "email", "credit_balance"]
+      attributes: ["client_id", "display_name", "email", "credit_balance"]
     });
 
     // 4. Find Credit Note (optional)
@@ -372,7 +372,7 @@ v1Router.get("/sales-return", authenticateJWT, async (req, res) => {
     // Fetch clients manually
     const clients = await db.Client.findAll({
       where: { client_id: clientIds },
-      attributes: ["client_id", "first_name", "email"],
+      attributes: ["client_id", "display_name", "email"],
     });
 
     const clientMap = {};
