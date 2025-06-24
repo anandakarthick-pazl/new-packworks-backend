@@ -494,6 +494,19 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
+     purchase_order_payment_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    purchase_order_payment_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    purchase_order_payment_digit: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 3,
+    },
   },
   {
     tableName: "invoice_settings",
