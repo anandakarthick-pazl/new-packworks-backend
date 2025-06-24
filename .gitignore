@@ -6,4 +6,4 @@ Dokerfile
 qrcodes/
 ecosystem.config.cjs
 dummy.js
-
+dev-ecosystem.config.cjs
