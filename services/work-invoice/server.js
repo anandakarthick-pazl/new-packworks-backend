@@ -214,7 +214,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
     const creditAmount = parseFloat(invoiceDetails.credit_amount) || 0.0;
     if (creditAmount > 0) {
       await WalletHistory.create({
-        type: "credit",
+        type: "debit",
         amount: creditAmount,
         client_id: invoiceDetails.client_id,
         company_id: req.user.company_id,
