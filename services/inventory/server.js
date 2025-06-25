@@ -35,6 +35,7 @@ const stockAdjustment = db.stockAdjustment;
 const stockAdjustmentItem = db.stockAdjustmentItem;
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
+const PurchaseOrderBilling = db.PurchaseOrderBilling;
 
 dotenv.config();
 const app = express();
@@ -328,6 +329,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       stockAdjustment,
       stockAdjustmentItem,
       User,
+      PurchaseOrderBilling
     } = db;
 
     const results = {
@@ -337,7 +339,8 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
       purchaseReturns: [],
       // creditNotes: [],
       // debitNotes: [],
-      stockAdjustments: []
+      stockAdjustments: [],
+      billing:[]
     };
 
     //products
@@ -402,6 +405,31 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         }
       ]
     });
+
+    // Billing
+    results.billings = await PurchaseOrderBilling.findAll({
+      include: [
+        {
+          model: PurchaseOrder,
+          as: "purchaseOrder",
+          required: true,
+          where: { 
+            // Filter only for POs that contain this item
+            id: Sequelize.literal(`(
+              SELECT po_id FROM purchase_order_items 
+              WHERE item_id = ${itemId} 
+              LIMIT 1
+            )`)
+          },
+          attributes: ["id", "purchase_generate_id", "supplier_name", "po_date"]
+        }
+      ],
+      attributes: [
+        "id", "bill_reference_number", "bill_date", "status", "created_at"
+      ],
+      order: [["created_at", "DESC"]]
+    });
+
 
     // GRNs
     results.grns = await GRNItem.findAll({
