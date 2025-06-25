@@ -225,6 +225,23 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
         updated_at: new Date(),
       }, { transaction });
 
+      // Check client credit balance before decrement
+      const client = await Client.findOne({
+        where: {
+          client_id: invoiceDetails.client_id,
+          company_id: req.user.company_id
+        },
+        transaction
+      });
+      if (!client) {
+        await transaction.rollback();
+        return res.status(404).json({ message: "Client not found" });
+      }
+      if (parseFloat(client.credit_balance) < creditAmount) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Insufficient client credit balance" });
+      }
+
       // Update client's credit balance
       await Client.decrement('credit_balance', {
         by: creditAmount,
@@ -234,6 +251,17 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
         },
         transaction
       });
+
+      // Also update the invoice's credit_amount if you want to track it
+      await WorkOrderInvoice.update(
+        {
+          credit_amount: sequelize.literal(`credit_amount + ${creditAmount}`),
+        },
+        { 
+          where: { id: newInvoice.id },
+          transaction 
+        }
+      );
     }
 
     // Commit the transaction
@@ -1045,6 +1073,7 @@ v1Router.get("/view/:id", async (req, res) => {
       workOrderInvoice: {
         id: workOrderInvoice.id,
         invoice_number: workOrderInvoice.invoice_number,
+        due_date: workOrderInvoice.due_date,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
         client_name: clientDetails?.display_name ||
           clientDetails?.company_name ||
@@ -1064,7 +1093,7 @@ v1Router.get("/view/:id", async (req, res) => {
         balance: workOrderInvoice.balance || 0,
         received_amount: workOrderInvoice.received_amount || 0.0,
         credit_amount: workOrderInvoice.credit_amount || 0.0,
-        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0, // <-- Added
+        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0,
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
@@ -1337,7 +1366,7 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
     amount,
     remarks,
     status,
-    credit_amount // Add this field to handle credit amount for partial payments
+    credit_amount // Credit amount to deduct from client wallet
   } = req.body;
 
   if (!work_order_invoice_id || !payment_type || !amount) {
@@ -1348,10 +1377,10 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    // Fetch invoice details including client_id and company_id
+    // Fetch invoice details for client_id and company_id only
     const invoice = await WorkOrderInvoice.findOne({
       where: { id: work_order_invoice_id },
-      attributes: ["total_amount", "client_id", "company_id", "invoice_number"]
+      attributes: ["client_id", "company_id", "invoice_number"]
     });
 
     if (!invoice) {
@@ -1359,31 +1388,7 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    const totalInvoiceAmount = parseFloat(invoice.total_amount);
-
-    // Get total paid amount so far
-    const paid = await PartialPayment.findOne({
-      where: { work_order_invoice_id },
-      attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
-      raw: true,
-      transaction
-    });
-
-    const totalPaid = parseFloat(paid.total_paid) || 0;
-    const newTotalPaid = totalPaid + parseFloat(amount);
-
-    if (newTotalPaid > totalInvoiceAmount) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "Trying to overpay the invoice" });
-    }
-
-    // Determine updated payment status
-    let paymentStatus = "partial";
-    if (newTotalPaid === totalInvoiceAmount) {
-      paymentStatus = "paid";
-    }
-
-    // Create new partial payment
+    // Create new partial payment entry
     const newPartialPayment = await PartialPayment.create({
       work_order_invoice_id,
       payment_type,
@@ -1391,29 +1396,39 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       amount,
       remarks: remarks || null,
       status: status || "completed",
+      credit_amount: parseFloat(credit_amount) || 0.0, // Store credit_amount in PartialPayment
       created_at: new Date(),
       updated_at: new Date(),
     }, { transaction });
 
-    // Update invoice with new received amount and payment status
-    await WorkOrderInvoice.update(
-      {
-        received_amount: sequelize.literal(`received_amount + ${amount}`),
-        updated_at: new Date(),
-        payment_status: paymentStatus
-      },
-      { where: { id: work_order_invoice_id } },
-      { transaction }
-    );
-
-    // Create WalletHistory entry if credit_amount exists
+    // Handle wallet credit if credit_amount is provided
     const creditAmountValue = parseFloat(credit_amount) || 0.0;
     if (creditAmountValue > 0) {
-      // Generate a reference number for wallet history (you can modify this logic)
+      // Check client exists and has sufficient credit balance
+      const client = await Client.findOne({
+        where: {
+          client_id: invoice.client_id,
+          company_id: invoice.company_id
+        },
+        transaction
+      });
+
+      if (!client) {
+        await transaction.rollback();
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      if (parseFloat(client.credit_balance) < creditAmountValue) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Insufficient client credit balance" });
+      }
+
+      // Generate wallet reference number
       const walletReferenceNumber = reference_number || `${invoice.invoice_number}-PP-${Date.now()}`;
       
+      // Create WalletHistory entry for credit deduction
       await WalletHistory.create({
-        type: "credit",
+        type: "debit", // Changed to debit since we're deducting from wallet
         amount: creditAmountValue,
         client_id: invoice.client_id,
         company_id: invoice.company_id,
@@ -1424,26 +1439,15 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
         updated_at: new Date(),
       }, { transaction });
 
-      // Update client's credit balance
+      // Deduct amount from client's credit balance
       await Client.decrement('credit_balance', {
         by: creditAmountValue,
         where: {
-          id: invoice.client_id,
+          client_id: invoice.client_id,
           company_id: invoice.company_id
         },
         transaction
       });
-
-      // Also update the invoice's credit_amount if you want to track it
-      await WorkOrderInvoice.update(
-        {
-          credit_amount: sequelize.literal(`credit_amount + ${creditAmountValue}`),
-        },
-        { 
-          where: { id: work_order_invoice_id },
-          transaction 
-        }
-      );
     }
 
     // Commit the transaction
@@ -1453,8 +1457,7 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       message: "Partial payment created successfully",
       data: {
         partial_payment: newPartialPayment,
-        credit_amount_used: creditAmountValue,
-        payment_status: paymentStatus
+        credit_amount_used: creditAmountValue
       }
     });
 
@@ -2137,6 +2140,7 @@ v1Router.get("/payment/callback", async (req, res) => {
       status: razorpay_payment_link_status
     });
 
+   
     // Check if required parameters are present
     if (!invoice_id) {
       return res.status(400).send('<h1>Error: Invoice ID missing from callback</h1>');
