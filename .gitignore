@@ -8,3 +8,4 @@ ecosystem.config.cjs
 dummy.js
 dev-ecosystem.config.cjs
 dev-ecosystem.config.cjs
+public/

@@ -154,14 +154,7 @@ export const InvoiceCreatedTemplate = ({
            
             ` : ''}
 
-            {% comment %} <div class="button-container">
-                <a href="${frontendUrl}/invoice/${invoiceId || invoiceNumber}" class="btn">
-                    📄 View Invoice Online
-                </a>
-                <a href="${frontendUrl}/invoice" class="btn btn-secondary">
-                    📋 View All Invoices
-                </a>
-            </div> {% endcomment %}
+            
 
             <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 25px 0;">
                 <p style="color: #856404; margin: 0; font-size: 14px;">

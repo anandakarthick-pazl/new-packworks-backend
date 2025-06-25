@@ -10,7 +10,7 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 import puppeteer from "puppeteer";
 import handlebars from "handlebars";
 import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
-import { promises as fs, existsSync, createReadStream, unlinkSync } from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Razorpay from 'razorpay';
@@ -19,10 +19,6 @@ import { sendEmail } from '../../common/helper/emailService.js';
 import { PaymentLinkTemplate } from '../../common/services/email/templates/paymentLink.js';
 import { InvoiceCreatedTemplate } from '../../common/services/email/templates/invoiceCreated.js';
 // import { PaymentReceiptTemplate } from '../../common/services/email/templates/paymentReceipt.js';
-import axios from 'axios';
-import FormData from "form-data";
-import PDFDocument from 'pdfkit';
-import crypto from 'crypto';
 
 // For ES6 modules, we need to recreate __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -53,92 +49,8 @@ const WorkOrderInvoice = db.WorkOrderInvoice;
 const WorkOrder = db.WorkOrder;
 const SalesOrder = db.SalesOrder;
 const Client = db.Client;
-const WalletHistory = db.WalletHistory;
 const PartialPayment = db.PartialPayment;
 
-// POST create new work order invoice
-// v1Router.post("/create", authenticateJWT, async (req, res) => {
-//   const invoiceDetails = req.body;
-
-//   if (!invoiceDetails) {
-//     return res.status(400).json({ message: "Invalid input data" });
-//   }
-
-//   try {
-//     const invoice_number = await generateId(
-//       req.user.company_id,
-//       WorkOrderInvoice,
-//       "work_invoice"
-//     );
-
-//     let skuDetails = null;
-
-//     try {
-//       if (typeof invoiceDetails.sku_details === 'string') {
-//         skuDetails = JSON.parse(invoiceDetails.sku_details);
-//       } else if (typeof invoiceDetails.sku_details === 'object') {
-//         skuDetails = invoiceDetails.sku_details;
-//       }
-//     } catch (err) {
-//       console.error("Invalid JSON in sku_details:", err);
-//       skuDetails = null;
-//     }
-
-//     // Create Work Order Invoice
-//     const newInvoice = await WorkOrderInvoice.create({
-//       invoice_number: invoice_number,
-//       company_id: req.user.company_id,
-//       client_id: invoiceDetails.client_id,
-//       // sku_id: invoiceDetails.sku_id || null,
-//       sku_version_id: invoiceDetails.sku_version_id || null,
-//       status: invoiceDetails.status || "active",
-//       sale_id: invoiceDetails.sale_id || null,
-//       work_id: invoiceDetails.work_id || null,
-//       due_date: invoiceDetails.due_date || null,
-//       total: invoiceDetails.total || 0.0,
-//       balance: invoiceDetails.balance || 0.0,
-//       payment_expected_date: invoiceDetails.payment_expected_date || null,
-//       transaction_type: invoiceDetails.transaction_type || null,
-//       discount_type: invoiceDetails.discount_type || null,
-//       discount: invoiceDetails.discount || 0.0,
-//       total_tax: invoiceDetails.total_tax || 0.0,
-//       total_amount: invoiceDetails.total_amount || 0.0,
-//       payment_status: invoiceDetails.payment_status || null,
-//       created_by: req.user.id,
-//       updated_by: req.user.id,
-//       quantity: invoiceDetails.quantity || null,
-//       sku_details: skuDetails || null,
-//       client_name: invoiceDetails.client_name || null,
-//       client_email: invoiceDetails.client_email || null,
-//       client_phone: invoiceDetails.client_phone || null,
-//       received_amount: invoiceDetails.received_amount || 0.0,
-//       credit_amount: invoiceDetails.credit_amount || 0.0,
-//       rate_per_qty: invoiceDetails.rate_per_qty || 0.0,
-//       invoice_pdf: invoiceDetails.invoice_pdf || null,
-//     });
-//     if (invoiceDetails.payment_status !== 'pending') {
-//       await PartialPayment.create({
-//         work_order_invoice_id: newInvoice.id,
-//         payment_type: "other",
-//         reference_number: invoice_number || null,
-//         amount: invoiceDetails.received_amount || 0.0,
-//         remarks: "Paid" || null,
-//         status: "completed",
-//         created_at: new Date(),
-//         updated_at: new Date(),
-//       });
-//     }
-//     res.status(201).json({
-//       message: "Work Order Invoice created successfully",
-//       data: newInvoice.get({ plain: true }),
-//     });
-//   } catch (error) {
-//     logger.error("Error creating work order invoice:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
 /**
  * POST create new work order invoice
  * 
@@ -167,9 +79,6 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
     return res.status(400).json({ message: "Invalid input data" });
   }
 
-  // Start a transaction to ensure data consistency
-  const transaction = await sequelize.transaction();
-
   try {
     const invoice_number = await generateId(
       req.user.company_id,
@@ -195,6 +104,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       invoice_number: invoice_number,
       company_id: req.user.company_id,
       client_id: invoiceDetails.client_id,
+      // sku_id: invoiceDetails.sku_id || null,
       sku_version_id: invoiceDetails.sku_version_id || null,
       status: invoiceDetails.status || "active",
       sale_id: invoiceDetails.sale_id || null,
@@ -220,8 +130,8 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       credit_amount: invoiceDetails.credit_amount || 0.0,
       rate_per_qty: invoiceDetails.rate_per_qty || 0.0,
       invoice_pdf: invoiceDetails.invoice_pdf || null,
-    }, { transaction });
-
+    });
+    
     // Create partial payment if payment status is not pending
     if (invoiceDetails.payment_status !== 'pending') {
       await PartialPayment.create({
@@ -233,124 +143,91 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
         status: "completed",
         created_at: new Date(),
         updated_at: new Date(),
-      }, { transaction });
-    }
-
-    // Handle wallet credit operations
-    const creditAmount = parseFloat(invoiceDetails.credit_amount) || 0.0;
-    if (creditAmount > 0) {
-      // Check client credit balance before decrement
-      const client = await Client.findOne({
-        where: {
-          client_id: invoiceDetails.client_id,
-          company_id: req.user.company_id
-        },
-        transaction
       });
-      
-      if (!client) {
-        await transaction.rollback();
-        return res.status(404).json({ message: "Client not found" });
-      }
-      
-      if (parseFloat(client.credit_balance) < creditAmount) {
-        await transaction.rollback();
-        return res.status(400).json({ message: "Insufficient client credit balance" });
-      }
-
-      // Perform all wallet operations in parallel
-      await Promise.all([
-        WalletHistory.create({
-          type: "debit",
-          amount: creditAmount,
-          client_id: invoiceDetails.client_id,
-          company_id: req.user.company_id,
-          refference_number: `INVOICE NUMBER - #${invoice_number}`,
-          created_by: req.user.id,
-          updated_by: req.user.id,
-          created_at: new Date(),
-          updated_at: new Date(),
-        }, { transaction }),
-        
-        Client.decrement('credit_balance', {
-          by: creditAmount,
-          where: {
-            client_id: invoiceDetails.client_id,
-            company_id: req.user.company_id
-          },
-          transaction
-        }),
-        
-        WorkOrderInvoice.update({
-          credit_amount: sequelize.literal(`credit_amount + ${creditAmount}`),
-        }, {
-          where: { id: newInvoice.id },
-          transaction
-        })
-      ]);
     }
 
-    // Extract notification details
-    const clientEmail = invoiceDetails.client_email;
-    const clientPhone = invoiceDetails.client_phone;
-    const clientName = invoiceDetails.client_name || 'Valued Customer';
-    const shouldSendNotifications = clientEmail || clientPhone;
-
-    // Commit transaction early - don't wait for PDF/notifications
-    await transaction.commit();
-
-    // Send immediate response
-    const responseData = {
-      message: "Work Order Invoice created successfully",
-      data: {
-        ...newInvoice.get({ plain: true }),
-        invoice_pdf: null // Will be updated async
-      },
-      pdf_generation: {
-        success: false,
-        error: null,
-        file_path: null,
-        status: 'processing' // Indicate it's being processed
-      },
-      notifications: {
-        email: {
-          attempted: !!clientEmail,
-          success: false,
-          recipient: clientEmail,
-          error: null,
-          status: shouldSendNotifications ? 'processing' : 'skipped'
-        },
-        whatsapp: {
-          attempted: !!clientPhone,
-          success: false,
-          recipient: clientPhone,
-          error: null,
-          status: shouldSendNotifications ? 'processing' : 'skipped'
+    // Check if client_email or client_phone is available for sending notifications
+      const clientEmail = invoiceDetails.client_email;
+      const clientPhone = invoiceDetails.client_phone;
+      const clientName = invoiceDetails.client_name || 'Valued Customer';
+      
+      let emailResult = { success: false, error: null };
+      let whatsappResult = { success: false, error: null };
+      
+      // Only send notifications if either email or phone is provided
+      if (clientEmail || clientPhone) {
+        try {
+          // Generate PDF for attachment
+          logger.info(`Generating PDF for invoice ${invoice_number} for notifications`);
+          const pdfBuffer = await generateInvoicePDFBuffer({
+            ...newInvoice.get({ plain: true }),
+            company_id: req.user.company_id
+          });
+          
+          // Send email with PDF attachment if client_email is available
+          if (clientEmail && clientEmail.trim() !== '') {
+            try {
+              logger.info(`Sending invoice email to: ${clientEmail}`);
+              emailResult = await sendEmailInvoice(clientEmail, clientName, newInvoice, pdfBuffer);
+            } catch (emailError) {
+              emailResult = { success: false, error: emailError.message };
+              logger.error(`Failed to send invoice email to ${clientEmail}:`, emailError);
+            }
+          }
+          
+          // Send WhatsApp message if client_phone is available
+          if (clientPhone && clientPhone.trim() !== '') {
+            try {
+              logger.info(`Sending WhatsApp notification to: ${clientPhone}`);
+              whatsappResult = await sendWhatsAppInvoice(clientPhone, clientName, newInvoice, pdfBuffer);
+            } catch (whatsappError) {
+              whatsappResult = { success: false, error: whatsappError.message };
+              logger.error(`Failed to send WhatsApp notification to ${clientPhone}:`, whatsappError);
+            }
+          }
+          
+        } catch (pdfError) {
+          logger.error('Error generating PDF for notifications:', pdfError);
+          emailResult = { success: false, error: 'PDF generation failed' };
+          whatsappResult = { success: false, error: 'PDF generation failed' };
         }
       }
-    };
-
+      
+      // Prepare response with notification results
+      const responseData = {
+        message: "Work Order Invoice created successfully",
+        data: newInvoice.get({ plain: true }),
+        notifications: {
+          email: {
+            attempted: !!clientEmail,
+            success: emailResult.success,
+            recipient: clientEmail,
+            error: emailResult.error
+          },
+          whatsapp: {
+            attempted: !!clientPhone,
+            success: whatsappResult.success,
+            recipient: clientPhone,
+            error: whatsappResult.error
+          }
+        }
+      };
+      
+      // Log notification summary
+      if (clientEmail || clientPhone) {
+        const summary = [];
+        if (clientEmail) {
+          summary.push(`Email: ${emailResult.success ? 'Sent' : 'Failed'}`);
+        }
+        if (clientPhone) {
+          summary.push(`WhatsApp: ${whatsappResult.success ? 'Sent' : 'Failed'}`);
+        }
+        logger.info(`Invoice ${invoice_number} notifications - ${summary.join(', ')}`);
+      }
+    
     res.status(201).json(responseData);
-
-    // Process PDF generation and notifications asynchronously
-    if (shouldSendNotifications) {
-      // Don't await this - let it run in background
-      processInvoiceNotificationsAsync(
-        newInvoice,
-        clientEmail,
-        clientPhone,
-        clientName,
-        req.user.company_id,
-        invoice_number
-      ).catch(error => {
-        logger.error(`Background notification processing failed for invoice ${invoice_number}:`, error);
-      });
-    }
-
+    
   } catch (error) {
-    // Rollback the transaction in case of error
-    await transaction.rollback();
-
     logger.error("Error creating work order invoice:", error);
     res
       .status(500)
@@ -380,11 +257,12 @@ async function generateInvoicePDFBuffer(workOrderInvoice) {
 
     if (!htmlTemplate) {
       // Generate simple PDF using PDFKit as fallback
+      const PDFDocument = require('pdfkit');
       const doc = new PDFDocument({ margin: 40, size: 'A4' });
-
+      
       const buffers = [];
       doc.on('data', buffers.push.bind(buffers));
-
+      
       doc.fontSize(18).font('Helvetica-Bold').text('WORK ORDER INVOICE', { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(12).font('Helvetica').text(`Invoice Number: ${workOrderInvoice.invoice_number}`, 40);
@@ -392,9 +270,9 @@ async function generateInvoicePDFBuffer(workOrderInvoice) {
       doc.text(`Client: ${workOrderInvoice.client_name || 'N/A'}`, 40);
       doc.moveDown(1);
       doc.text(`Total Amount: ₹${parseFloat(workOrderInvoice.total_amount || 0).toFixed(2)}`, 40);
-
+      
       doc.end();
-
+      
       return new Promise((resolve) => {
         doc.on('end', () => {
           resolve(Buffer.concat(buffers));
@@ -408,20 +286,14 @@ async function generateInvoicePDFBuffer(workOrderInvoice) {
       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
     }
 
-    // Map skuDetails to template fields (add all possible keys)
+    // Map skuDetails to template fields
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      sku_id: item.sku_id || '',
-      sku: item.sku || '',
-      item_name: item.item_name || item.sku || item.name || '',
-      quantity: item.quantity || item.quantity_required || item.qty || '',
-      quantity_required: item.quantity_required || item.quantity || '',
-      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
-      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
-      total_amount: item.total_amount || '',
-      gst: item.gst || '',
-      total_incl_gst: item.total_incl_gst || '',
-      discount: item.discount || '',
+      item_name: item.item_name || item.sku || item.name || "",
+      quantity: item.quantity || item.quantity_required || item.qty || "",
+      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+      tax_percentage: item.tax_percentage || item.gst || "",
+      total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
     const templateData = {
@@ -491,121 +363,150 @@ async function generateInvoicePDFBuffer(workOrderInvoice) {
   }
 }
 
-// Async background function to handle PDF generation and notifications
-async function processInvoiceNotificationsAsync(
-  newInvoice, 
-  clientEmail, 
-  clientPhone, 
-  clientName, 
-  companyId, 
-  invoiceNumber
-) {
-  let pdfBuffer = null;
-  let uploadedImageUrl = null;
-  
+// Helper function to send WhatsApp message using approved templates WITH PDF attachment
+async function sendWhatsAppInvoice(clientPhone, clientName, invoiceDetails, pdfBuffer) {
   try {
-    // Generate PDF
-    logger.info(`Background: Generating PDF for invoice ${invoiceNumber}`);
-    pdfBuffer = await generateInvoicePDFBuffer({
-      ...newInvoice.get({ plain: true }),
-      company_id: companyId
+    // Clean phone number (remove any non-digits and ensure it starts with country code)
+    let cleanPhone = clientPhone.replace(/[^0-9]/g, '');
+    
+    // Add India country code if not present
+    if (!cleanPhone.startsWith('91') && cleanPhone.length === 10) {
+      cleanPhone = '91' + cleanPhone;
+    }
+    
+    const whatsappNumber = `whatsapp:+${cleanPhone}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info';
+    const invoiceUrl = `${frontendUrl}/invoice/${invoiceDetails.id}`;
+    
+    // Create public PDF URL for WhatsApp media
+    const publicPdfUrl = `${frontendUrl}/api/work-order-invoice/pdf/public/${invoiceDetails.id}`;
+    
+    // Format amount for display
+    const formattedAmount = parseFloat(invoiceDetails.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    const dueDate = invoiceDetails.due_date ? new Date(invoiceDetails.due_date).toLocaleDateString('en-IN') : 'N/A';
+    
+    console.log('Sending WhatsApp with PDF attachment to:', whatsappNumber);
+    console.log('PDF URL:', publicPdfUrl);
+    console.log('Template variables:', {
+      clientName: clientName || 'Valued Customer',
+      invoiceNumber: invoiceDetails.invoice_number,
+      amount: formattedAmount,
+      dueDate: dueDate,
+      url: invoiceUrl
     });
 
-    // Save and upload PDF
-    const fileName = `work-order-invoice-${invoiceNumber}.pdf`;
-    const fullFilePath = path.join(INVOICE_STORAGE_PATH, fileName);
-
-    // Create directory if it doesn't exist
-    await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
-    await fs.writeFile(fullFilePath, pdfBuffer);
-
-    if (existsSync(fullFilePath)) {
-      // Upload to file service
-      const form = new FormData();
-      form.append("file", createReadStream(fullFilePath));
-
-      const config = {
-        method: "post",
-        maxBodyLength: Infinity,
-        url: `${process.env.BASE_URL}/file/upload`,
-        headers: {
-          Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywiZW1haWwiOiJhbmFuZGEuc0BwYXpsLmluZm8iLCJjb21wYW55X2lkIjo4LCJpYXQiOjE3NDMwMDQzMTV9.VvivVHaaony2amd1u_Uyf-tOBorVTTEgIoiWAF6QKBc`,
-          ...form.getHeaders(),
-        },
-        data: form,
+    // Try different approaches for WhatsApp messaging with PDF
+    let messageResponse;
+    
+    // Option 1: Send PDF as document attachment
+    try {
+      console.log('Attempting to send PDF as WhatsApp document');
+      
+      const pdfMessage = `📄 Invoice ${invoiceDetails.invoice_number}\n\nHi ${clientName || 'Customer'}!\n\nYour invoice for ₹${formattedAmount} is attached as PDF.\n\nDue Date: ${dueDate}\nView Online: ${invoiceUrl}\n\nPackWorkX Team`;
+      
+      messageResponse = await twilioClient.messages.create({
+        body: pdfMessage,
+        mediaUrl: [publicPdfUrl], // Send PDF as media attachment
+        from: `whatsapp:${process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER}`,
+        to: whatsappNumber
+      });
+      
+      console.log('PDF sent successfully as WhatsApp document:', messageResponse.sid);
+      
+      logger.info(`WhatsApp invoice with PDF sent successfully to: ${whatsappNumber}, Message SID: ${messageResponse.sid}`);
+      return { 
+        success: true, 
+        phone: whatsappNumber,
+        messageId: messageResponse.sid,
+        status: messageResponse.status,
+        method: 'pdf_attachment'
       };
-
-      const uploadResponse = await axios.request(config);
-      if (uploadResponse.status === 200 && uploadResponse.data?.data?.file_url) {
-        uploadedImageUrl = uploadResponse.data.data.file_url;
-        
-        // Update invoice record with PDF path (outside transaction)
-        await WorkOrderInvoice.update(
-          { invoice_pdf: fullFilePath, invoice_pdf_url: uploadedImageUrl },
-          { where: { id: newInvoice.id } }
-        );
-        
-        logger.info(`Background: PDF uploaded successfully for invoice ${invoiceNumber}`);
-      }
-
-      // Clean up local file
-      unlinkSync(fullFilePath);
-    }
-
-    // Send notifications in parallel
-    const notificationPromises = [];
-    
-    if (clientEmail && clientEmail.trim() !== '') {
-      notificationPromises.push(
-        sendEmailInvoice(clientEmail, clientName, newInvoice, pdfBuffer)
-          .then(() => logger.info(`Background: Email sent successfully to ${clientEmail} for invoice ${invoiceNumber}`))
-          .catch(error => logger.error(`Background: Email failed for ${clientEmail}:`, error))
-      );
-    }
-
-    if (clientPhone && clientPhone.trim() !== '' && uploadedImageUrl) {
-      notificationPromises.push(
-        sendWhatsAppInvoice(clientPhone, clientName, newInvoice, uploadedImageUrl)
-          .then(() => logger.info(`Background: WhatsApp sent successfully to ${clientPhone} for invoice ${invoiceNumber}`))
-          .catch(error => logger.error(`Background: WhatsApp failed for ${clientPhone}:`, error))
-      );
-    }
-
-    // Wait for all notifications to complete
-    await Promise.allSettled(notificationPromises);
-    
-    logger.info(`Background: All notifications processed for invoice ${invoiceNumber}`);
-    
-  } catch (error) {
-    logger.error(`Background: PDF generation failed for invoice ${invoiceNumber}:`, error);
-    
-    // Try to send notifications without PDF if possible
-    if (clientEmail && pdfBuffer) {
+      
+    } catch (pdfError) {
+      console.error('Failed to send PDF as attachment:', pdfError.message);
+      console.log('Falling back to text message with PDF download link');
+      
+      // Option 2: Fallback to text with download link
       try {
-        await sendEmailInvoice(clientEmail, clientName, newInvoice, pdfBuffer);
-        logger.info(`Background: Email sent without upload for invoice ${invoiceNumber}`);
-      } catch (emailError) {
-        logger.error(`Background: Email fallback failed for invoice ${invoiceNumber}:`, emailError);
+        const fallbackMessage = `Hi ${clientName || 'Customer'}! \n\nInvoice ${invoiceDetails.invoice_number} for ₹${formattedAmount} is ready.\n\nDue Date: ${dueDate}\n\n📄 Download PDF: ${publicPdfUrl}\n🌐 View Online: ${invoiceUrl}\n\nPackWorkX Team`;
+        
+        messageResponse = await twilioClient.messages.create({
+          body: fallbackMessage,
+          from: `whatsapp:${process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER}`,
+          to: whatsappNumber
+        });
+        
+        console.log('Fallback message sent successfully:', messageResponse.sid);
+        
+        logger.info(`WhatsApp invoice (fallback) sent successfully to: ${whatsappNumber}, Message SID: ${messageResponse.sid}`);
+        return { 
+          success: true, 
+          phone: whatsappNumber,
+          messageId: messageResponse.sid,
+          status: messageResponse.status,
+          method: 'text_with_pdf_link',
+          note: 'PDF attachment failed, sent download link instead'
+        };
+        
+      } catch (fallbackError) {
+        console.error('Fallback message also failed:', fallbackError.message);
+        
+        // Option 3: Ultra-minimal message
+        const minimalMessage = `Invoice ${invoiceDetails.invoice_number}: ₹${formattedAmount}. View: ${invoiceUrl}`;
+        
+        messageResponse = await twilioClient.messages.create({
+          body: minimalMessage,
+          from: `whatsapp:${process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER}`,
+          to: whatsappNumber
+        });
+        
+        console.log('Minimal message sent successfully:', messageResponse.sid);
+        
+        logger.info(`WhatsApp invoice (minimal) sent successfully to: ${whatsappNumber}, Message SID: ${messageResponse.sid}`);
+        return { 
+          success: true, 
+          phone: whatsappNumber,
+          messageId: messageResponse.sid,
+          status: messageResponse.status,
+          method: 'minimal_text',
+          note: 'PDF and enhanced messages failed, sent minimal text'
+        };
       }
     }
+
+  } catch (error) {
+    logger.error('Error sending WhatsApp invoice:', {
+      message: error.message,
+      code: error.code,
+      moreInfo: error.moreInfo,
+      status: error.status
+    });
+    throw error;
   }
 }
 
-// Helper function to send email with invoice PDF attachment
+// Helper function to send email with PDF attachment
 async function sendEmailInvoice(clientEmail, clientName, invoiceDetails, pdfBuffer) {
   try {
+    // Parse SKU details if needed
+    let skuDetails = invoiceDetails.sku_details;
+    if (typeof skuDetails === "string") {
+      try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
+    }
+
     const emailTemplate = InvoiceCreatedTemplate({
-      clientName,
-      clientEmail,
+      clientName: clientName || 'Valued Customer',
+      clientEmail: clientEmail,
       invoiceNumber: invoiceDetails.invoice_number,
       invoiceAmount: parseFloat(invoiceDetails.total_amount || 0),
-      skuDetails: typeof invoiceDetails.sku_details === 'string'
-        ? JSON.parse(invoiceDetails.sku_details || '[]')
-        : invoiceDetails.sku_details || [],
-      dueDate: invoiceDetails.due_date ? new Date(invoiceDetails.due_date) : '',
-      companyName: 'PackWorkX'
+      dueDate: invoiceDetails.due_date,
+      skuDetails: skuDetails || [],
+      companyName: 'PackWorkX',
+      invoiceId: invoiceDetails.id,
+      frontendUrl: process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info'
     });
 
+    // Prepare email attachment
     const attachments = [{
       filename: `invoice-${invoiceDetails.invoice_number}.pdf`,
       content: pdfBuffer,
@@ -614,90 +515,298 @@ async function sendEmailInvoice(clientEmail, clientName, invoiceDetails, pdfBuff
 
     await sendEmail(
       clientEmail,
-      `Invoice Created - ${invoiceDetails.invoice_number}`,
+      `Invoice ${invoiceDetails.invoice_number} - PackWorkX`,
       emailTemplate,
       attachments
     );
 
-    return { success: true, error: null };
+    logger.info(`Invoice email sent successfully to: ${clientEmail}`);
+    return { success: true, email: clientEmail };
+
   } catch (error) {
-    logger.error('Error sending email invoice:', error);
-    return { success: false, error: error.message };
+    logger.error('Error sending invoice email:', error);
+    throw error;
   }
 }
 
-// Helper function to send WhatsApp message using approved templates WITH PDF attachment
-async function sendWhatsAppInvoice(clientPhone, clientName, invoiceDetails, publicMediaUrl) {
-  try {
-    // Clean phone number (remove any non-digits and ensure it starts with country code)
-    let cleanPhone = clientPhone.replace(/[^0-9]/g, '');
+// WhatsApp Debug endpoint to test configuration
+v1Router.post("/debug/whatsapp", authenticateJWT, async (req, res) => {
+  const { test_phone, test_message = 'Hello! This is a test WhatsApp message from PackWorkX.' } = req.body;
 
-    // Add India country code if not present
+  if (!test_phone) {
+    return res.status(400).json({ 
+      message: "test_phone is required for WhatsApp debugging" 
+    });
+  }
+
+  try {
+    // Check environment variables
+    const envCheck = {
+      TWILIO_ACCOUNT_ID: !!process.env.TWILIO_ACCOUNT_ID,
+      TWILIO_AUTH_TOKEN: !!process.env.TWILIO_AUTH_TOKEN,
+      TWILIO_FROM_WHATSAPP_MOBILE_NUMBER: !!process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER,
+      TWILIO_FROM_MOBILE_NUMBER: !!process.env.TWILIO_FROM_MOBILE_NUMBER,
+    };
+
+    console.log('Environment Variables Check:', envCheck);
+    console.log('Twilio From WhatsApp Number:', process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER);
+    console.log('Twilio From Mobile Number:', process.env.TWILIO_FROM_MOBILE_NUMBER);
+
+    // Clean phone number
+    let cleanPhone = test_phone.replace(/[^0-9]/g, '');
     if (!cleanPhone.startsWith('91') && cleanPhone.length === 10) {
       cleanPhone = '91' + cleanPhone;
     }
+    const whatsappNumber = `whatsapp:+${cleanPhone}`;
+    
+    console.log('Original phone:', test_phone);
+    console.log('Cleaned phone:', cleanPhone);
+    console.log('WhatsApp number:', whatsappNumber);
 
-    // IMPORTANT: Both From and To must use whatsapp: prefix for WhatsApp channel
-    const whatsappTo = `whatsapp:+${cleanPhone}`;
-    const whatsappFrom = `whatsapp:${process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER}`; // Ensure From also has whatsapp: prefix
-
-    // Format amount for display
-    const formattedAmount = parseFloat(invoiceDetails.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-    // Professional WhatsApp message for PDF attachment
-    const whatsappMessage = `🧾 *New Invoice Created*\n\n` +
-      `Hello ${clientName},\n\n` +
-      `Your invoice has been successfully created:\n\n` +
-      `📄 *Invoice #:* ${invoiceDetails.invoice_number}\n` +
-      `💰 *Amount:* ₹${formattedAmount}\n` +
-      `📅 *Due Date:* ${invoiceDetails.due_date ? new Date(invoiceDetails.due_date).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
-      `📎 Please find your invoice PDF attached.\n\n` +
-      `Thank you for your business!\n\n` +
-      `*PackWorkX Team*`;
-
-    logger.info(`Sending WhatsApp with PDF attachment to ${whatsappTo} from ${whatsappFrom}`);
-
-    // Validate that both From and To numbers are properly formatted
-    if (!whatsappFrom.startsWith('whatsapp:')) {
-      throw new Error(`Invalid From number format: ${whatsappFrom}. Must start with 'whatsapp:'`);
-    }
-
-    if (!whatsappTo.startsWith('whatsapp:')) {
-      throw new Error(`Invalid To number format: ${whatsappTo}. Must start with 'whatsapp:'`);
-    }
-
-
+    // Try to send message
+    let result = { success: false, error: null, messageId: null };
+    
     try {
-
-
-      // Send WhatsApp message with PDF attachment using mediaUrl
       const messageResponse = await twilioClient.messages.create({
-        body: whatsappMessage,
-        from: whatsappFrom,
-        to: whatsappTo,
-        mediaUrl: [publicMediaUrl] // Attach the PDF using public URL
+        body: test_message,
+        from: `whatsapp:${process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER || process.env.TWILIO_FROM_MOBILE_NUMBER}`,
+        to: whatsappNumber
       });
-
-      logger.info(`WhatsApp message with PDF sent successfully. SID: ${messageResponse.sid}`);
-
-
-      return {
+      
+      result = {
         success: true,
-        error: null,
-        messageSid: messageResponse.sid,
-        mediaUrl: publicMediaUrl
+        messageId: messageResponse.sid,
+        status: messageResponse.status,
+        direction: messageResponse.direction,
+        from: messageResponse.from,
+        to: messageResponse.to
       };
-
+      
+      console.log('WhatsApp message sent successfully:', messageResponse.sid);
+      
     } catch (twilioError) {
-      logger.error('Error sending WhatsApp message with PDF attachment:', twilioError);
-      throw twilioError;
+      result = {
+        success: false,
+        error: twilioError.message,
+        code: twilioError.code,
+        moreInfo: twilioError.moreInfo,
+        status: twilioError.status
+      };
+      
+      console.error('Twilio WhatsApp Error:', {
+        message: twilioError.message,
+        code: twilioError.code,
+        moreInfo: twilioError.moreInfo,
+        status: twilioError.status
+      });
     }
+
+    res.status(200).json({
+      message: "WhatsApp debug test completed",
+      environment_check: envCheck,
+      phone_processing: {
+        original: test_phone,
+        cleaned: cleanPhone,
+        whatsapp_format: whatsappNumber
+      },
+      twilio_config: {
+        account_id_exists: !!process.env.TWILIO_ACCOUNT_ID,
+        auth_token_exists: !!process.env.TWILIO_AUTH_TOKEN,
+        from_whatsapp_number: process.env.TWILIO_FROM_WHATSAPP_MOBILE_NUMBER,
+        from_mobile_number: process.env.TWILIO_FROM_MOBILE_NUMBER
+      },
+      test_result: result,
+      recommendations: [
+        "1. Check if you're using Twilio WhatsApp Sandbox (limited to verified numbers)",
+        "2. Verify your Twilio WhatsApp Business API is approved",
+        "3. Ensure the 'from' number is a verified WhatsApp Business number",
+        "4. Check if the recipient number needs to opt-in first (sandbox mode)",
+        "5. Verify your Twilio account has WhatsApp messaging enabled"
+      ]
+    });
 
   } catch (error) {
-    logger.error('Error sending WhatsApp invoice with PDF attachment:', error);
-    return { success: false, error: error.message };
+    logger.error("Error in WhatsApp debug test:", error);
+    res.status(500).json({
+      message: "WhatsApp debug test failed",
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
-}
+});
+
+// Test endpoint specifically for PDF WhatsApp sending
+v1Router.post("/test/whatsapp-pdf", authenticateJWT, async (req, res) => {
+  const { test_phone, test_name = 'Test Customer' } = req.body;
+
+  if (!test_phone) {
+    return res.status(400).json({ 
+      message: "test_phone is required for PDF WhatsApp testing" 
+    });
+  }
+
+  try {
+    // Create a sample invoice for PDF testing
+    const sampleInvoice = {
+      id: 'PDF-TEST-001',
+      invoice_number: 'PDF-INV-001',
+      total_amount: 2500.00,
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      payment_status: 'pending',
+      sku_details: [
+        {
+          item_name: 'PDF Test Product A',
+          quantity: 3,
+          unit_price: 500,
+          total_amount: 1500
+        },
+        {
+          item_name: 'PDF Test Product B', 
+          quantity: 2,
+          unit_price: 500,
+          total_amount: 1000
+        }
+      ]
+    };
+
+    // Generate sample PDF for testing
+    const pdfBuffer = await generateInvoicePDFBuffer({
+      ...sampleInvoice,
+      company_id: req.user.company_id,
+      client_name: test_name
+    });
+
+    // Test WhatsApp PDF sending
+    let whatsappResult = { success: false, error: null };
+    
+    try {
+      whatsappResult = await sendWhatsAppInvoice(test_phone, test_name, sampleInvoice, pdfBuffer);
+    } catch (error) {
+      whatsappResult = { success: false, error: error.message };
+    }
+
+    res.status(200).json({
+      message: "WhatsApp PDF test completed",
+      test_data: {
+        sample_invoice: sampleInvoice,
+        test_phone,
+        test_name,
+        pdf_url: `${process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info'}/api/work-order-invoice/pdf/public/PDF-TEST-001`
+      },
+      results: {
+        whatsapp: {
+          attempted: true,
+          success: whatsappResult.success,
+          method: whatsappResult.method || 'unknown',
+          messageId: whatsappResult.messageId,
+          note: whatsappResult.note || null,
+          error: whatsappResult.error
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error("Error in WhatsApp PDF test:", error);
+    res.status(500).json({
+      message: "WhatsApp PDF test failed",
+      error: error.message
+    });
+  }
+});
+
+// Test endpoint for email and WhatsApp notifications
+v1Router.post("/test/notifications", authenticateJWT, async (req, res) => {
+  const { test_email, test_phone, test_name = 'Test User' } = req.body;
+
+  if (!test_email && !test_phone) {
+    return res.status(400).json({ 
+      message: "Provide either test_email or test_phone to test notifications" 
+    });
+  }
+
+  try {
+    // Create a sample invoice data for testing
+    const sampleInvoice = {
+      id: 'TEST-001',
+      invoice_number: 'TEST-INV-001',
+      total_amount: 1500.00,
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      payment_status: 'pending',
+      sku_details: [
+        {
+          item_name: 'Test Product A',
+          quantity: 2,
+          unit_price: 500,
+          total_amount: 1000
+        },
+        {
+          item_name: 'Test Product B', 
+          quantity: 1,
+          unit_price: 500,
+          total_amount: 500
+        }
+      ]
+    };
+
+    let emailResult = { success: false, error: null };
+    let whatsappResult = { success: false, error: null };
+
+    // Generate sample PDF for testing
+    const pdfBuffer = await generateInvoicePDFBuffer({
+      ...sampleInvoice,
+      company_id: req.user.company_id,
+      client_name: test_name
+    });
+
+    // Test email if provided
+    if (test_email) {
+      try {
+        emailResult = await sendEmailInvoice(test_email, test_name, sampleInvoice, pdfBuffer);
+      } catch (error) {
+        emailResult = { success: false, error: error.message };
+      }
+    }
+
+    // Test WhatsApp if provided  
+    if (test_phone) {
+      try {
+        whatsappResult = await sendWhatsAppInvoice(test_phone, test_name, sampleInvoice, pdfBuffer);
+      } catch (error) {
+        whatsappResult = { success: false, error: error.message };
+      }
+    }
+
+    res.status(200).json({
+      message: "Notification test completed",
+      test_data: {
+        sample_invoice: sampleInvoice,
+        test_email,
+        test_phone,
+        test_name
+      },
+      results: {
+        email: {
+          attempted: !!test_email,
+          success: emailResult.success,
+          error: emailResult.error
+        },
+        whatsapp: {
+          attempted: !!test_phone,
+          success: whatsappResult.success,
+          error: whatsappResult.error
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error("Error in notification test:", error);
+    res.status(500).json({
+      message: "Test failed",
+      error: error.message
+    });
+  }
+});
+
 // Helper function to update received_amount for invoices
 const updateReceivedAmountForInvoices = async (invoiceIds) => {
   try {
@@ -785,18 +894,8 @@ v1Router.get("/get", authenticateJWT, async (req, res) => {
     if (sale_id) {
       whereClause.sale_id = sale_id;
     }
-
-    // Modified payment_status filtering logic
     if (payment_status) {
-      if (payment_status === "except_invoiced") {
-        // Exclude 'Invoiced' status, fetch all other statuses
-        whereClause.payment_status = {
-          [Op.ne]: "Invoiced" // Not equal to 'Invoiced'
-        };
-      } else {
-        // Normal filtering for specific payment status
-        whereClause.payment_status = payment_status;
-      }
+      whereClause.payment_status = payment_status;
     }
 
     // Add search functionality if search parameter is provided
@@ -1005,6 +1104,7 @@ const INVOICE_STORAGE_PATH = path.join(process.cwd(), 'public', 'invoice');
 // Updated generateOriginalInvoicePDF function
 async function generateOriginalInvoicePDF(req, res, workOrderInvoice) {
   try {
+    const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
     const fileName = `work-order-invoice-${workOrderInvoice.invoice_number}.pdf`;
@@ -1171,20 +1271,14 @@ v1Router.get("/download/:id", async (req, res) => {
       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
     }
 
-    // Map skuDetails to template fields (add all possible keys)
+    // Map skuDetails to template fields
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      sku_id: item.sku_id || '',
-      sku: item.sku || '',
-      item_name: item.item_name || item.sku || item.name || '',
-      quantity: item.quantity || item.quantity_required || item.qty || '',
-      quantity_required: item.quantity_required || item.quantity || '',
-      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
-      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
-      total_amount: item.total_amount || '',
-      gst: item.gst || '',
-      total_incl_gst: item.total_incl_gst || '',
-      discount: item.discount || '',
+      item_name: item.item_name || item.sku || item.name || "",
+      quantity: item.quantity || item.quantity_required || item.qty || "",
+      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+      tax_percentage: item.tax_percentage || item.gst || "",
+      total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
     // Get client details from different possible sources
@@ -1319,6 +1413,60 @@ v1Router.get("/download/:id", async (req, res) => {
   }
 });
 
+// Add public PDF endpoint (no authentication required for WhatsApp access)
+v1Router.get("/pdf/public/:id", async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    
+    // Find the invoice (no auth check for public PDF access)
+    const workOrderInvoice = await WorkOrderInvoice.findOne({
+      where: { id: invoiceId, status: "active" },
+      attributes: ["id", "invoice_number", "invoice_pdf"]
+    });
+
+    if (!workOrderInvoice || !workOrderInvoice.invoice_pdf) {
+      return res.status(404).json({
+        success: false,
+        message: "PDF not found"
+      });
+    }
+
+    // Use the stored full path directly
+    const fullPath = workOrderInvoice.invoice_pdf;
+
+    // Check if file exists
+    try {
+      await fs.access(fullPath);
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        message: "PDF file not found on server"
+      });
+    }
+
+    // Get file stats for content length
+    const stats = await fs.stat(fullPath);
+
+    // Set headers for public access
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `inline; filename=invoice-${workOrderInvoice.invoice_number}.pdf`);
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow public access
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+    // Stream the file
+    const fileStream = require('fs').createReadStream(fullPath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    logger.error("Error serving public PDF:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+});
+
 // Updated PDF serving endpoint
 v1Router.get("/pdf/:id", authenticateJWT, async (req, res) => {
   try {
@@ -1371,151 +1519,11 @@ v1Router.get("/pdf/:id", authenticateJWT, async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
 
     // Stream the file
-    const fileStream = createReadStream(fullPath);
+    const fileStream = require('fs').createReadStream(fullPath);
     fileStream.pipe(res);
 
   } catch (error) {
     logger.error("Error serving PDF file:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message
-    });
-  }
-});
-
-// Public PDF endpoint (no authentication required)
-v1Router.get("/pdf/public/:id", async (req, res) => {
-  try {
-    const invoiceId = req.params.id;
-
-    // Find the invoice with the stored PDF path (no company filter for public access)
-    const workOrderInvoice = await WorkOrderInvoice.findOne({
-      where: {
-        id: invoiceId,
-        status: "active"
-      },
-      attributes: ["id", "invoice_number", "invoice_pdf"]
-    });
-
-    if (!workOrderInvoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Work Order Invoice not found"
-      });
-    }
-
-    if (!workOrderInvoice.invoice_pdf) {
-      // If no PDF path stored, try to generate it on-demand
-      logger.info(`PDF not found for invoice ${invoiceId}, attempting to generate...`);
-
-      // Fetch full invoice data for PDF generation
-      const fullInvoiceData = await WorkOrderInvoice.findOne({
-        where: { id: invoiceId, status: "active" },
-        include: [
-          {
-            model: WorkOrder,
-            as: "workOrder",
-            attributes: ["id", "work_generate_id", "sku_name", "qty", "status"],
-          },
-          {
-            model: SalesOrder,
-            as: "salesOrder",
-            attributes: ["id", "sales_generate_id", "status", "client_id"],
-            include: [
-              {
-                model: Client,
-                as: "Client",
-                attributes: [
-                  "client_id", "display_name", "first_name", "last_name",
-                  "company_name", "email", "work_phone", "mobile"
-                ]
-              }
-            ]
-          },
-          {
-            model: Client,
-            as: "Client",
-            attributes: [
-              "client_id", "display_name", "first_name", "last_name",
-              "company_name", "email", "work_phone", "mobile"
-            ]
-          }
-        ],
-      });
-
-      if (fullInvoiceData) {
-        try {
-          // Generate PDF on demand
-          const pdfBuffer = await generateInvoicePDFBuffer({
-            ...fullInvoiceData.get({ plain: true }),
-            company_id: fullInvoiceData.company_id
-          });
-
-          // Save PDF to file system
-          const fileName = `work-order-invoice-${fullInvoiceData.invoice_number}.pdf`;
-          const fullFilePath = path.join(INVOICE_STORAGE_PATH, fileName);
-
-          await fs.mkdir(INVOICE_STORAGE_PATH, { recursive: true });
-          await fs.writeFile(fullFilePath, pdfBuffer);
-
-          // Update database with PDF path
-          await WorkOrderInvoice.update(
-            { invoice_pdf: fullFilePath },
-            { where: { id: invoiceId } }
-          );
-
-          logger.info(`PDF generated on-demand for invoice ${invoiceId}: ${fullFilePath}`);
-
-          // Serve the generated PDF
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Length', pdfBuffer.length);
-          res.setHeader('Content-Disposition', `inline; filename=work-order-invoice-${fullInvoiceData.invoice_number}.pdf`);
-          return res.end(pdfBuffer);
-
-        } catch (generateError) {
-          logger.error(`Failed to generate PDF on-demand for invoice ${invoiceId}:`, generateError);
-          return res.status(500).json({
-            success: false,
-            message: "Failed to generate PDF",
-            error: generateError.message
-          });
-        }
-      }
-
-      return res.status(404).json({
-        success: false,
-        message: "PDF file not found and could not be generated"
-      });
-    }
-
-    // Use the stored full path directly
-    const fullPath = workOrderInvoice.invoice_pdf;
-
-    // Check if file exists
-    try {
-      await fs.access(fullPath);
-    } catch (error) {
-      return res.status(404).json({
-        success: false,
-        message: "PDF file not found on server",
-        path: fullPath
-      });
-    }
-
-    // Get file stats for content length
-    const stats = await fs.stat(fullPath);
-
-    // Set headers
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', stats.size);
-    res.setHeader('Content-Disposition', `inline; filename=work-order-invoice-${workOrderInvoice.invoice_number}.pdf`);
-
-    // Stream the file
-    const fileStream = createReadStream(fullPath);
-    fileStream.pipe(res);
-
-  } catch (error) {
-    logger.error("Error serving public PDF file:", error);
     res.status(500).json({
       message: "Internal Server Error",
       error: error.message
@@ -1616,20 +1624,14 @@ v1Router.get("/view/:id", async (req, res) => {
       }
     }
 
-    // Map skuDetails to template fields (add all possible keys)
+    // Map skuDetails to template fields (same as download route)
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      sku_id: item.sku_id || '',
-      sku: item.sku || '',
-      item_name: item.item_name || item.sku || item.name || '',
-      quantity: item.quantity || item.quantity_required || item.qty || '',
-      quantity_required: item.quantity_required || item.quantity || '',
-      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
-      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
-      total_amount: item.total_amount || '',
-      gst: item.gst || '',
-      total_incl_gst: item.total_incl_gst || '',
-      discount: item.discount || '',
+      item_name: item.item_name || item.sku || item.name || "",
+      quantity: item.quantity || item.quantity_required || item.qty || "",
+      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
+      tax_percentage: item.tax_percentage || item.gst || "",
+      total_amount: item.total_amount || item.total_incl_gst || "",
     }));
 
     // Get client details from different possible sources
@@ -1641,7 +1643,6 @@ v1Router.get("/view/:id", async (req, res) => {
       workOrderInvoice: {
         id: workOrderInvoice.id,
         invoice_number: workOrderInvoice.invoice_number,
-        due_date: workOrderInvoice.due_date,
         due_date_formatted: workOrderInvoice.due_date ? new Date(workOrderInvoice.due_date).toLocaleDateString('en-IN') : '',
         client_name: clientDetails?.display_name ||
           clientDetails?.company_name ||
@@ -1661,7 +1662,7 @@ v1Router.get("/view/:id", async (req, res) => {
         balance: workOrderInvoice.balance || 0,
         received_amount: workOrderInvoice.received_amount || 0.0,
         credit_amount: workOrderInvoice.credit_amount || 0.0,
-        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0,
+        rate_per_qty: workOrderInvoice.rate_per_qty || 0.0, // <-- Added
       },
       workOrder: workOrderInvoice.workOrder || null,
       salesOrder: workOrderInvoice.salesOrder || null,
@@ -1846,86 +1847,6 @@ v1Router.get("/activate/:id", async (req, res) => {
 });
 
 // POST create new partial payment
-// v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
-//   const {
-//     work_order_invoice_id,
-//     payment_type,
-//     reference_number,
-//     amount,
-//     remarks,
-//     status
-//   } = req.body;
-
-//   if (!work_order_invoice_id || !payment_type || !amount) {
-//     return res.status(400).json({ message: "Missing required fields" });
-//   }
-
-//   try {
-//     // Fetch total invoice amount
-//     const invoice = await WorkOrderInvoice.findOne({
-//       where: { id: work_order_invoice_id },
-//       attributes: ["total_amount"]
-//     });
-
-//     if (!invoice) {
-//       return res.status(404).json({ message: "Invoice not found" });
-//     }
-
-//     const totalInvoiceAmount = parseFloat(invoice.total_amount);
-
-//     // Get total paid amount so far
-//     const paid = await PartialPayment.findOne({
-//       where: { work_order_invoice_id },
-//       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
-//       raw: true
-//     });
-
-//     const totalPaid = parseFloat(paid.total_paid) || 0;
-//     const newTotalPaid = totalPaid + parseFloat(amount);
-
-//     if (newTotalPaid > totalInvoiceAmount) {
-//       return res.status(400).json({ message: "Trying to overpay the invoice" });
-//     }
-
-//     // Determine updated payment status
-//     let paymentStatus = "partial";
-//     if (newTotalPaid === totalInvoiceAmount) {
-//       paymentStatus = "paid";
-//     }
-
-//     // Create new partial payment
-//     const newPartialPayment = await PartialPayment.create({
-//       work_order_invoice_id,
-//       payment_type,
-//       reference_number: reference_number || null,
-//       amount,
-//       remarks: remarks || null,
-//       status: status || "completed",
-//       created_at: new Date(),
-//       updated_at: new Date(),
-//     });
-
-//     // Update invoice with new received amount and payment status
-//     await WorkOrderInvoice.update(
-//       {
-//         received_amount: sequelize.literal(`received_amount + ${amount}`),
-//         updated_at: new Date(),
-//         payment_status: paymentStatus
-//       },
-//       { where: { id: work_order_invoice_id } }
-//     );
-
-//     return res.status(201).json({
-//       message: "Partial payment created successfully",
-//       data: newPartialPayment
-//     });
-
-//   } catch (error) {
-//     logger.error("Error creating partial payment:", error);
-//     return res.status(500).json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
-
 v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   const {
     work_order_invoice_id,
@@ -1933,30 +1854,47 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
     reference_number,
     amount,
     remarks,
-    status,
-    credit_amount // Credit amount to deduct from client wallet
+    status
   } = req.body;
 
   if (!work_order_invoice_id || !payment_type || !amount) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // Start a transaction to ensure data consistency
-  const transaction = await sequelize.transaction();
-
   try {
-    // Fetch invoice details for client_id and company_id only
+    // Fetch total invoice amount
     const invoice = await WorkOrderInvoice.findOne({
       where: { id: work_order_invoice_id },
-      attributes: ["client_id", "company_id", "invoice_number"]
+      attributes: ["total_amount"]
     });
 
     if (!invoice) {
-      await transaction.rollback();
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    // Create new partial payment entry
+    const totalInvoiceAmount = parseFloat(invoice.total_amount);
+
+    // Get total paid amount so far
+    const paid = await PartialPayment.findOne({
+      where: { work_order_invoice_id },
+      attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
+      raw: true
+    });
+
+    const totalPaid = parseFloat(paid.total_paid) || 0;
+    const newTotalPaid = totalPaid + parseFloat(amount);
+
+    if (newTotalPaid > totalInvoiceAmount) {
+      return res.status(400).json({ message: "Trying to overpay the invoice" });
+    }
+
+    // Determine updated payment status
+    let paymentStatus = "partial";
+    if (newTotalPaid === totalInvoiceAmount) {
+      paymentStatus = "paid";
+    }
+
+    // Create new partial payment
     const newPartialPayment = await PartialPayment.create({
       work_order_invoice_id,
       payment_type,
@@ -1964,75 +1902,26 @@ v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
       amount,
       remarks: remarks || null,
       status: status || "completed",
-      credit_amount: parseFloat(credit_amount) || 0.0, // Store credit_amount in PartialPayment
       created_at: new Date(),
       updated_at: new Date(),
-    }, { transaction });
+    });
 
-    // Handle wallet credit if credit_amount is provided
-    const creditAmountValue = parseFloat(credit_amount) || 0.0;
-    if (creditAmountValue > 0) {
-      // Check client exists and has sufficient credit balance
-      const client = await Client.findOne({
-        where: {
-          client_id: invoice.client_id,
-          company_id: invoice.company_id
-        },
-        transaction
-      });
-
-      if (!client) {
-        await transaction.rollback();
-        return res.status(404).json({ message: "Client not found" });
-      }
-
-      if (parseFloat(client.credit_balance) < creditAmountValue) {
-        await transaction.rollback();
-        return res.status(400).json({ message: "Insufficient client credit balance" });
-      }
-
-      // Generate wallet reference number
-      const walletReferenceNumber = reference_number || `${invoice.invoice_number}-PP-${Date.now()}`;
-
-      // Create WalletHistory entry for credit deduction
-      await WalletHistory.create({
-        type: "debit", // Changed to debit since we're deducting from wallet
-        amount: creditAmountValue,
-        client_id: invoice.client_id,
-        company_id: invoice.company_id,
-        refference_number: walletReferenceNumber,
-        created_by: req.user.id,
-        updated_by: req.user.id,
-        created_at: new Date(),
+    // Update invoice with new received amount and payment status
+    await WorkOrderInvoice.update(
+      {
+        received_amount: sequelize.literal(`received_amount + ${amount}`),
         updated_at: new Date(),
-      }, { transaction });
-
-      // Deduct amount from client's credit balance
-      await Client.decrement('credit_balance', {
-        by: creditAmountValue,
-        where: {
-          client_id: invoice.client_id,
-          company_id: invoice.company_id
-        },
-        transaction
-      });
-    }
-
-    // Commit the transaction
-    await transaction.commit();
+        payment_status: paymentStatus
+      },
+      { where: { id: work_order_invoice_id } }
+    );
 
     return res.status(201).json({
       message: "Partial payment created successfully",
-      data: {
-        partial_payment: newPartialPayment,
-        credit_amount_used: creditAmountValue
-      }
+      data: newPartialPayment
     });
 
   } catch (error) {
-    // Rollback the transaction in case of error
-    await transaction.rollback();
-
     logger.error("Error creating partial payment:", error);
     return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
@@ -2048,7 +1937,7 @@ v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) =>
       ],
       order: [['created_at', 'DESC']],
     });
-
+    
     res.status(200).json({
       message: "Payment history retrieved successfully",
       data: partialPayments
@@ -2062,7 +1951,7 @@ v1Router.get("/partial-payment/status/:id", authenticateJWT, async (req, res) =>
 // GET comprehensive payment status for an invoice
 v1Router.get("/payment/status/:invoiceId", authenticateJWT, async (req, res) => {
   const { invoiceId } = req.params;
-
+  
   try {
     // Fetch invoice details
     const invoice = await WorkOrderInvoice.findOne({
@@ -2072,7 +1961,7 @@ v1Router.get("/payment/status/:invoiceId", authenticateJWT, async (req, res) => 
         status: 'active'
       },
       attributes: [
-        'id', 'invoice_number', 'total_amount', 'received_amount',
+        'id', 'invoice_number', 'total_amount', 'received_amount', 
         'payment_status', 'due_date', 'created_at', 'updated_at'
       ]
     });
@@ -2088,7 +1977,7 @@ v1Router.get("/payment/status/:invoiceId", authenticateJWT, async (req, res) => 
     const payments = await PartialPayment.findAll({
       where: { work_order_invoice_id: invoiceId },
       attributes: [
-        "id", "payment_type", "reference_number", "amount",
+        "id", "payment_type", "reference_number", "amount", 
         "remarks", "status", "created_at", "updated_at"
       ],
       order: [['created_at', 'DESC']]
@@ -2219,7 +2108,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
     });
   }
   console.log("Before query");
-
+  
   // Check required environment variables
   console.log("Environment check:", {
     razorpay_key_id: !!process.env.RAZORPAY_KEY_ID,
@@ -2229,10 +2118,10 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
     twilio_from_number: !!process.env.TWILIO_FROM_MOBILE_NUMBER,
     frontend_url: !!process.env.FRONTEND_URL
   });
-
+  
   try {
     console.log("Before database query - Invoice ID:", id, "Company ID:", req.user.company_id);
-
+    
     // Fetch invoice details with client information
     const invoice = await WorkOrderInvoice.findOne({
       where: {
@@ -2251,7 +2140,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
         }
       ]
     });
-
+    
     console.log("Invoice found:", !!invoice);
     if (invoice) {
       console.log("Invoice details:", {
@@ -2262,7 +2151,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
         has_client: !!invoice.Client
       });
     }
-
+   
 
     if (!invoice) {
       return res.status(404).json({
@@ -2275,7 +2164,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
     let skuDetails = invoice.sku_details;
     console.log("SKU details type:", typeof skuDetails);
     console.log("SKU details value:", skuDetails);
-
+     
     if (typeof skuDetails === "string") {
       try {
         skuDetails = JSON.parse(skuDetails);
@@ -2289,7 +2178,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
     // Determine payment amount (use provided amount or invoice total)
     const paymentAmount = amount || invoice.total_amount || 0;
     const amountInPaise = Math.round(parseFloat(paymentAmount) * 100); // Convert to paise
-
+    
     console.log("Payment amount:", paymentAmount, "Amount in paise:", amountInPaise);
 
     // Get client details
@@ -2298,7 +2187,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       `${invoice.Client?.first_name || ''} ${invoice.Client?.last_name || ''}`.trim() ||
       invoice.client_name ||
       'Valued Customer';
-
+      
     console.log("Client name:", clientName);
 
     // Determine email and mobile based on input type and database fallback
@@ -2314,7 +2203,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       // Try to get email from database if available
       clientEmail = invoice.Client?.email || invoice.client_email;
     }
-
+    
     console.log("Contact info - Type:", contactInfo.type, "Email:", clientEmail, "Mobile:", clientMobile);
 
     // Create Razorpay payment link
@@ -2326,7 +2215,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       customerEmail: clientEmail,
       customerContact: clientMobile ? `+91${clientMobile}` : undefined
     });
-
+    
     const paymentLinkData = {
       amount: amountInPaise,
       currency: 'INR',
@@ -2350,17 +2239,17 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       callback_url: `${req.protocol}://${req.get('host')}/api/work-order-invoice/payment/callback?invoice_id=${invoice.id}`,
       callback_method: 'get'
     };
-
+    
     console.log("About to create Razorpay payment link...");
-
+    
     // Check if Razorpay is properly initialized
     if (!razorpay) {
       throw new Error("Razorpay client not initialized. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.");
     }
-
+    
     console.log("Razorpay client status:", !!razorpay);
     console.log("Razorpay key_id (first 10 chars):", process.env.RAZORPAY_KEY_ID?.substring(0, 10) + '...');
-
+    
     let paymentLink;
     try {
       paymentLink = await razorpay.paymentLink.create(paymentLinkData);
@@ -2377,7 +2266,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
         reason: razorpayError.reason,
         field: razorpayError.field
       });
-
+      
       // Re-throw with more specific message
       if (razorpayError.statusCode === 400) {
         throw new Error(`Razorpay API Error (400): ${razorpayError.error?.description || razorpayError.message || 'Invalid request parameters. Check your Razorpay API credentials and request data.'}`);
@@ -2453,7 +2342,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
 
     // Prepare response
     console.log("Preparing response with results - Email sent:", emailSent, "SMS sent:", smsSent);
-
+    
     const responseData = {
       paymentLink: {
         id: paymentLink.id,
@@ -2507,13 +2396,13 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       code: error.code,
       statusCode: error.statusCode
     });
-
+    
     logger.error("Error creating/sending payment link:", error);
-
+    
     // Provide specific error messages based on error type
     let errorMessage = "Internal Server Error";
     let statusCode = 500;
-
+    
     if (error.message?.includes('Authentication failed') || error.message?.includes('Invalid API key')) {
       errorMessage = "Payment gateway configuration error. Please check Razorpay credentials.";
       statusCode = 500;
@@ -2527,7 +2416,7 @@ v1Router.post("/send/payment/link", authenticateJWT, async (req, res) => {
       errorMessage = "Database connection error.";
       statusCode = 500;
     }
-
+    
     res.status(statusCode).json({
       message: errorMessage,
       success: false,
@@ -2604,7 +2493,7 @@ v1Router.post("/payment/retry/:invoiceId", authenticateJWT, async (req, res) => 
 
     // Calculate remaining amount
     const remainingAmount = parseFloat(invoice.total_amount) - parseFloat(invoice.received_amount || 0);
-
+    
     if (remainingAmount <= 0) {
       return res.status(400).json({
         message: "This invoice is already fully paid",
@@ -2708,7 +2597,6 @@ v1Router.get("/payment/callback", async (req, res) => {
       status: razorpay_payment_link_status
     });
 
-
     // Check if required parameters are present
     if (!invoice_id) {
       return res.status(400).send('<h1>Error: Invoice ID missing from callback</h1>');
@@ -2760,12 +2648,12 @@ v1Router.get("/payment/callback", async (req, res) => {
         if (!existingPayment) {
           // Get payment amount - fetch from Razorpay or use invoice amount
           let paymentAmount = invoice.total_amount;
-
+          
           try {
             // Try to fetch payment details from Razorpay
             const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
             paymentAmount = paymentDetails.amount / 100; // Convert from paise
-
+            
             logger.info(`Fetched payment details from Razorpay: ${paymentAmount}`);
           } catch (razorpayError) {
             logger.warn('Could not fetch payment details from Razorpay, using invoice amount:', razorpayError.message);
@@ -2786,7 +2674,7 @@ v1Router.get("/payment/callback", async (req, res) => {
           // Calculate total received amount
           const totalReceived = parseFloat(invoice.received_amount || 0) + parseFloat(paymentAmount);
           const invoiceTotal = parseFloat(invoice.total_amount);
-
+          
           // Determine payment status
           let paymentStatus = 'partial';
           if (totalReceived >= invoiceTotal) {
@@ -2812,7 +2700,7 @@ v1Router.get("/payment/callback", async (req, res) => {
           path.join(__dirname, '../../public/payment-callback/success.html'),
           'utf8'
         );
-
+        
         // Replace template variables
         let finalHtml = successHtml
           .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
@@ -2833,7 +2721,7 @@ v1Router.get("/payment/callback", async (req, res) => {
           path.join(__dirname, '../../public/payment-callback/success.html'),
           'utf8'
         );
-
+        
         let finalHtml = successHtml
           .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
           .replace(/{{amount}}/g, templateData.amount)
@@ -2857,7 +2745,7 @@ v1Router.get("/payment/callback", async (req, res) => {
         path.join(__dirname, '../../public/payment-callback/failure.html'),
         'utf8'
       );
-
+      
       // Replace template variables
       let finalHtml = failureHtml
         .replace(/{{invoiceNumber}}/g, templateData.invoiceNumber)
@@ -2889,6 +2777,7 @@ v1Router.post("/payment/webhook", async (req, res) => {
 
     // Verify webhook signature (optional but recommended)
     if (webhookSecret) {
+      const crypto = require('crypto');
       const expectedSignature = crypto
         .createHmac('sha256', webhookSecret)
         .update(JSON.stringify(req.body))
@@ -2959,17 +2848,6 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
   });
 });
-
-// Serve static files for WhatsApp media (temporary PDFs)
-app.use('/whatsapp-media', express.static(path.join(process.cwd(), 'public', 'whatsapp-media'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.pdf')) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline');
-      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache
-    }
-  }
-}));
 
 // Use Version 1 Router
 app.use("/api/work-order-invoice", v1Router);
