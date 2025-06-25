@@ -19,9 +19,10 @@ const transporter = nodemailer.createTransport({
  * @param {string} to - Recipient email address
  * @param {string} subject - Email subject
  * @param {string} htmlBody - HTML email content
+ * @param {Array} attachments - Optional email attachments
  */
-export const sendEmail = async (to, subject, htmlBody) => {
-    console.log(`📩 First Email sent to ${to}`);
+export const sendEmail = async (to, subject, htmlBody, attachments = []) => {
+    console.log(`📩 Email sending to ${to}`);
     try {
         const mailOptions = {
              from: {
@@ -34,10 +35,16 @@ export const sendEmail = async (to, subject, htmlBody) => {
             html: htmlBody // Email content in HTML format
         };
 
+        // Add attachments if provided
+        if (attachments && attachments.length > 0) {
+            mailOptions.attachments = attachments;
+            console.log(`📎 Email has ${attachments.length} attachment(s)`);
+        }
+
         // Send email
-        const info = transporter.sendMail(mailOptions);
-        console.log(`📩 Email sent to ${to}: ${info.messageId}`);
-        return { success: true, message: "Email sent successfully" };
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📩 Email sent successfully to ${to}: ${info.messageId}`);
+        return { success: true, message: "Email sent successfully", messageId: info.messageId };
     } catch (error) {
         console.error("❌ Error sending email:", error);
         return { success: false, message: "Error sending email", error };
