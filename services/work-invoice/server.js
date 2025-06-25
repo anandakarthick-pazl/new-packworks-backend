@@ -617,46 +617,56 @@ async function sendWhatsAppInvoice(clientPhone, clientName, invoiceDetails, pdfB
       throw new Error(`Invalid To number format: ${whatsappTo}. Must start with 'whatsapp:'`);
     }
     
-    // Create a temporary file for the PDF attachment
-    const tempFileName = `invoice-${invoiceDetails.invoice_number}-${Date.now()}.pdf`;
-    const tempFilePath = path.join(INVOICE_STORAGE_PATH, 'temp', tempFileName);
+    // Create a temporary public file for WhatsApp media attachment
+    const tempFileName = `whatsapp-invoice-${invoiceDetails.invoice_number}-${Date.now()}.pdf`;
+    const tempPublicDir = path.join(process.cwd(), 'public', 'whatsapp-media');
+    const tempFilePath = path.join(tempPublicDir, tempFileName);
     
     // Ensure temp directory exists
-    await fs.mkdir(path.dirname(tempFilePath), { recursive: true });
+    await fs.mkdir(tempPublicDir, { recursive: true });
     
     // Write PDF buffer to temporary file
     await fs.writeFile(tempFilePath, pdfBuffer);
     
     try {
-      // For WhatsApp PDF attachment, we need to use a public URL
-      // Create a public endpoint for this specific PDF
+      // Create a direct public URL for the temporarily stored PDF
       const frontendUrl = process.env.FRONTEND_URL || 'https://dev-packwork.pazl.info';
-      const publicPdfUrl = `${frontendUrl}/api/work-order-invoice/pdf/public/${invoiceDetails.id}`;
+      const publicMediaUrl = `${frontendUrl}/whatsapp-media/${tempFileName}`;
+      
+      logger.info(`Created temporary PDF for WhatsApp: ${publicMediaUrl}`);
       
       // Send WhatsApp message with PDF attachment using mediaUrl
       const messageResponse = await twilioClient.messages.create({
         body: whatsappMessage,
         from: whatsappFrom,
         to: whatsappTo,
-        mediaUrl: [publicPdfUrl] // Attach the PDF using public URL
+        mediaUrl: [publicMediaUrl] // Attach the PDF using public URL
       });
       
       logger.info(`WhatsApp message with PDF sent successfully. SID: ${messageResponse.sid}`);
       
-      // Clean up temporary file
-      try {
-        await fs.unlink(tempFilePath);
-        logger.info(`Temporary file cleaned up: ${tempFilePath}`);
-      } catch (cleanupError) {
-        logger.warn(`Failed to cleanup temporary file: ${tempFilePath}`, cleanupError);
-      }
+      // Schedule cleanup after 10 minutes to ensure WhatsApp has time to fetch the file
+      setTimeout(async () => {
+        try {
+          await fs.unlink(tempFilePath);
+          logger.info(`Temporary WhatsApp media file cleaned up: ${tempFilePath}`);
+        } catch (cleanupError) {
+          logger.warn(`Failed to cleanup temporary WhatsApp media file: ${tempFilePath}`, cleanupError);
+        }
+      }, 10 * 60 * 1000); // 10 minutes
       
-      return { success: true, error: null, messageSid: messageResponse.sid };
+      return { 
+        success: true, 
+        error: null, 
+        messageSid: messageResponse.sid,
+        mediaUrl: publicMediaUrl
+      };
       
     } catch (twilioError) {
-      // Clean up temporary file in case of error
+      // Clean up temporary file immediately in case of error
       try {
         await fs.unlink(tempFilePath);
+        logger.info(`Cleaned up temporary file after error: ${tempFilePath}`);
       } catch (cleanupError) {
         logger.warn(`Failed to cleanup temporary file after error: ${tempFilePath}`, cleanupError);
       }
@@ -2919,6 +2929,17 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
   });
 });
+
+// Serve static files for WhatsApp media (temporary PDFs)
+app.use('/whatsapp-media', express.static(path.join(process.cwd(), 'public', 'whatsapp-media'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache
+    }
+  }
+}));
 
 // Use Version 1 Router
 app.use("/api/work-order-invoice", v1Router);
