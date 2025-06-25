@@ -512,6 +512,7 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
   }
 });
 // Enhanced GET /work-order/:id endpoint with sales order details
+
 // v1Router.get("/work-order", authenticateJWT, async (req, res) => {
 //   try {
 //     const {
@@ -521,10 +522,15 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 //       status = "active",
 //       production,
 //       clientName,
+//       progress,
 //       skuName,
+//       payment_status, // Added payment_status parameter
 //       updateMissingQrCodes = "true",
 //       sortBy,
 //       sortOrder = "desc",
+//       startDate,
+//       endDate,
+
 //     } = req.query;
 
 //     const pageNum = parseInt(page, 10);
@@ -552,6 +558,43 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 //     }
 //     if (skuName) {
 //       whereClause.sku_name = skuName;
+//     }
+//      if (progress) {
+//       whereClause.progress = progress;
+//     }
+
+//     // Payment status filtering - exclude 'Invoiced' or filter by specific status
+//     if (payment_status) {
+//       if (payment_status === "except_invoiced") {
+//         // Exclude 'Invoiced' status, fetch all other statuses
+//         whereClause.progress = {
+//           [Op.ne]: "Invoiced" // Not equal to 'Invoiced'
+//         };
+//       } else {
+//         // Normal filtering for specific payment status
+//         whereClause.progress = payment_status;
+//       }
+//     }
+
+//     // Date range filtering on created_at only
+//     if (startDate || endDate) {
+//       const dateFilter = {};
+      
+//       if (startDate) {
+//         // Start from beginning of the day
+//         const startDateTime = new Date(startDate);
+//         startDateTime.setHours(0, 0, 0, 0);
+//         dateFilter[Op.gte] = startDateTime;
+//       }
+      
+//       if (endDate) {
+//         // End at the end of the day
+//         const endDateTime = new Date(endDate);
+//         endDateTime.setHours(23, 59, 59, 999);
+//         dateFilter[Op.lte] = endDateTime;
+//       }
+      
+//       whereClause.created_at = dateFilter;
 //     }
 
 //     // Add unified search if provided - search across multiple fields
@@ -880,13 +923,28 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
       return workOrderData;
     };
 
-    // Process work orders - updating QR codes for those missing them
+    // Process work orders - updating QR codes for those missing them and handle production-progress logic
     const workOrders = await Promise.all(
       rows.map(async (workOrder) => {
         const plainWorkOrder = workOrder.get({ plain: true });
 
         // Parse work_order_sku_values
         const parsedWorkOrder = parseWorkOrderSkuValues(plainWorkOrder);
+
+        // Check if production is "in_production" and update progress to "Raw Material Allocation"
+        if (parsedWorkOrder.production === "in_production" && 
+            parsedWorkOrder.progress !== "Raw Material Allocation") {
+          try {
+            await workOrder.update({ progress: "Raw Material Allocation" });
+            parsedWorkOrder.progress = "Raw Material Allocation";
+            logger.info(`Updated progress to "Raw Material Allocation" for work order ${parsedWorkOrder.id}`);
+          } catch (updateError) {
+            logger.error(
+              `Error updating progress for work order ${parsedWorkOrder.id}:`,
+              updateError
+            );
+          }
+        }
 
         // If QR code URL is missing and update flag is true, generate and update
         if (updateMissingQrCodes === "true" && !parsedWorkOrder.qr_code_url) {
