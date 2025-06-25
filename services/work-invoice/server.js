@@ -408,14 +408,20 @@ async function generateInvoicePDFBuffer(workOrderInvoice) {
       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
     }
 
-    // Map skuDetails to template fields
+    // Map skuDetails to template fields (add all possible keys)
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      item_name: item.item_name || item.sku || item.name || "",
-      quantity: item.quantity || item.quantity_required || item.qty || "",
-      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
-      tax_percentage: item.tax_percentage || item.gst || "",
-      total_amount: item.total_amount || item.total_incl_gst || "",
+      sku_id: item.sku_id || '',
+      sku: item.sku || '',
+      item_name: item.item_name || item.sku || item.name || '',
+      quantity: item.quantity || item.quantity_required || item.qty || '',
+      quantity_required: item.quantity_required || item.quantity || '',
+      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
+      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
+      total_amount: item.total_amount || '',
+      gst: item.gst || '',
+      total_incl_gst: item.total_incl_gst || '',
+      discount: item.discount || '',
     }));
 
     const templateData = {
@@ -1165,14 +1171,20 @@ v1Router.get("/download/:id", async (req, res) => {
       try { skuDetails = JSON.parse(skuDetails); } catch { skuDetails = []; }
     }
 
-    // Map skuDetails to template fields
+    // Map skuDetails to template fields (add all possible keys)
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      item_name: item.item_name || item.sku || item.name || "",
-      quantity: item.quantity || item.quantity_required || item.qty || "",
-      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
-      tax_percentage: item.tax_percentage || item.gst || "",
-      total_amount: item.total_amount || item.total_incl_gst || "",
+      sku_id: item.sku_id || '',
+      sku: item.sku || '',
+      item_name: item.item_name || item.sku || item.name || '',
+      quantity: item.quantity || item.quantity_required || item.qty || '',
+      quantity_required: item.quantity_required || item.quantity || '',
+      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
+      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
+      total_amount: item.total_amount || '',
+      gst: item.gst || '',
+      total_incl_gst: item.total_incl_gst || '',
+      discount: item.discount || '',
     }));
 
     // Get client details from different possible sources
@@ -1604,14 +1616,20 @@ v1Router.get("/view/:id", async (req, res) => {
       }
     }
 
-    // Map skuDetails to template fields (same as download route)
+    // Map skuDetails to template fields (add all possible keys)
     const items = (skuDetails || []).map((item, idx) => ({
       serial_number: idx + 1,
-      item_name: item.item_name || item.sku || item.name || "",
-      quantity: item.quantity || item.quantity_required || item.qty || "",
-      unit_price: item.unit_price || item.rate_per_sku || item.price || "",
-      tax_percentage: item.tax_percentage || item.gst || "",
-      total_amount: item.total_amount || item.total_incl_gst || "",
+      sku_id: item.sku_id || '',
+      sku: item.sku || '',
+      item_name: item.item_name || item.sku || item.name || '',
+      quantity: item.quantity || item.quantity_required || item.qty || '',
+      quantity_required: item.quantity_required || item.quantity || '',
+      unit_price: item.unit_price || item.rate_per_sku || item.price || '',
+      rate_per_sku: item.rate_per_sku || item.unit_price || item.price || '',
+      total_amount: item.total_amount || '',
+      gst: item.gst || '',
+      total_incl_gst: item.total_incl_gst || '',
+      discount: item.discount || '',
     }));
 
     // Get client details from different possible sources
