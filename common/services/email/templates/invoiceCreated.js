@@ -39,7 +39,7 @@ export const InvoiceCreatedTemplate = ({
           <td style="padding: 12px 8px; text-align: right; font-size: 14px;">₹${parseFloat(item.rate_per_sku || item.unit_price ||  item.price || 0).toFixed(2)}</td>
           <td style="padding: 12px 8px; text-align: right; font-size: 14px;">₹${parseFloat(item.discount || 0).toFixed(2)}</td>
           <td style="padding: 12px 8px; text-align: right; font-size: 14px;">₹${parseFloat(item.gst || 0).toFixed(2)}</td>
-          <td style="padding: 12px 8px; text-align: right; font-size: 14px; font-weight: 600;">₹${parseFloat(item.total_amount || item.total_incl_gst || 0).toFixed(2)}</td>
+          <td style="padding: 12px 8px; text-align: right; font-size: 14px; font-weight: 600;">₹${parseFloat(item.total_incl_gst || item.total_amount ||  0).toFixed(2)}</td>
         </tr>
       `).join('')
     : `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #666; font-style: italic;">No items details available</td></tr>`;
@@ -126,9 +126,7 @@ export const InvoiceCreatedTemplate = ({
                 </div>
             </div>
 
-            <div class="amount-highlight">
-                Total Amount: ${formattedAmount}
-            </div>
+            
 
             ${skuDetails && skuDetails.length > 0 ? `
             <h3 style="margin: 25px 0 15px 0; color: #333;">📦 Order Items</h3>
@@ -148,16 +146,22 @@ export const InvoiceCreatedTemplate = ({
                     ${skuDetailsHtml}
                 </tbody>
             </table>
+
+             <div class="amount-highlight">
+                Total Amount: ${formattedAmount}
+            </div>
+
+           
             ` : ''}
 
-            <div class="button-container">
+            {% comment %} <div class="button-container">
                 <a href="${frontendUrl}/invoice/${invoiceId || invoiceNumber}" class="btn">
                     📄 View Invoice Online
                 </a>
                 <a href="${frontendUrl}/invoice" class="btn btn-secondary">
                     📋 View All Invoices
                 </a>
-            </div>
+            </div> {% endcomment %}
 
             <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 25px 0;">
                 <p style="color: #856404; margin: 0; font-size: 14px;">
