@@ -208,7 +208,8 @@ console.log("Sales Return ID:", salesReturnHeader.id);
        inventoryData = await Inventory.create({
         inventory_generate_id,
         company_id: companyId,
-        item_id: skuDetails?.sku_id || 0,
+        item_id: 0,
+        sku_id: skuDetails?.sku_id || 0,
         work_order_id: workOrderInvoice.work_id || null,
         quantity_available,
         rate,
