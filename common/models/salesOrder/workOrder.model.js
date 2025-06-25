@@ -109,6 +109,11 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    priority: {
+      type: DataTypes.ENUM("High", "Medium", "Low"),
+      allowNull: false,
+      defaultValue: "low",
+    },
     production: {
       type: DataTypes.ENUM(
         "created",
@@ -117,11 +122,6 @@ const WorkOrder = sequelize.define(
       ),
       allowNull: true,
       defaultValue: "created",
-    },
-    priority: {
-      type: DataTypes.ENUM("High", "Medium", "Low"),
-      allowNull: false,
-      defaultValue: "low",
     },
     progress: {
       type: DataTypes.ENUM(
