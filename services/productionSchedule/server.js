@@ -91,7 +91,7 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 
 app.use("/api/production-schedule", v1Router);
 // await db.sequelize.sync();
-const PORT = process.env.PORT_PRODUCTIONPLANING;
-app.listen(process.env.PORT_PRODUCTIONPLANING,'0.0.0.0', () => {
-  console.log(`Production Schedule Service running on port ${process.env.PORT_PRODUCTIONPLANING}`);
+const PORT = process.env.PORT_PRODUCTION_SCHEDULE;
+app.listen(process.env.PORT_PRODUCTION_SCHEDULE,'0.0.0.0', () => {
+  console.log(`Production Schedule Service running on port ${process.env.PORT_PRODUCTION_SCHEDULE}`);
 });
