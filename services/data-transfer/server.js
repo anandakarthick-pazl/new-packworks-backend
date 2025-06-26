@@ -1183,7 +1183,7 @@ app.get("/health", (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/api/data/transfer", v1Router);
+app.use("/api/data-transfer", v1Router);
 
 const PORT = process.env.PORT_DATA_TRANSFER || 3020;
 app.listen(PORT, "0.0.0.0", () => {
