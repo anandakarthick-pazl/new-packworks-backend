@@ -37,7 +37,7 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
 //get
 v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   try {
-     schedules = await ProductionSchedule.findAll({
+     const schedules = await ProductionSchedule.findAll({
       where: {
         company_id: req.user.company_id
       }
@@ -49,13 +49,10 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
 
 //get by id
 v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
-  try {
-    const [updated] = await ProductionSchedule.update(req.body, {
-      where: { id: req.params.id },
-    });
-    if (!updated) return res.status(404).json({ success: false, message: 'Not found' });
-    const updatedSchedule = await ProductionSchedule.findByPk(req.params.id);
-    res.status(200).json({ success: true, data: updatedSchedule });
+   try {
+    const schedule = await ProductionSchedule.findByPk(req.params.id);
+    if (!schedule) return res.status(404).json({ success: false, message: 'Not found' });
+    res.status(200).json({ success: true, data: schedule });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
