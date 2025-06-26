@@ -227,69 +227,15 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
 });
 
 /**
- * Step 2: Map columns and start processing
+ * Step 2: Map columns and start processing (temporarily disabled)
  */
 v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => {
   try {
-    const { transfer_id } = req.params;
-    const { column_mapping } = req.body;
-
-    if (!column_mapping || typeof column_mapping !== 'object') {
-      return res.status(400).json({
-        success: false,
-        message: "Column mapping is required"
-      });
-    }
-
-    // Get data transfer record
-    const dataTransfer = await DataTransfer.findOne({
-      where: {
-        id: transfer_id,
-        company_id: req.user.company_id,
-        status: 'uploaded'
-      }
+    res.status(503).json({
+      success: false,
+      message: "Column mapping feature is temporarily disabled. Please run the database migration first.",
+      hint: "Execute the SQL commands in add_column_mapping.sql file or run: npm run migrate"
     });
-
-    if (!dataTransfer) {
-      return res.status(404).json({
-        success: false,
-        message: "Data transfer not found or already processed"
-      });
-    }
-
-    // Validate column mapping
-    const dbFields = getModuleFields(dataTransfer.module_name);
-    const requiredFields = dbFields.filter(field => field.required).map(field => field.key);
-    
-    const mappedFields = Object.values(column_mapping).filter(field => field && field !== '');
-    const missingRequired = requiredFields.filter(field => !mappedFields.includes(field));
-
-    if (missingRequired.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Required fields not mapped: ${missingRequired.join(', ')}`
-      });
-    }
-
-    // Store column mapping and update status
-    await dataTransfer.update({
-      status: 'pending',
-      column_mapping: JSON.stringify(column_mapping)
-    });
-
-    // Start processing asynchronously
-    processDataTransferWithMapping(dataTransfer.id, column_mapping);
-
-    res.json({
-      success: true,
-      data: {
-        transfer_id: dataTransfer.id,
-        status: 'pending',
-        column_mapping: column_mapping
-      },
-      message: "Column mapping saved. Processing started."
-    });
-
   } catch (error) {
     logger.error('Error mapping columns:', error);
     res.status(500).json({
@@ -350,7 +296,7 @@ v1Router.get("/preview/:transfer_id", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Get data transfer status
+ * Get data transfer status (temporary without column_mapping)
  */
 v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
   try {
@@ -383,8 +329,8 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
         started_at: dataTransfer.started_at,
         completed_at: dataTransfer.completed_at,
         error_log: dataTransfer.error_log,
-        email_sent: dataTransfer.email_sent,
-        column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
+        email_sent: dataTransfer.email_sent
+        // column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
       },
       message: "Data transfer status retrieved successfully"
     });
@@ -399,9 +345,9 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Get all data transfers for company
+ * Get all data transfers for company (simple version without associations)
  */
-v1Router.get("/history", authenticateJWT, async (req, res) => {
+v1Router.get("/history-simple", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, status, module_name } = req.query;
     const offset = (page - 1) * limit;
@@ -422,20 +368,85 @@ v1Router.get("/history", authenticateJWT, async (req, res) => {
       where: whereClause,
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
-      offset: parseInt(offset),
-      include: [
-        {
-          model: db.User,
-          as: 'creator',
-          attributes: ['id', 'name', 'email']
-        }
-      ]
+      offset: parseInt(offset)
     });
 
     res.json({
       success: true,
       data: {
         transfers: rows,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      },
+      message: "Data transfer history retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('Error getting transfer history (simple):', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get transfer history",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get all data transfers for company (simplified without associations)
+ */
+v1Router.get("/history", authenticateJWT, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, module_name } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {
+      company_id: req.user.company_id
+    };
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    if (module_name) {
+      whereClause.module_name = module_name;
+    }
+
+    // Use simple query without associations for now
+    const { count, rows } = await DataTransfer.findAndCountAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    // Manually add creator info for each transfer
+    const transfersWithCreator = await Promise.all(
+      rows.map(async (transfer) => {
+        try {
+          const creator = await db.User.findByPk(transfer.created_by, {
+            attributes: ['id', 'name', 'email']
+          });
+          return {
+            ...transfer.toJSON(),
+            creator: creator ? creator.toJSON() : null
+          };
+        } catch (error) {
+          logger.warn(`Could not fetch creator for transfer ${transfer.id}:`, error.message);
+          return {
+            ...transfer.toJSON(),
+            creator: null
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        transfers: transfersWithCreator,
         pagination: {
           total: count,
           page: parseInt(page),
@@ -555,19 +566,32 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
       order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']]
     });
 
-    // Get recent transfers
-    const recentTransfers = await DataTransfer.findAll({
+    // Get recent transfers (simplified without associations)
+    const recentTransfersData = await DataTransfer.findAll({
       where: whereClause,
       order: [['created_at', 'DESC']],
-      limit: 10,
-      include: [
-        {
-          model: db.User,
-          as: 'creator',
-          attributes: ['id', 'name', 'email']
-        }
-      ]
+      limit: 10
     });
+
+    // Manually add creator info for recent transfers
+    const recentTransfers = await Promise.all(
+      recentTransfersData.map(async (transfer) => {
+        try {
+          const creator = await db.User.findByPk(transfer.created_by, {
+            attributes: ['id', 'name', 'email']
+          });
+          return {
+            ...transfer.toJSON(),
+            creator: creator ? creator.toJSON() : null
+          };
+        } catch (error) {
+          return {
+            ...transfer.toJSON(),
+            creator: null
+          };
+        }
+      })
+    );
 
     res.json({
       success: true,

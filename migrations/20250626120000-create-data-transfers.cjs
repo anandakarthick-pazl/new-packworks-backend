@@ -144,26 +144,6 @@ module.exports = {
       },
     });
 
-    // Add indexes for better performance
-    await queryInterface.addIndex('data_transfers', ['company_id'], {
-      name: 'idx_data_transfers_company_id'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['module_name'], {
-      name: 'idx_data_transfers_module_name'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['status'], {
-      name: 'idx_data_transfers_status'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['created_at'], {
-      name: 'idx_data_transfers_created_at'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['user_id'], {
-      name: 'idx_data_transfers_user_id'
-    });
   },
 
   down: async (queryInterface, Sequelize) => {
