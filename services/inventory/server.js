@@ -36,6 +36,8 @@ const stockAdjustmentItem = db.stockAdjustmentItem;
 const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
 const PurchaseOrderBilling = db.PurchaseOrderBilling;
+const Sku = db.Sku;
+const WorkOrder = db.WorkOrder;
 
 dotenv.config();
 const app = express();
@@ -649,8 +651,19 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         // [Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],
       ],
       // where: whereCondition,
-      group: ['Inventory.sub_category', 'sub_category_info.id'],
+      group: ['Inventory.sub_category', 'sub_category_info.id', 'Inventory.category'],
       include: [
+        {
+          model: Categories,
+          as: 'category_info',
+          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          required: false,
+          on: Sequelize.where(
+            Sequelize.col('Inventory.category'),
+            '=',
+            Sequelize.col('category_info.id')
+          )
+        },
         {
           model: Sub_categories,
           as: 'sub_category_info',
@@ -869,6 +882,19 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         searchConditions.push({ item_id: { [Op.in]: itemIds } });
       }
 
+
+      const matchingSku = await Sku.findAll({
+        attributes: ['id'],
+        where: {
+          [Op.or]: [ { sku_generate_id: { [Op.like]: `%${search}%` } }]
+        }
+      });
+
+      if (matchingSku.length > 0) {
+        const skuIds = matchingItems.map(item => item.id);
+        searchConditions.push({ sku_id: { [Op.in]: skuIds } });
+      }
+
       // 🔍 Category name match
       const matchingCategory = await Categories.findAll({
         attributes: ['id',],
@@ -918,8 +944,19 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         'category'
       ],
       // where: whereCondition,
-      group: ['Inventory.sub_category', 'sub_category_info.id'],
+      group: ['Inventory.sub_category', 'sub_category_info.id', 'Inventory.category'],
       include: [
+        {
+          model: Categories,
+          as: 'category_info',
+          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          required: false,
+          on: Sequelize.where(
+            Sequelize.col('Inventory.category'),
+            '=',
+            Sequelize.col('category_info.id')
+          )
+        },
         {
           model: Sub_categories,
           as: 'sub_category_info',
@@ -950,7 +987,55 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 
     // get inventory data
-    const inventory = await Inventory.findAll({
+
+
+
+    
+//   const inventory = await Inventory.findAll({
+//   attributes: [
+//     'id',
+//     'item_id',
+//     'quantity_available',
+//     'total_amount',
+//     'location',
+//     'rate',
+//     'status',
+//     'created_at',
+//     'updated_at'
+//   ],
+//   where: whereCondition,
+//   include: [
+//     {
+//       model: ItemMaster,
+//       as: 'item_info',
+//       attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+//       required: false,
+//       include: [
+//         {
+//           model: Categories,
+//           as: 'category_info',
+//           attributes: ['category_name'],
+//           required: false
+//         },
+//         {
+//           model: Sub_categories,
+//           as: 'sub_category_info',
+//           attributes: ['sub_category_name'],
+//           required: false
+//         }
+//       ]
+//     }
+
+//   ],
+//   order: [['created_at', 'DESC']],
+//   limit: limitNumber,
+//   offset: offset,
+// });
+
+
+let inventory = [];
+
+const itemMasterInventory = await Inventory.findAll({
   attributes: [
     'id',
     'item_id',
@@ -959,15 +1044,23 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     'location',
     'rate',
     'status',
+    'sales_return_id',
     'created_at',
     'updated_at'
   ],
-  where: whereCondition,
+  where: {
+    ...whereCondition,
+  sku_id: { [Sequelize.Op.or]: [0, null] }
+  },
   include: [
     {
       model: ItemMaster,
       as: 'item_info',
-      attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+      attributes: [
+        'item_generate_id', 'item_name', 'uom', 'net_weight', 'description',
+        'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status',
+        'default_custom_fields', 'custom_fields'
+      ],
       required: false,
       include: [
         {
@@ -987,8 +1080,43 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   ],
   order: [['created_at', 'DESC']],
   limit: limitNumber,
-  offset: offset,
+  offset: offset
 });
+
+const skuInventory = await Inventory.findAll({
+  attributes: [
+    'id',
+    'sku_id',
+    'work_order_id',
+    'quantity_available',
+    'total_amount',
+    'location',
+    'rate',
+    'status',
+    'sales_return_id',
+    'created_at',
+    'updated_at'
+  ],
+  where: {
+    ...whereCondition,
+    item_id: { [Sequelize.Op.or]: [0, null] }
+  },
+  //  include: [
+  //   {
+  //     model: WorkOrder, 
+  //     as: 'work_order_info', 
+  //     attributes: ['id'] 
+  //   }
+  // ],
+  order: [['created_at', 'DESC']],
+  limit: limitNumber,
+  offset: offset
+});
+
+
+// Final merged result
+inventory = [...itemMasterInventory, ...skuInventory];
+
 
 
 
