@@ -51,9 +51,9 @@ const DataTransfer = sequelize.define(
       comment: "Size of the uploaded file in bytes"
     },
     status: {
-      type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed'),
+      type: DataTypes.ENUM('uploaded', 'pending', 'processing', 'completed', 'failed'),
       allowNull: false,
-      defaultValue: 'pending',
+      defaultValue: 'uploaded',
       comment: "Current status of the data transfer process"
     },
     total_records: {
@@ -99,6 +99,11 @@ const DataTransfer = sequelize.define(
       allowNull: false,
       defaultValue: false,
       comment: "Whether completion email has been sent"
+    },
+    column_mapping: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: "JSON mapping of Excel columns to database fields"
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,

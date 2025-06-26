@@ -62,9 +62,9 @@ module.exports = {
         comment: "Size of the uploaded file in bytes"
       },
       status: {
-        type: Sequelize.ENUM('pending', 'processing', 'completed', 'failed'),
+        type: Sequelize.ENUM('uploaded', 'pending', 'processing', 'completed', 'failed'),
         allowNull: false,
-        defaultValue: 'pending',
+        defaultValue: 'uploaded',
         comment: "Current status of the data transfer process"
       },
       total_records: {
@@ -110,6 +110,11 @@ module.exports = {
         allowNull: false,
         defaultValue: false,
         comment: "Whether completion email has been sent"
+      },
+      column_mapping: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "JSON mapping of Excel columns to database fields"
       },
       created_by: {
         type: Sequelize.INTEGER.UNSIGNED,

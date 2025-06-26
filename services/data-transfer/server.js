@@ -2,10 +2,11 @@
  * Data Transfer Service for PACKWORKX ERP System
  * 
  * This service handles module-based Excel file uploads and data transfers
- * Supports: Employee, Sale Order, Work Order, Machine, Routes, and other modules
+ * Two-step process: 1) Upload file 2) Map columns and process
  * 
  * Features:
  * - File upload with validation
+ * - Column mapping interface
  * - Module-based data processing
  * - Email notifications on completion
  * - Progress tracking and error logging
@@ -133,7 +134,7 @@ v1Router.get("/modules", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Upload Excel file for data transfer
+ * Step 1: Upload Excel file (without processing)
  */
 v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res) => {
   try {
@@ -173,6 +174,9 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
       });
     }
 
+    // Read Excel file to get headers and preview data
+    const { headers, previewData, totalRecords } = await readExcelHeaders(req.file.path);
+
     // Create data transfer record
     const dataTransfer = await DataTransfer.create({
       company_id: req.user.company_id,
@@ -182,12 +186,13 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
       file_path: req.file.path,
       file_size: req.file.size,
       email: email,
-      status: 'pending',
+      status: 'uploaded', // New status for uploaded but not processed
+      total_records: totalRecords,
       created_by: req.user.id
     });
 
-    // Start processing asynchronously
-    processDataTransfer(dataTransfer.id);
+    // Get database fields for the module
+    const dbFields = getModuleFields(module_name);
 
     res.json({
       success: true,
@@ -196,9 +201,13 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
         file_name: req.file.originalname,
         file_size: req.file.size,
         module_name: module_name,
-        status: 'pending'
+        status: 'uploaded',
+        total_records: totalRecords,
+        excel_headers: headers,
+        preview_data: previewData,
+        database_fields: dbFields
       },
-      message: "File uploaded successfully. Processing started."
+      message: "File uploaded successfully. Please map columns to proceed."
     });
 
   } catch (error) {
@@ -212,6 +221,129 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
     res.status(500).json({
       success: false,
       message: "Failed to upload file",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Step 2: Map columns and start processing
+ */
+v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => {
+  try {
+    const { transfer_id } = req.params;
+    const { column_mapping } = req.body;
+
+    if (!column_mapping || typeof column_mapping !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: "Column mapping is required"
+      });
+    }
+
+    // Get data transfer record
+    const dataTransfer = await DataTransfer.findOne({
+      where: {
+        id: transfer_id,
+        company_id: req.user.company_id,
+        status: 'uploaded'
+      }
+    });
+
+    if (!dataTransfer) {
+      return res.status(404).json({
+        success: false,
+        message: "Data transfer not found or already processed"
+      });
+    }
+
+    // Validate column mapping
+    const dbFields = getModuleFields(dataTransfer.module_name);
+    const requiredFields = dbFields.filter(field => field.required).map(field => field.key);
+    
+    const mappedFields = Object.values(column_mapping).filter(field => field && field !== '');
+    const missingRequired = requiredFields.filter(field => !mappedFields.includes(field));
+
+    if (missingRequired.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Required fields not mapped: ${missingRequired.join(', ')}`
+      });
+    }
+
+    // Store column mapping and update status
+    await dataTransfer.update({
+      status: 'pending',
+      column_mapping: JSON.stringify(column_mapping)
+    });
+
+    // Start processing asynchronously
+    processDataTransferWithMapping(dataTransfer.id, column_mapping);
+
+    res.json({
+      success: true,
+      data: {
+        transfer_id: dataTransfer.id,
+        status: 'pending',
+        column_mapping: column_mapping
+      },
+      message: "Column mapping saved. Processing started."
+    });
+
+  } catch (error) {
+    logger.error('Error mapping columns:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to map columns",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get preview data for column mapping
+ */
+v1Router.get("/preview/:transfer_id", authenticateJWT, async (req, res) => {
+  try {
+    const { transfer_id } = req.params;
+    
+    const dataTransfer = await DataTransfer.findOne({
+      where: {
+        id: transfer_id,
+        company_id: req.user.company_id
+      }
+    });
+
+    if (!dataTransfer) {
+      return res.status(404).json({
+        success: false,
+        message: "Data transfer not found"
+      });
+    }
+
+    // Read Excel file to get headers and preview data
+    const { headers, previewData } = await readExcelHeaders(dataTransfer.file_path);
+    
+    // Get database fields for the module
+    const dbFields = getModuleFields(dataTransfer.module_name);
+
+    res.json({
+      success: true,
+      data: {
+        transfer_id: dataTransfer.id,
+        module_name: dataTransfer.module_name,
+        excel_headers: headers,
+        preview_data: previewData,
+        database_fields: dbFields,
+        total_records: dataTransfer.total_records
+      },
+      message: "Preview data retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('Error getting preview data:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get preview data",
       error: error.message
     });
   }
@@ -251,7 +383,8 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
         started_at: dataTransfer.started_at,
         completed_at: dataTransfer.completed_at,
         error_log: dataTransfer.error_log,
-        email_sent: dataTransfer.email_sent
+        email_sent: dataTransfer.email_sent,
+        column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
       },
       message: "Data transfer status retrieved successfully"
     });
@@ -383,504 +516,6 @@ v1Router.get("/template/:module_name", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Process data transfer asynchronously
- */
-async function processDataTransfer(transferId) {
-  let dataTransfer;
-  
-  try {
-    dataTransfer = await DataTransfer.findByPk(transferId);
-    if (!dataTransfer) {
-      throw new Error('Data transfer record not found');
-    }
-
-    // Update status to processing
-    await dataTransfer.update({
-      status: 'processing',
-      started_at: new Date()
-    });
-
-    // Read Excel file
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(dataTransfer.file_path);
-    
-    const worksheet = workbook.getWorksheet(1);
-    if (!worksheet) {
-      throw new Error('No worksheet found in the Excel file');
-    }
-
-    const rows = [];
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 1) { // Skip header row
-        rows.push(row.values);
-      }
-    });
-
-    const totalRecords = rows.length;
-    let processedRecords = 0;
-    let failedRecords = 0;
-    const errors = [];
-
-    // Update total records
-    await dataTransfer.update({ total_records: totalRecords });
-
-    // Process each row based on module
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        await processModuleRecord(dataTransfer.module_name, rows[i], dataTransfer.company_id, dataTransfer.user_id);
-        processedRecords++;
-      } catch (error) {
-        failedRecords++;
-        errors.push(`Row ${i + 2}: ${error.message}`);
-        logger.error(`Error processing row ${i + 2}:`, error);
-      }
-
-      // Update progress every 10 records
-      if ((i + 1) % 10 === 0) {
-        await dataTransfer.update({
-          processed_records: processedRecords,
-          failed_records: failedRecords
-        });
-      }
-    }
-
-    // Final update
-    await dataTransfer.update({
-      status: failedRecords === 0 ? 'completed' : (processedRecords > 0 ? 'completed' : 'failed'),
-      processed_records: processedRecords,
-      failed_records: failedRecords,
-      completed_at: new Date(),
-      error_log: errors.length > 0 ? errors.join('\n') : null
-    });
-
-    // Send completion email
-    await sendCompletionEmail(dataTransfer);
-
-  } catch (error) {
-    logger.error('Error processing data transfer:', error);
-    
-    if (dataTransfer) {
-      await dataTransfer.update({
-        status: 'failed',
-        completed_at: new Date(),
-        error_log: error.message
-      });
-      
-      // Send failure email
-      await sendCompletionEmail(dataTransfer);
-    }
-  }
-}
-
-/**
- * Process individual record based on module type
- */
-async function processModuleRecord(moduleName, row, companyId, userId) {
-  switch (moduleName) {
-    case 'employee':
-      return await processEmployeeRecord(row, companyId, userId);
-    case 'sale_order':
-      return await processSalesOrderRecord(row, companyId, userId);
-    case 'work_order':
-      return await processWorkOrderRecord(row, companyId, userId);
-    case 'machine':
-      return await processMachineRecord(row, companyId, userId);
-    case 'route':
-      return await processRouteRecord(row, companyId, userId);
-    case 'client':
-      return await processClientRecord(row, companyId, userId);
-    case 'item':
-      return await processItemRecord(row, companyId, userId);
-    case 'purchase_order':
-      return await processPurchaseOrderRecord(row, companyId, userId);
-    case 'inventory':
-      return await processInventoryRecord(row, companyId, userId);
-    case 'sku':
-      return await processSkuRecord(row, companyId, userId);
-    case 'category':
-      return await processCategoryRecord(row, companyId, userId);
-    case 'package':
-      return await processPackageRecord(row, companyId, userId);
-    default:
-      throw new Error(`Unknown module: ${moduleName}`);
-  }
-}
-
-/**
- * Process employee record
- */
-async function processEmployeeRecord(row, companyId, userId) {
-  // Skip empty rows
-  if (!row || !row[1]) return;
-
-  const employeeData = {
-    company_id: companyId,
-    user_id: userId, // This might need to be adjusted based on your employee structure
-    employee_id: row[1],
-    address: row[2],
-    skills: row[3],
-    hourly_rate: parseFloat(row[4]) || null,
-    department_id: parseInt(row[5]) || null,
-    designation_id: parseInt(row[6]) || null,
-    joining_date: row[7] ? new Date(row[7]) : null,
-    employment_type: row[8],
-    created_by: userId
-  };
-
-  // Check if Employee model exists, otherwise use User model
-  const model = Employee || db.User;
-  return await model.create(employeeData);
-}
-
-/**
- * Process sales order record
- */
-async function processSalesOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const salesOrderData = {
-    company_id: companyId,
-    client_id: parseInt(row[1]) || null,
-    order_number: row[2],
-    order_date: row[3] ? new Date(row[3]) : new Date(),
-    delivery_date: row[4] ? new Date(row[4]) : null,
-    total_amount: parseFloat(row[5]) || 0,
-    status: row[6] || 'pending',
-    created_by: userId
-  };
-
-  return await SalesOrder.create(salesOrderData);
-}
-
-/**
- * Process work order record
- */
-async function processWorkOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const workOrderData = {
-    company_id: companyId,
-    work_order_number: row[1],
-    sales_order_id: parseInt(row[2]) || null,
-    start_date: row[3] ? new Date(row[3]) : new Date(),
-    end_date: row[4] ? new Date(row[4]) : null,
-    status: row[5] || 'pending',
-    priority: row[6] || 'medium',
-    created_by: userId
-  };
-
-  return await WorkOrder.create(workOrderData);
-}
-
-/**
- * Process machine record
- */
-async function processMachineRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const machineData = {
-    company_id: companyId,
-    machine_name: row[1],
-    machine_code: row[2],
-    machine_type: row[3],
-    capacity: parseFloat(row[4]) || null,
-    location: row[5],
-    status: row[6] || 'active',
-    created_by: userId
-  };
-
-  return await Machine.create(machineData);
-}
-
-/**
- * Process route record
- */
-async function processRouteRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const routeData = {
-    company_id: companyId,
-    route_name: row[1],
-    route_code: row[2],
-    description: row[3],
-    sequence: parseInt(row[4]) || 1,
-    status: row[5] || 'active',
-    created_by: userId
-  };
-
-  return await Route.create(routeData);
-}
-
-/**
- * Process client record
- */
-async function processClientRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const clientData = {
-    company_id: companyId,
-    client_name: row[1],
-    email: row[2],
-    phone: row[3],
-    address: row[4],
-    city: row[5],
-    state: row[6],
-    country: row[7],
-    status: row[8] || 'active',
-    created_by: userId
-  };
-
-  return await Client.create(clientData);
-}
-
-/**
- * Process item record
- */
-async function processItemRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const itemData = {
-    company_id: companyId,
-    item_name: row[1],
-    item_code: row[2],
-    category: row[3],
-    unit: row[4],
-    price: parseFloat(row[5]) || 0,
-    status: row[6] || 'active',
-    created_by: userId
-  };
-
-  return await ItemMaster.create(itemData);
-}
-
-/**
- * Process purchase order record
- */
-async function processPurchaseOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const poData = {
-    company_id: companyId,
-    po_number: row[1],
-    supplier_name: row[2],
-    po_date: row[3] ? new Date(row[3]) : new Date(),
-    delivery_date: row[4] ? new Date(row[4]) : null,
-    total_amount: parseFloat(row[5]) || 0,
-    status: row[6] || 'pending',
-    created_by: userId
-  };
-
-  return await PurchaseOrder.create(poData);
-}
-
-/**
- * Process inventory record
- */
-async function processInventoryRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const inventoryData = {
-    company_id: companyId,
-    item_id: parseInt(row[1]) || null,
-    quantity: parseFloat(row[2]) || 0,
-    unit_price: parseFloat(row[3]) || 0,
-    location: row[4],
-    batch_number: row[5],
-    expiry_date: row[6] ? new Date(row[6]) : null,
-    created_by: userId
-  };
-
-  return await Inventory.create(inventoryData);
-}
-
-/**
- * Process SKU record
- */
-async function processSkuRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const skuData = {
-    company_id: companyId,
-    sku_name: row[1],
-    sku_code: row[2],
-    description: row[3],
-    price: parseFloat(row[4]) || 0,
-    status: row[5] || 'active',
-    created_by: userId
-  };
-
-  return await Sku.create(skuData);
-}
-
-/**
- * Process category record
- */
-async function processCategoryRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const categoryData = {
-    company_id: companyId,
-    category_name: row[1],
-    description: row[2],
-    parent_id: parseInt(row[3]) || null,
-    status: row[4] || 'active',
-    created_by: userId
-  };
-
-  return await Categories.create(categoryData);
-}
-
-/**
- * Process package record
- */
-async function processPackageRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const packageData = {
-    company_id: companyId,
-    package_name: row[1],
-    package_code: row[2],
-    dimensions: row[3],
-    weight: parseFloat(row[4]) || 0,
-    material: row[5],
-    created_by: userId
-  };
-
-  return await Package.create(packageData);
-}
-
-/**
- * Send completion email
- */
-async function sendCompletionEmail(dataTransfer) {
-  try {
-    // Get user details
-    const user = await db.User.findByPk(dataTransfer.user_id);
-    
-    const emailData = {
-      to: dataTransfer.email,
-      subject: `Data Transfer ${dataTransfer.status === 'completed' ? 'Completed' : 'Update'} - ${dataTransfer.module_name.replace('_', ' ')}`,
-      html: DataTransferCompletionTemplate({
-        userName: user ? user.name : 'User',
-        moduleName: dataTransfer.module_name,
-        fileName: dataTransfer.file_name,
-        totalRecords: dataTransfer.total_records,
-        processedRecords: dataTransfer.processed_records,
-        failedRecords: dataTransfer.failed_records,
-        status: dataTransfer.status,
-        startedAt: dataTransfer.started_at,
-        completedAt: dataTransfer.completed_at,
-        dashboardUrl: process.env.FRONTEND_URL + '/dashboard',
-        supportEmail: process.env.SUPPORT_EMAIL || 'support@packworkx.com'
-      })
-    };
-
-    await EmailService.sendEmail(emailData);
-    
-    // Mark email as sent
-    await dataTransfer.update({ email_sent: true });
-    
-    logger.info(`Completion email sent for data transfer ${dataTransfer.id}`);
-  } catch (error) {
-    logger.error(`Failed to send completion email for data transfer ${dataTransfer.id}:`, error);
-  }
-}
-
-/**
- * Get template structure for different modules
- */
-function getModuleTemplate(moduleName) {
-  const templates = {
-    employee: {
-      headers: ['S.No', 'Employee ID', 'Address', 'Skills', 'Hourly Rate', 'Department ID', 'Designation ID', 'Joining Date', 'Employment Type'],
-      sampleData: [
-        [1, 'EMP001', '123 Main St', 'JavaScript, Node.js', 25.50, 1, 1, '2024-01-15', 'Full-time'],
-        [2, 'EMP002', '456 Oak Ave', 'Python, Django', 30.00, 2, 2, '2024-02-01', 'Part-time']
-      ]
-    },
-    sale_order: {
-      headers: ['S.No', 'Client ID', 'Order Number', 'Order Date', 'Delivery Date', 'Total Amount', 'Status'],
-      sampleData: [
-        [1, 1, 'SO001', '2024-06-01', '2024-06-15', 1500.00, 'pending'],
-        [2, 2, 'SO002', '2024-06-02', '2024-06-16', 2500.00, 'confirmed']
-      ]
-    },
-    work_order: {
-      headers: ['S.No', 'Work Order Number', 'Sales Order ID', 'Start Date', 'End Date', 'Status', 'Priority'],
-      sampleData: [
-        [1, 'WO001', 1, '2024-06-01', '2024-06-10', 'pending', 'high'],
-        [2, 'WO002', 2, '2024-06-05', '2024-06-15', 'in_progress', 'medium']
-      ]
-    },
-    machine: {
-      headers: ['S.No', 'Machine Name', 'Machine Code', 'Machine Type', 'Capacity', 'Location', 'Status'],
-      sampleData: [
-        [1, 'Printing Machine 1', 'PM001', 'Printing', 1000, 'Floor 1', 'active'],
-        [2, 'Cutting Machine 1', 'CM001', 'Cutting', 500, 'Floor 2', 'active']
-      ]
-    },
-    route: {
-      headers: ['S.No', 'Route Name', 'Route Code', 'Description', 'Sequence', 'Status'],
-      sampleData: [
-        [1, 'Standard Route', 'RT001', 'Standard production route', 1, 'active'],
-        [2, 'Express Route', 'RT002', 'Express production route', 2, 'active']
-      ]
-    },
-    client: {
-      headers: ['S.No', 'Client Name', 'Email', 'Phone', 'Address', 'City', 'State', 'Country', 'Status'],
-      sampleData: [
-        [1, 'ABC Corp', 'contact@abc.com', '+1234567890', '123 Business St', 'New York', 'NY', 'USA', 'active'],
-        [2, 'XYZ Ltd', 'info@xyz.com', '+1987654321', '456 Trade Ave', 'Los Angeles', 'CA', 'USA', 'active']
-      ]
-    },
-    item: {
-      headers: ['S.No', 'Item Name', 'Item Code', 'Category', 'Unit', 'Price', 'Status'],
-      sampleData: [
-        [1, 'Cardboard Sheet', 'ITM001', 'Raw Material', 'Sheets', 5.00, 'active'],
-        [2, 'Printing Ink', 'ITM002', 'Consumables', 'Liters', 25.00, 'active']
-      ]
-    },
-    purchase_order: {
-      headers: ['S.No', 'PO Number', 'Supplier Name', 'PO Date', 'Delivery Date', 'Total Amount', 'Status'],
-      sampleData: [
-        [1, 'PO001', 'Supplier ABC', '2024-06-01', '2024-06-15', 5000.00, 'pending'],
-        [2, 'PO002', 'Supplier XYZ', '2024-06-02', '2024-06-16', 7500.00, 'approved']
-      ]
-    },
-    inventory: {
-      headers: ['S.No', 'Item ID', 'Quantity', 'Unit Price', 'Location', 'Batch Number', 'Expiry Date'],
-      sampleData: [
-        [1, 1, 100, 5.00, 'Warehouse A', 'BATCH001', '2025-12-31'],
-        [2, 2, 50, 25.00, 'Warehouse B', 'BATCH002', '2024-12-31']
-      ]
-    },
-    sku: {
-      headers: ['S.No', 'SKU Name', 'SKU Code', 'Description', 'Price', 'Status'],
-      sampleData: [
-        [1, 'Box Type A', 'SKU001', 'Small cardboard box', 10.00, 'active'],
-        [2, 'Box Type B', 'SKU002', 'Large cardboard box', 15.00, 'active']
-      ]
-    },
-    category: {
-      headers: ['S.No', 'Category Name', 'Description', 'Parent ID', 'Status'],
-      sampleData: [
-        [1, 'Raw Materials', 'All raw materials', null, 'active'],
-        [2, 'Finished Goods', 'All finished products', null, 'active']
-      ]
-    },
-    package: {
-      headers: ['S.No', 'Package Name', 'Package Code', 'Dimensions', 'Weight', 'Material'],
-      sampleData: [
-        [1, 'Standard Box', 'PKG001', '10x8x6 inches', 0.5, 'Cardboard'],
-        [2, 'Large Box', 'PKG002', '20x16x12 inches', 1.2, 'Corrugated']
-      ]
-    }
-  };
-
-  return templates[moduleName] || null;
-}
-
-/**
  * Dashboard API Endpoint - Data Transfer Summary
  */
 v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
@@ -962,6 +597,582 @@ v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
   }
 });
 
+/**
+ * Read Excel file headers and preview data
+ */
+async function readExcelHeaders(filePath) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      throw new Error('No worksheet found in the Excel file');
+    }
+
+    const headers = [];
+    const previewData = [];
+    let totalRecords = 0;
+
+    // Get headers from first row
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      if (cell.value) {
+        headers.push({
+          index: colNumber - 1,
+          name: cell.value.toString().trim(),
+          letter: String.fromCharCode(64 + colNumber) // A, B, C, etc.
+        });
+      }
+    });
+
+    // Get preview data (first 5 rows)
+    let rowCount = 0;
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) { // Skip header row
+        totalRecords++;
+        if (rowCount < 5) { // Only get first 5 rows for preview
+          const rowData = [];
+          row.eachCell((cell, colNumber) => {
+            rowData[colNumber - 1] = cell.value ? cell.value.toString() : '';
+          });
+          previewData.push(rowData);
+          rowCount++;
+        }
+      }
+    });
+
+    return { headers, previewData, totalRecords };
+  } catch (error) {
+    logger.error('Error reading Excel headers:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get database fields for module
+ */
+function getModuleFields(moduleName) {
+  const fieldMappings = {
+    employee: [
+      { key: 'employee_id', label: 'Employee ID', type: 'string', required: true },
+      { key: 'address', label: 'Address', type: 'text', required: false },
+      { key: 'skills', label: 'Skills', type: 'text', required: false },
+      { key: 'hourly_rate', label: 'Hourly Rate', type: 'number', required: false },
+      { key: 'department_id', label: 'Department ID', type: 'number', required: false },
+      { key: 'designation_id', label: 'Designation ID', type: 'number', required: false },
+      { key: 'joining_date', label: 'Joining Date', type: 'date', required: false },
+      { key: 'employment_type', label: 'Employment Type', type: 'string', required: false },
+      { key: 'date_of_birth', label: 'Date of Birth', type: 'date', required: false },
+      { key: 'marital_status', label: 'Marital Status', type: 'string', required: false }
+    ],
+    sale_order: [
+      { key: 'client_id', label: 'Client ID', type: 'number', required: true },
+      { key: 'order_number', label: 'Order Number', type: 'string', required: true },
+      { key: 'order_date', label: 'Order Date', type: 'date', required: true },
+      { key: 'delivery_date', label: 'Delivery Date', type: 'date', required: false },
+      { key: 'total_amount', label: 'Total Amount', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    work_order: [
+      { key: 'work_order_number', label: 'Work Order Number', type: 'string', required: true },
+      { key: 'sales_order_id', label: 'Sales Order ID', type: 'number', required: false },
+      { key: 'start_date', label: 'Start Date', type: 'date', required: true },
+      { key: 'end_date', label: 'End Date', type: 'date', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'priority', label: 'Priority', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    machine: [
+      { key: 'machine_name', label: 'Machine Name', type: 'string', required: true },
+      { key: 'machine_code', label: 'Machine Code', type: 'string', required: true },
+      { key: 'machine_type', label: 'Machine Type', type: 'string', required: false },
+      { key: 'capacity', label: 'Capacity', type: 'number', required: false },
+      { key: 'location', label: 'Location', type: 'string', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    route: [
+      { key: 'route_name', label: 'Route Name', type: 'string', required: true },
+      { key: 'route_code', label: 'Route Code', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'sequence', label: 'Sequence', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    client: [
+      { key: 'client_name', label: 'Client Name', type: 'string', required: true },
+      { key: 'email', label: 'Email', type: 'email', required: false },
+      { key: 'phone', label: 'Phone', type: 'string', required: false },
+      { key: 'address', label: 'Address', type: 'text', required: false },
+      { key: 'city', label: 'City', type: 'string', required: false },
+      { key: 'state', label: 'State', type: 'string', required: false },
+      { key: 'country', label: 'Country', type: 'string', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    item: [
+      { key: 'item_name', label: 'Item Name', type: 'string', required: true },
+      { key: 'item_code', label: 'Item Code', type: 'string', required: true },
+      { key: 'category', label: 'Category', type: 'string', required: false },
+      { key: 'unit', label: 'Unit', type: 'string', required: false },
+      { key: 'price', label: 'Price', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    purchase_order: [
+      { key: 'po_number', label: 'PO Number', type: 'string', required: true },
+      { key: 'supplier_name', label: 'Supplier Name', type: 'string', required: true },
+      { key: 'po_date', label: 'PO Date', type: 'date', required: true },
+      { key: 'delivery_date', label: 'Delivery Date', type: 'date', required: false },
+      { key: 'total_amount', label: 'Total Amount', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    inventory: [
+      { key: 'item_id', label: 'Item ID', type: 'number', required: true },
+      { key: 'quantity', label: 'Quantity', type: 'number', required: true },
+      { key: 'unit_price', label: 'Unit Price', type: 'number', required: false },
+      { key: 'location', label: 'Location', type: 'string', required: false },
+      { key: 'batch_number', label: 'Batch Number', type: 'string', required: false },
+      { key: 'expiry_date', label: 'Expiry Date', type: 'date', required: false }
+    ],
+    sku: [
+      { key: 'sku_name', label: 'SKU Name', type: 'string', required: true },
+      { key: 'sku_code', label: 'SKU Code', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'price', label: 'Price', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    category: [
+      { key: 'category_name', label: 'Category Name', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'parent_id', label: 'Parent ID', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    package: [
+      { key: 'package_name', label: 'Package Name', type: 'string', required: true },
+      { key: 'package_code', label: 'Package Code', type: 'string', required: true },
+      { key: 'dimensions', label: 'Dimensions', type: 'string', required: false },
+      { key: 'weight', label: 'Weight', type: 'number', required: false },
+      { key: 'material', label: 'Material', type: 'string', required: false }
+    ]
+  };
+
+  return fieldMappings[moduleName] || [];
+}
+
+/**
+ * Process data transfer with column mapping
+ */
+async function processDataTransferWithMapping(transferId, columnMapping) {
+  let dataTransfer;
+  
+  try {
+    dataTransfer = await DataTransfer.findByPk(transferId);
+    if (!dataTransfer) {
+      throw new Error('Data transfer record not found');
+    }
+
+    // Update status to processing
+    await dataTransfer.update({
+      status: 'processing',
+      started_at: new Date()
+    });
+
+    // Read Excel file
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(dataTransfer.file_path);
+    
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      throw new Error('No worksheet found in the Excel file');
+    }
+
+    const rows = [];
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) { // Skip header row
+        rows.push(row.values);
+      }
+    });
+
+    const totalRecords = rows.length;
+    let processedRecords = 0;
+    let failedRecords = 0;
+    const errors = [];
+
+    // Update total records
+    await dataTransfer.update({ total_records: totalRecords });
+
+    // Process each row based on module with column mapping
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        await processModuleRecordWithMapping(
+          dataTransfer.module_name, 
+          rows[i], 
+          columnMapping,
+          dataTransfer.company_id, 
+          dataTransfer.user_id
+        );
+        processedRecords++;
+      } catch (error) {
+        failedRecords++;
+        errors.push(`Row ${i + 2}: ${error.message}`);
+        logger.error(`Error processing row ${i + 2}:`, error);
+      }
+
+      // Update progress every 10 records
+      if ((i + 1) % 10 === 0) {
+        await dataTransfer.update({
+          processed_records: processedRecords,
+          failed_records: failedRecords
+        });
+      }
+    }
+
+    // Final update
+    await dataTransfer.update({
+      status: failedRecords === 0 ? 'completed' : (processedRecords > 0 ? 'completed' : 'failed'),
+      processed_records: processedRecords,
+      failed_records: failedRecords,
+      completed_at: new Date(),
+      error_log: errors.length > 0 ? errors.join('\n') : null
+    });
+
+    // Send completion email
+    await sendCompletionEmail(dataTransfer);
+
+  } catch (error) {
+    logger.error('Error processing data transfer:', error);
+    
+    if (dataTransfer) {
+      await dataTransfer.update({
+        status: 'failed',
+        completed_at: new Date(),
+        error_log: error.message
+      });
+      
+      // Send failure email
+      await sendCompletionEmail(dataTransfer);
+    }
+  }
+}
+
+/**
+ * Process individual record with column mapping
+ */
+async function processModuleRecordWithMapping(moduleName, row, columnMapping, companyId, userId) {
+  // Skip empty rows
+  if (!row || row.length <= 1) return;
+
+  // Map Excel columns to database fields using column mapping
+  const mappedData = {};
+  
+  Object.entries(columnMapping).forEach(([excelColumn, dbField]) => {
+    if (dbField && dbField !== '') {
+      const columnIndex = parseInt(excelColumn);
+      const value = row[columnIndex + 1]; // Excel is 1-indexed, array is 0-indexed, and row[0] is usually null
+      
+      if (value !== undefined && value !== null && value !== '') {
+        // Process the value based on field type
+        mappedData[dbField] = processFieldValue(value, dbField);
+      }
+    }
+  });
+
+  // Add common fields
+  mappedData.company_id = companyId;
+  mappedData.created_by = userId;
+
+  // Call the appropriate processing function
+  switch (moduleName) {
+    case 'employee':
+      return await processEmployeeRecordMapped(mappedData, userId);
+    case 'sale_order':
+      return await processSalesOrderRecordMapped(mappedData);
+    case 'work_order':
+      return await processWorkOrderRecordMapped(mappedData);
+    case 'machine':
+      return await processMachineRecordMapped(mappedData);
+    case 'route':
+      return await processRouteRecordMapped(mappedData);
+    case 'client':
+      return await processClientRecordMapped(mappedData);
+    case 'item':
+      return await processItemRecordMapped(mappedData);
+    case 'purchase_order':
+      return await processPurchaseOrderRecordMapped(mappedData);
+    case 'inventory':
+      return await processInventoryRecordMapped(mappedData);
+    case 'sku':
+      return await processSkuRecordMapped(mappedData);
+    case 'category':
+      return await processCategoryRecordMapped(mappedData);
+    case 'package':
+      return await processPackageRecordMapped(mappedData);
+    default:
+      throw new Error(`Unknown module: ${moduleName}`);
+  }
+}
+
+/**
+ * Process field value based on type
+ */
+function processFieldValue(value, fieldName) {
+  const stringValue = value.toString().trim();
+  
+  // Date fields
+  if (fieldName.includes('date') || fieldName.includes('Date')) {
+    if (stringValue === '') return null;
+    const date = new Date(stringValue);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  
+  // Numeric fields
+  if (fieldName.includes('id') || fieldName.includes('Id') || 
+      fieldName.includes('rate') || fieldName.includes('amount') || 
+      fieldName.includes('price') || fieldName.includes('quantity') || 
+      fieldName.includes('weight') || fieldName.includes('capacity')) {
+    const num = parseFloat(stringValue);
+    return isNaN(num) ? null : num;
+  }
+  
+  // Boolean fields
+  if (fieldName.includes('status') && (stringValue.toLowerCase() === 'true' || stringValue.toLowerCase() === 'false')) {
+    return stringValue.toLowerCase() === 'true';
+  }
+  
+  return stringValue;
+}
+
+/**
+ * Module-specific processing functions with mapped data
+ */
+async function processEmployeeRecordMapped(mappedData, userId) {
+  // Ensure user_id is set for employee
+  if (!mappedData.user_id) {
+    mappedData.user_id = userId;
+  }
+  
+  const model = Employee || db.User;
+  return await model.create(mappedData);
+}
+
+async function processSalesOrderRecordMapped(mappedData) {
+  if (!mappedData.order_date) {
+    mappedData.order_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  return await SalesOrder.create(mappedData);
+}
+
+async function processWorkOrderRecordMapped(mappedData) {
+  if (!mappedData.start_date) {
+    mappedData.start_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  if (!mappedData.priority) {
+    mappedData.priority = 'medium';
+  }
+  return await WorkOrder.create(mappedData);
+}
+
+async function processMachineRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Machine.create(mappedData);
+}
+
+async function processRouteRecordMapped(mappedData) {
+  if (!mappedData.sequence) {
+    mappedData.sequence = 1;
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Route.create(mappedData);
+}
+
+async function processClientRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Client.create(mappedData);
+}
+
+async function processItemRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await ItemMaster.create(mappedData);
+}
+
+async function processPurchaseOrderRecordMapped(mappedData) {
+  if (!mappedData.po_date) {
+    mappedData.po_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  return await PurchaseOrder.create(mappedData);
+}
+
+async function processInventoryRecordMapped(mappedData) {
+  return await Inventory.create(mappedData);
+}
+
+async function processSkuRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Sku.create(mappedData);
+}
+
+async function processCategoryRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Categories.create(mappedData);
+}
+
+async function processPackageRecordMapped(mappedData) {
+  return await Package.create(mappedData);
+}
+
+/**
+ * Send completion email
+ */
+async function sendCompletionEmail(dataTransfer) {
+  try {
+    // Get user details
+    const user = await db.User.findByPk(dataTransfer.user_id);
+    
+    const emailData = {
+      to: dataTransfer.email,
+      subject: `Data Transfer ${dataTransfer.status === 'completed' ? 'Completed' : 'Update'} - ${dataTransfer.module_name.replace('_', ' ')}`,
+      html: DataTransferCompletionTemplate({
+        userName: user ? user.name : 'User',
+        moduleName: dataTransfer.module_name,
+        fileName: dataTransfer.file_name,
+        totalRecords: dataTransfer.total_records,
+        processedRecords: dataTransfer.processed_records,
+        failedRecords: dataTransfer.failed_records,
+        status: dataTransfer.status,
+        startedAt: dataTransfer.started_at,
+        completedAt: dataTransfer.completed_at,
+        dashboardUrl: process.env.FRONTEND_URL + '/dashboard',
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@packworkx.com'
+      })
+    };
+
+    await EmailService.sendEmail(emailData);
+    
+    // Mark email as sent
+    await dataTransfer.update({ email_sent: true });
+    
+    logger.info(`Completion email sent for data transfer ${dataTransfer.id}`);
+  } catch (error) {
+    logger.error(`Failed to send completion email for data transfer ${dataTransfer.id}:`, error);
+  }
+}
+
+/**
+ * Get template structure for different modules
+ */
+function getModuleTemplate(moduleName) {
+  const templates = {
+    employee: {
+      headers: ['Employee ID', 'Address', 'Skills', 'Hourly Rate', 'Department ID', 'Designation ID', 'Joining Date', 'Employment Type', 'Date of Birth', 'Marital Status'],
+      sampleData: [
+        ['EMP001', '123 Main St', 'JavaScript, Node.js', 25.50, 1, 1, '2024-01-15', 'Full-time', '1990-05-15', 'single'],
+        ['EMP002', '456 Oak Ave', 'Python, Django', 30.00, 2, 2, '2024-02-01', 'Part-time', '1985-08-20', 'married']
+      ]
+    },
+    sale_order: {
+      headers: ['Client ID', 'Order Number', 'Order Date', 'Delivery Date', 'Total Amount', 'Status', 'Description'],
+      sampleData: [
+        [1, 'SO001', '2024-06-01', '2024-06-15', 1500.00, 'pending', 'Sample order'],
+        [2, 'SO002', '2024-06-02', '2024-06-16', 2500.00, 'confirmed', 'Urgent order']
+      ]
+    },
+    work_order: {
+      headers: ['Work Order Number', 'Sales Order ID', 'Start Date', 'End Date', 'Status', 'Priority', 'Description'],
+      sampleData: [
+        ['WO001', 1, '2024-06-01', '2024-06-10', 'pending', 'high', 'Urgent work order'],
+        ['WO002', 2, '2024-06-05', '2024-06-15', 'in_progress', 'medium', 'Standard work order']
+      ]
+    },
+    machine: {
+      headers: ['Machine Name', 'Machine Code', 'Machine Type', 'Capacity', 'Location', 'Status', 'Description'],
+      sampleData: [
+        ['Printing Machine 1', 'PM001', 'Printing', 1000, 'Floor 1', 'active', 'Main printing machine'],
+        ['Cutting Machine 1', 'CM001', 'Cutting', 500, 'Floor 2', 'active', 'Primary cutting machine']
+      ]
+    },
+    route: {
+      headers: ['Route Name', 'Route Code', 'Description', 'Sequence', 'Status'],
+      sampleData: [
+        ['Standard Route', 'RT001', 'Standard production route', 1, 'active'],
+        ['Express Route', 'RT002', 'Express production route', 2, 'active']
+      ]
+    },
+    client: {
+      headers: ['Client Name', 'Email', 'Phone', 'Address', 'City', 'State', 'Country', 'Status'],
+      sampleData: [
+        ['ABC Corp', 'contact@abc.com', '+1234567890', '123 Business St', 'New York', 'NY', 'USA', 'active'],
+        ['XYZ Ltd', 'info@xyz.com', '+1987654321', '456 Trade Ave', 'Los Angeles', 'CA', 'USA', 'active']
+      ]
+    },
+    item: {
+      headers: ['Item Name', 'Item Code', 'Category', 'Unit', 'Price', 'Status', 'Description'],
+      sampleData: [
+        ['Cardboard Sheet', 'ITM001', 'Raw Material', 'Sheets', 5.00, 'active', 'Standard cardboard'],
+        ['Printing Ink', 'ITM002', 'Consumables', 'Liters', 25.00, 'active', 'Black printing ink']
+      ]
+    },
+    purchase_order: {
+      headers: ['PO Number', 'Supplier Name', 'PO Date', 'Delivery Date', 'Total Amount', 'Status'],
+      sampleData: [
+        ['PO001', 'Supplier ABC', '2024-06-01', '2024-06-15', 5000.00, 'pending'],
+        ['PO002', 'Supplier XYZ', '2024-06-02', '2024-06-16', 7500.00, 'approved']
+      ]
+    },
+    inventory: {
+      headers: ['Item ID', 'Quantity', 'Unit Price', 'Location', 'Batch Number', 'Expiry Date'],
+      sampleData: [
+        [1, 100, 5.00, 'Warehouse A', 'BATCH001', '2025-12-31'],
+        [2, 50, 25.00, 'Warehouse B', 'BATCH002', '2024-12-31']
+      ]
+    },
+    sku: {
+      headers: ['SKU Name', 'SKU Code', 'Description', 'Price', 'Status'],
+      sampleData: [
+        ['Box Type A', 'SKU001', 'Small cardboard box', 10.00, 'active'],
+        ['Box Type B', 'SKU002', 'Large cardboard box', 15.00, 'active']
+      ]
+    },
+    category: {
+      headers: ['Category Name', 'Description', 'Parent ID', 'Status'],
+      sampleData: [
+        ['Raw Materials', 'All raw materials', null, 'active'],
+        ['Finished Goods', 'All finished products', null, 'active']
+      ]
+    },
+    package: {
+      headers: ['Package Name', 'Package Code', 'Dimensions', 'Weight', 'Material'],
+      sampleData: [
+        ['Standard Box', 'PKG001', '10x8x6 inches', 0.5, 'Cardboard'],
+        ['Large Box', 'PKG002', '20x16x12 inches', 1.2, 'Corrugated']
+      ]
+    }
+  };
+
+  return templates[moduleName] || null;
+}
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -972,7 +1183,7 @@ app.get("/health", (req, res) => {
 });
 
 // Use Version 1 Router
-app.use("/api/data-transfer", v1Router);
+app.use("/api/data/transfer", v1Router);
 
 const PORT = process.env.PORT_DATA_TRANSFER || 3020;
 app.listen(PORT, "0.0.0.0", () => {
