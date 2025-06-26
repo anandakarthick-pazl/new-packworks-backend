@@ -407,20 +407,23 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
     });
 
     // Billing
-    results.billings = await PurchaseOrderBilling.findAll({
+
+    const purchaseOrderItemPOs = await PurchaseOrderItem.findAll({
+      where: { item_id: itemId },
+      attributes: ["po_id"],
+      raw: true,
+    });
+    const relevantPoIds = purchaseOrderItemPOs.map(item => item.po_id);
+
+    results.billing = await PurchaseOrderBilling.findAll({
+      where: {
+        purchase_order_id: relevantPoIds  
+      },
       include: [
         {
           model: PurchaseOrder,
           as: "purchaseOrder",
           required: true,
-          where: { 
-            // Filter only for POs that contain this item
-            id: Sequelize.literal(`(
-              SELECT po_id FROM purchase_order_items 
-              WHERE item_id = ${itemId} 
-              LIMIT 1
-            )`)
-          },
           attributes: ["id", "purchase_generate_id", "supplier_name", "po_date"]
         }
       ],
