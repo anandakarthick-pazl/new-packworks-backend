@@ -21,7 +21,7 @@ const v1Router = Router();
 
 
 //post
-v1Router.post("/production-schedule", authenticateJWT, async (req, res) => {
+v1Router.post("/create", authenticateJWT, async (req, res) => {
   try {
     const data = await ProductionSchedule.create({
       ...req.body,                     
@@ -35,7 +35,7 @@ v1Router.post("/production-schedule", authenticateJWT, async (req, res) => {
 });
 
 //get
-v1Router.get("/production-schedule", authenticateJWT, async (req, res) => {
+v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   try {
      schedules = await ProductionSchedule.findAll({
       where: {
@@ -48,7 +48,7 @@ v1Router.get("/production-schedule", authenticateJWT, async (req, res) => {
 });
 
 //get by id
-v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
+v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
   try {
     const [updated] = await ProductionSchedule.update(req.body, {
       where: { id: req.params.id },
@@ -62,7 +62,7 @@ v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
 });
 
 //update
-v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
+v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
   try {
     const [updated] = await ProductionSchedule.update(req.body, {
       where: { id: req.params.id },
@@ -77,7 +77,7 @@ v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
 
 
 //delete
-v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
+v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
   try {
     const deleted = await ProductionSchedule.destroy({ where: { id: req.params.id } });
     if (!deleted) return res.status(404).json({ success: false, message: 'Not found' });
@@ -92,7 +92,7 @@ v1Router.get("/production-schedule/:id", authenticateJWT, async (req, res) => {
 
 
 
-app.use("/api", v1Router);
+app.use("/api/production-schedule", v1Router);
 // await db.sequelize.sync();
 const PORT = process.env.PORT_PRODUCTIONPLANING;
 app.listen(process.env.PORT_PRODUCTIONPLANING,'0.0.0.0', () => {
