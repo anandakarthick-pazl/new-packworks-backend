@@ -105,10 +105,10 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
           ],
           required: true,
           where: Sequelize.and(
-            ...(bf ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.bf')) = '${bf}'`)] : []),
-            ...(gsm ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.gsm')) = '${gsm}'`)] : []),
-            ...(size ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.size')) = '${size}'`)] : []),
-            ...(color ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item\`.\`default_custom_fields\`, '$.color')) = '${color}'`)] : [])
+            ...(bf ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item_info\`.\`default_custom_fields\`, '$.bf')) = '${bf}'`)] : []),
+            ...(gsm ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item_info\`.\`default_custom_fields\`, '$.gsm')) = '${gsm}'`)] : []),
+            ...(size ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item_info\`.\`default_custom_fields\`, '$.size')) = '${size}'`)] : []),
+            ...(color ? [Sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`item_info\`.\`default_custom_fields\`, '$.color')) = '${color}'`)] : [])
           ),
           
         }
@@ -116,17 +116,21 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
       order: [['created_at', 'DESC']],
     });
 
-    // Parse JSON fields for each item in the result
     const inventoryData = inventory.map(inv => {
-      const raw = inv.toJSON();
-      if (raw.item) {
-        raw.item.default_custom_fields = raw.item.default_custom_fields
-          ? JSON.parse(raw.item.default_custom_fields) : {};
-        // raw.item.custom_fields = raw.item.custom_fields
-        //   ? JSON.parse(raw.item.custom_fields) : {};
+    const raw = inv.toJSON();
+
+    if (raw.item_info) {
+      if (typeof raw.item_info.default_custom_fields === 'string') {
+        try {
+          raw.item_info.default_custom_fields = JSON.parse(raw.item_info.default_custom_fields);
+        } catch {
+          raw.item_info.default_custom_fields = {};
+        }
       }
-      return raw;
-    });
+    }
+
+    return raw;
+  });
 
     return res.status(200).json({
       success: true,
@@ -1087,6 +1091,7 @@ const skuInventory = await Inventory.findAll({
   attributes: [
     'id',
     'sku_id',
+    'sku_generate_id',
     'work_order_id',
     'quantity_available',
     'total_amount',

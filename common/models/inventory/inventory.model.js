@@ -29,13 +29,19 @@ const Inventory = sequelize.define("Inventory", {
   },
   item_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    // references: {
-    //   model: ItemMaster,
-    //   key: "id",
-    // },
-    // onUpdate: "CASCADE",
-    // onDelete: "CASCADE",
+    allowNull: false
+  },
+  sku_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  sku_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
+  sales_return_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
   },
   item_code: {
     type: DataTypes.STRING(50),
