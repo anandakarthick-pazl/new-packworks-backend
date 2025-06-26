@@ -61,6 +61,8 @@ import PartialPayment from "./salesOrder/partialPayment.model.js";
 import SalesReturn  from "./sales_return/sales_return.model.js";
 import SalesReturnItem  from "./sales_return/sales_return_item.model.js";
 import PurchaseOrderPayment from "./po/PurchaseOrderPayment.model.js";
+import DataTransfer from "./dataTransfer.model.js";
+
 import ProductionSchedule from "./Production/productionSchedule.model.js";
 const db = {
   sequelize,
@@ -126,6 +128,7 @@ const db = {
   SalesReturnItem,
   SalesReturn,
   PurchaseOrderPayment,
+  DataTransfer,
   ProductionSchedule
 
 
