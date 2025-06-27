@@ -23,256 +23,6 @@ const AllocationHistory = db.AllocationHistory;
 const User = db.User;
 
 
-// Function to update layer production status when group status is completed
-async function updateLayerProductionStatus(groupId, companyId, transaction = null) {
-  try {
-    // Get the production group (don't check status since we're updating it in the same transaction)
-    const productionGroup = await ProductionGroup.findOne({
-      where: {
-        id: groupId,
-        company_id: companyId
-      },
-      attributes: ['id', 'group_value', 'group_status'],  // Changed from 'status' to 'group_status'
-      transaction
-    });
-
-    if (!productionGroup) {
-      logger.warn(`Production group ${groupId} not found`);
-      return { success: false, message: 'Production group not found' };
-    }
-
-    logger.info(`Processing group ${groupId} with group_value:`, productionGroup.group_value);
-
-    // Parse group_value
-    let groupValue = productionGroup.group_value;
-    if (typeof groupValue === "string") {
-      try {
-        groupValue = JSON.parse(groupValue);
-      } catch (parseError) {
-        logger.error(`Error parsing group_value for group ${groupId}:`, parseError);
-        return;
-      }
-    }
-
-    if (!Array.isArray(groupValue) || groupValue.length === 0) {
-      logger.warn(`No valid group_value found for group ${groupId}`);
-      return { success: false, message: 'No valid group_value found' };
-    }
-
-    logger.info(`Found ${groupValue.length} items to process:`, groupValue);
-
-    // Group layer IDs by work_order_id to minimize database queries
-    const workOrderMap = {};
-    groupValue.forEach(item => {
-      const { work_order_id, layer_id } = item;
-      if (!workOrderMap[work_order_id]) {
-        workOrderMap[work_order_id] = [];
-      }
-      workOrderMap[work_order_id].push(layer_id);
-    });
-
-    // Process each unique work order
-    for (const workOrderId of Object.keys(workOrderMap)) {
-      const layerIds = workOrderMap[workOrderId];
-      
-      try {
-        // Find the work order - break after finding the first match
-        const workOrder = await WorkOrder.findByPk(workOrderId, {
-          attributes: ['id', 'work_order_sku_values'],
-          transaction
-        });
-
-        if (!workOrder) {
-          logger.warn(`Work order ${workOrderId} not found`);
-          continue; // Skip to next work order
-        }
-
-        logger.info(`Found work order ${workOrderId}, processing layers:`, layerIds);
-
-        // Parse work_order_sku_values
-        let skuValues = workOrder.work_order_sku_values;
-        if (typeof skuValues === "string") {
-          try {
-            skuValues = JSON.parse(skuValues);
-          } catch (parseError) {
-            logger.error(`Error parsing work_order_sku_values for work order ${workOrderId}:`, parseError);
-            continue;
-          }
-        }
-
-        if (!Array.isArray(skuValues)) {
-          logger.warn(`Invalid work_order_sku_values format for work order ${workOrderId}`);
-          continue;
-        }
-
-        // Update production_status for matching layer_ids
-        let updated = false;
-        let updatedLayers = [];
-        skuValues.forEach(layer => {
-          if (layerIds.includes(layer.layer_id)) {
-            layer.production_status = "completed";
-            updated = true;
-            updatedLayers.push(layer.layer_id);
-          }
-        });
-
-        logger.info(`Updated layers ${updatedLayers.join(', ')} in work order ${workOrderId}`);
-
-        // Save updated work order if any changes were made
-        if (updated) {
-          // For JSON columns, save the object directly - Sequelize will handle serialization
-          await workOrder.update({
-            work_order_sku_values: skuValues
-          }, { transaction });
-          
-          logger.info(`Updated production status for work order ${workOrderId}, layers: ${layerIds.join(', ')}`);
-        }
-
-      } catch (error) {
-        logger.error(`Error updating work order ${workOrderId}:`, error);
-        continue; // Continue with next work order even if this one fails
-      }
-    }
-
-    logger.info(`Successfully processed production group ${groupId} completion`);
-    return { success: true, message: 'Layer production status updated successfully' };
-
-  } catch (error) {
-    logger.error(`Error updating layer production status for group ${groupId}:`, error);
-    throw error;
-  }
-}
-
-// Enhanced route with automatic layer status update
-v1Router.put("/production-group/:id/complete", authenticateJWT, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { group_status } = req.body;
-
-    logger.info(`Attempting to update production group ${id} to status: ${group_status}`);
-    logger.info(`User company_id: ${req.user.company_id}`);
-    logger.info(`User id: ${req.user.id}`);
-
-    // First, check if the production group exists
-    const existingGroup = await ProductionGroup.findOne({
-      where: {
-        id: id,
-        company_id: req.user.company_id
-      }
-    });
-
-    if (!existingGroup) {
-      logger.error(`Production group ${id} not found for company ${req.user.company_id}`);
-      return res.status(404).json({
-        message: "Production group not found"
-      });
-    }
-
-    logger.info(`Found production group:`, {
-      id: existingGroup.id,
-      current_status: existingGroup.group_status,  // Changed from 'status' to 'group_status'
-      company_id: existingGroup.company_id
-    });
-
-    // First, update production group status in a separate transaction
-    const productionTransaction = await sequelize.transaction();
-    
-    try {
-      // Update production group status
-      const [updatedRows] = await ProductionGroup.update(
-        {
-          group_status: group_status,  // Changed from 'status' to 'group_status'
-          updated_by: req.user.id,
-          updated_at: new Date()
-        },
-        {
-          where: {
-            id: id,
-            company_id: req.user.company_id
-          },
-          transaction: productionTransaction
-        }
-      );
-
-      logger.info(`Update query affected ${updatedRows} rows`);
-
-      if (updatedRows === 0) {
-        await productionTransaction.rollback();
-        logger.error(`No rows updated for production group ${id}`);
-        return res.status(404).json({
-          message: "Production group not found or not updated"
-        });
-      }
-
-      // Verify the update before committing
-      const verifyUpdate = await ProductionGroup.findOne({
-        where: {
-          id: id,
-          company_id: req.user.company_id
-        },
-        transaction: productionTransaction
-      });
-
-      logger.info(`After update, group status is: ${verifyUpdate?.group_status}`);
-
-      // Commit the production group status update first
-      await productionTransaction.commit();
-      
-      logger.info(`Production group ${id} status successfully committed to ${group_status}`);
-      
-    } catch (error) {
-      await productionTransaction.rollback();
-      logger.error(`Error in production group transaction:`, error);
-      throw error;
-    }
-
-    // If status is being set to Completed, update layer production status in a separate transaction
-    let layerUpdateResult = null;
-    if (group_status === 'Completed') {
-      try {
-        const layerTransaction = await sequelize.transaction();
-        layerUpdateResult = await updateLayerProductionStatus(id, req.user.company_id, layerTransaction);
-        await layerTransaction.commit();
-        logger.info(`Layer status updated for production group ${id}`);
-      } catch (layerError) {
-        logger.error(`Error updating layer status for group ${id}:`, layerError);
-        layerUpdateResult = { success: false, message: 'Layer update failed', error: layerError.message };
-      }
-    }
-
-    // Final verification - check the actual status in the database
-    const finalCheck = await ProductionGroup.findOne({
-      where: {
-        id: id,
-        company_id: req.user.company_id
-      },
-      attributes: ['id', 'group_status', 'updated_at']  // Changed from 'status' to 'group_status'
-    });
-
-    logger.info(`Final verification - Production group ${id} status: ${finalCheck?.group_status}`);
-
-    res.status(200).json({
-      message: "Production group status updated successfully",
-      data: {
-        id: id,
-        status: group_status,
-        actual_status_in_db: finalCheck?.group_status,  // Changed from 'status' to 'group_status'
-        layers_updated: group_status === 'Completed',
-        layer_update_result: layerUpdateResult,
-        updated_at: finalCheck?.updated_at
-      }
-    });
-
-  } catch (error) {
-    logger.error("Error updating production group status:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message
-    });
-  }
-});
-
-
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
@@ -311,6 +61,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           status: groupDetails.status || "active",
           created_by: req.user.id,
           updated_by: req.user.id,
+          temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : 0,
         });
 
         // Process group_value array to update work_order status
@@ -511,7 +262,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-// PATCH API to ungroup layers (set layer_status back to "ungrouped")
+
 v1Router.patch(
   "/production-group/ungroup",
   authenticateJWT,
@@ -722,15 +473,25 @@ v1Router.patch(
     }
   }
 );
+
+
 v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   try {
-    const { include_work_orders = "false" } = req.query;
+    const { include_work_orders = "false", temporary_status } = req.query;
+
+    // Build where clause
+    const whereClause = {
+      company_id: req.user.company_id,
+    };
+
+    // Add temporary_status filter if provided
+    if (temporary_status) {
+      whereClause.temporary_status = parseInt(temporary_status, 10);
+    }
 
     // Get all production groups for the company
     const productionGroups = await ProductionGroup.findAll({
-      where: {
-        company_id: req.user.company_id,
-      },
+      where: whereClause,
       order: [["created_at", "DESC"]],
       attributes: [
         "id",
@@ -743,6 +504,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         "updated_at",
         "created_by",
         "updated_by",
+        "temporary_status",
       ],
     });
 
@@ -929,6 +691,225 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { include_work_orders = "false" } = req.query;
+
+    // Validate ID parameter
+    if (!id) {
+      return res.status(400).json({
+        message: "Production group ID is required",
+      });
+    }
+
+    // Get specific production group for the company
+    const productionGroup = await ProductionGroup.findOne({
+      where: {
+        id: id,
+        company_id: req.user.company_id,
+      },
+      attributes: [
+        "id",
+        "group_name",
+        "group_value",
+        "group_Qty",
+        "allocated_Qty",
+        "status",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+        "temporary_status",
+      ],
+    });
+
+    // Check if production group exists
+    if (!productionGroup) {
+      return res.status(404).json({
+        message: "Production group not found",
+      });
+    }
+
+    // Process the production group data
+    const groupData = productionGroup.toJSON();
+
+    // Parse group_value if it's a string
+    let groupValue = groupData.group_value;
+    if (typeof groupValue === "string") {
+      try {
+        groupValue = JSON.parse(groupValue);
+      } catch (parseError) {
+        logger.warn(
+          `Error parsing group_value for group ${productionGroup.id}:`,
+          parseError
+        );
+        groupValue = [];
+      }
+    }
+
+    groupData.group_value = groupValue || [];
+
+    // Calculate balance_Qty = group_Qty - allocated_Qty
+    groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+
+    // Fetch allocation history for this group
+    try {
+      const allocationHistory = await AllocationHistory.findAll({
+        where: {
+          group_id: productionGroup.id,
+          company_id: req.user.company_id,
+        },
+        attributes: [
+          "id",
+          "inventory_id",
+          "allocated_qty",
+          "status",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at",
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      // Process allocation history data
+      const allocationData = allocationHistory.map(item => item.toJSON());
+      
+      // Calculate total allocated quantity by inventory_id
+      const allocationSummary = {};
+      let totalAllocatedQty = 0;
+      
+      allocationData.forEach(allocation => {
+        const inventoryId = allocation.inventory_id;
+        const allocatedQty = allocation.allocated_qty || 0;
+        
+        if (!allocationSummary[inventoryId]) {
+          allocationSummary[inventoryId] = {
+            inventory_id: inventoryId,
+            total_allocated_qty: 0,
+            allocation_records: []
+          };
+        }
+        
+        allocationSummary[inventoryId].total_allocated_qty += allocatedQty;
+        allocationSummary[inventoryId].allocation_records.push(allocation);
+        totalAllocatedQty += allocatedQty;
+      });
+
+      // Convert summary object to array
+      const allocationSummaryArray = Object.values(allocationSummary);
+
+      // Add allocation data to group
+      groupData.allocation_history = {
+        total_allocated_qty: totalAllocatedQty,
+        allocation_by_inventory: allocationSummaryArray,
+        all_allocation_records: allocationData
+      };
+
+    } catch (allocationError) {
+      logger.error(
+        `Error fetching allocation history for group ${productionGroup.id}:`,
+        allocationError
+      );
+      groupData.allocation_history = {
+        total_allocated_qty: 0,
+        allocation_by_inventory: [],
+        all_allocation_records: [],
+        error: "Error fetching allocation history"
+      };
+    }
+
+    // Include only layer details if requested
+    if (include_work_orders === "true" && Array.isArray(groupValue)) {
+      const layerDetails = await Promise.all(
+        groupValue.map(async (item) => {
+          const { work_order_id, layer_id, sales_order_id } = item;
+
+          try {
+            // Only fetch work_order_sku_values to extract layer details
+            const workOrder = await WorkOrder.findByPk(work_order_id, {
+              attributes: ["id", "work_generate_id", "work_order_sku_values"],
+            });
+
+            if (!workOrder) {
+              return {
+                work_order_id,
+                layer_id,
+                sales_order_id,
+                layer_found: false,
+                error: "Work order not found",
+              };
+            }
+
+            // Parse work_order_sku_values to get layer details
+            let skuValues = workOrder.work_order_sku_values;
+            if (typeof skuValues === "string") {
+              try {
+                skuValues = JSON.parse(skuValues);
+              } catch (parseError) {
+                skuValues = [];
+              }
+            }
+
+            // Find the specific layer by layer_id
+            const layerDetail = Array.isArray(skuValues)
+              ? skuValues.find((layer) => layer.layer_id === layer_id)
+              : null;
+
+            if (!layerDetail) {
+              return {
+                work_order_id,
+                work_generate_id: workOrder.work_generate_id,
+                layer_id,
+                sales_order_id,
+                layer_found: false,
+                error: "Layer not found in work order",
+              };
+            }
+
+            return {
+              work_order_id,
+              work_generate_id: workOrder.work_generate_id,
+              layer_id,
+              sales_order_id,
+              layer_found: true,
+              layer_detail: layerDetail,
+            };
+          } catch (error) {
+            logger.error(
+              `Error fetching layer details for work order ${work_order_id}:`,
+              error
+            );
+            return {
+              work_order_id,
+              layer_id,
+              sales_order_id,
+              layer_found: false,
+              error: "Error fetching layer details",
+            };
+          }
+        })
+      );
+
+      groupData.layer_details = layerDetails;
+    }
+
+    res.status(200).json({
+      message: "Production group retrieved successfully",
+      data: groupData,
+    });
+  } catch (error) {
+    logger.error("Error fetching production group:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
 v1Router.patch(
   "/production-group/allocate",
   authenticateJWT,
@@ -1120,90 +1101,6 @@ v1Router.patch(
       await transaction.rollback();
       console.error("Error processing raw material allocations:", error);
       logger.error("Error processing raw material allocations:", error);
-      res.status(500).json({
-        message: "Internal Server Error",
-        error: error.message,
-      });
-    }
-  }
-);
-// GET API to view allocation details for a production group
-v1Router.get(
-  "/production-group/:id/allocations",
-  authenticateJWT,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // Find the production group with its details
-      const productionGroup = await ProductionGroup.findOne({
-        where: {
-          id: id,
-          company_id: req.user.company_id,
-        },
-        attributes: [
-          "id",
-          "group_name",
-          "group_Qty",
-          "allocated_Qty",
-          "status",
-          "created_at",
-          "updated_at",
-        ],
-      });
-
-      if (!productionGroup) {
-        return res.status(404).json({
-          message:
-            "Production group not found or doesn't belong to your company",
-        });
-      }
-
-      // Get allocation history for this production group
-      const allocationHistory = await AllocationHistory.findAll({
-        where: {
-          group_id: id,
-          company_id: req.user.company_id,
-        },
-        include: [
-          {
-            model: Inventory,
-            attributes: ["id", "quantity_available", "quantity_blocked"],
-          },
-        ],
-        order: [["created_at", "DESC"]],
-        limit: 50, // Limit to recent 50 records
-      });
-
-      res.status(200).json({
-        message: "Production group allocation details retrieved successfully",
-        data: {
-          production_group: productionGroup,
-          allocation_status: {
-            required_qty: productionGroup.group_Qty || 0,
-            allocated_qty: productionGroup.allocated_Qty || 0,
-            remaining_to_allocate: Math.max(
-              0,
-              (productionGroup.group_Qty || 0) -
-                (productionGroup.allocated_Qty || 0)
-            ),
-            allocation_percentage:
-              productionGroup.group_Qty > 0
-                ? Math.round(
-                    ((productionGroup.allocated_Qty || 0) /
-                      productionGroup.group_Qty) *
-                      100
-                  )
-                : 0,
-          },
-          allocation_history: allocationHistory,
-        },
-      });
-    } catch (error) {
-      logger.error(
-        "Error fetching production group allocation details:",
-        error
-      );
       res.status(500).json({
         message: "Internal Server Error",
         error: error.message,
@@ -1489,6 +1386,91 @@ v1Router.patch(
     }
   }
 );
+
+// GET API to view allocation details for a production group
+v1Router.get(
+  "/production-group/:id/allocations",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Find the production group with its details
+      const productionGroup = await ProductionGroup.findOne({
+        where: {
+          id: id,
+          company_id: req.user.company_id,
+        },
+        attributes: [
+          "id",
+          "group_name",
+          "group_Qty",
+          "allocated_Qty",
+          "status",
+          "created_at",
+          "updated_at",
+        ],
+      });
+
+      if (!productionGroup) {
+        return res.status(404).json({
+          message:
+            "Production group not found or doesn't belong to your company",
+        });
+      }
+
+      // Get allocation history for this production group
+      const allocationHistory = await AllocationHistory.findAll({
+        where: {
+          group_id: id,
+          company_id: req.user.company_id,
+        },
+        include: [
+          {
+            model: Inventory,
+            attributes: ["id", "quantity_available", "quantity_blocked"],
+          },
+        ],
+        order: [["created_at", "DESC"]],
+        limit: 50, // Limit to recent 50 records
+      });
+
+      res.status(200).json({
+        message: "Production group allocation details retrieved successfully",
+        data: {
+          production_group: productionGroup,
+          allocation_status: {
+            required_qty: productionGroup.group_Qty || 0,
+            allocated_qty: productionGroup.allocated_Qty || 0,
+            remaining_to_allocate: Math.max(
+              0,
+              (productionGroup.group_Qty || 0) -
+                (productionGroup.allocated_Qty || 0)
+            ),
+            allocation_percentage:
+              productionGroup.group_Qty > 0
+                ? Math.round(
+                    ((productionGroup.allocated_Qty || 0) /
+                      productionGroup.group_Qty) *
+                      100
+                  )
+                : 0,
+          },
+          allocation_history: allocationHistory,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        "Error fetching production group allocation details:",
+        error
+      );
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
 v1Router.get(
   "/allocation-history/inventory/:inventory_id",
   authenticateJWT,
@@ -1629,6 +1611,40 @@ v1Router.get(
   }
 );
 
+
+
+v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
+  const { groupIds, temporary_status } = req.body;
+
+  if (!Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({ message: "groupIds must be a non-empty array" });
+  }
+  if (typeof temporary_status === 'undefined') {
+    return res.status(400).json({ message: "temporary_status is required" });
+  }
+
+  try {
+    const [updatedCount] = await ProductionGroup.update(
+      { temporary_status },
+      {
+        where: {
+          id: groupIds,
+          company_id: req.user.company_id,
+        },
+      }
+    );
+    if (updatedCount === 0) {
+      return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
+    }
+    res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
+  } catch (error) {
+    logger.error("Error batch updating temporary_status:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -1646,3 +1662,5 @@ app.listen(process.env.PORT_PRODUCTION, "0.0.0.0", () => {
     `Production Service running on port ${process.env.PORT_PRODUCTION}`
   );
 });
+
+
