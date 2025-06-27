@@ -512,7 +512,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -541,7 +541,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
