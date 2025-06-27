@@ -501,7 +501,8 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
           { machine_generate_id: { [Op.like]: `%${searchTerm}%` } },
           { machine_name: { [Op.like]: `%${searchTerm}%` } },
           { machine_type: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } },
+          { model_number: { [Op.like]: `%${searchTerm}%` } },
+          { serial_number: { [Op.like]: `%${searchTerm}%` } },
           { manufacturer: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
