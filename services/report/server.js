@@ -299,7 +299,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -333,7 +333,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -408,7 +408,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -442,7 +442,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -606,7 +606,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -634,7 +634,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -699,7 +699,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -727,7 +727,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -798,7 +798,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -832,7 +832,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -904,7 +904,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -938,7 +938,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1008,7 +1008,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1042,7 +1042,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1527,7 +1527,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1558,7 +1558,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1629,7 +1629,7 @@ v1Router.get("/products", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1661,7 +1661,7 @@ v1Router.get("/products", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
