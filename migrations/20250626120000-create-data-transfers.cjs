@@ -62,9 +62,9 @@ module.exports = {
         comment: "Size of the uploaded file in bytes"
       },
       status: {
-        type: Sequelize.ENUM('pending', 'processing', 'completed', 'failed'),
+        type: Sequelize.ENUM('uploaded', 'pending', 'processing', 'completed', 'failed'),
         allowNull: false,
-        defaultValue: 'pending',
+        defaultValue: 'uploaded',
         comment: "Current status of the data transfer process"
       },
       total_records: {
@@ -111,6 +111,11 @@ module.exports = {
         defaultValue: false,
         comment: "Whether completion email has been sent"
       },
+      column_mapping: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "JSON mapping of Excel columns to database fields"
+      },
       created_by: {
         type: Sequelize.INTEGER.UNSIGNED,
         allowNull: false,
@@ -139,26 +144,6 @@ module.exports = {
       },
     });
 
-    // Add indexes for better performance
-    await queryInterface.addIndex('data_transfers', ['company_id'], {
-      name: 'idx_data_transfers_company_id'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['module_name'], {
-      name: 'idx_data_transfers_module_name'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['status'], {
-      name: 'idx_data_transfers_status'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['created_at'], {
-      name: 'idx_data_transfers_created_at'
-    });
-
-    await queryInterface.addIndex('data_transfers', ['user_id'], {
-      name: 'idx_data_transfers_user_id'
-    });
   },
 
   down: async (queryInterface, Sequelize) => {

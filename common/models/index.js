@@ -64,6 +64,9 @@ import PurchaseOrderPayment from "./po/PurchaseOrderPayment.model.js";
 import DataTransfer from "./dataTransfer.model.js";
 
 import ProductionSchedule from "./Production/productionSchedule.model.js";
+
+// Import associations
+import "./association.js";
 const db = {
   sequelize,
   User,

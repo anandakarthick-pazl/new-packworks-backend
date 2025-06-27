@@ -2,10 +2,11 @@
  * Data Transfer Service for PACKWORKX ERP System
  * 
  * This service handles module-based Excel file uploads and data transfers
- * Supports: Employee, Sale Order, Work Order, Machine, Routes, and other modules
+ * Two-step process: 1) Upload file 2) Map columns and process
  * 
  * Features:
  * - File upload with validation
+ * - Column mapping interface
  * - Module-based data processing
  * - Email notifications on completion
  * - Progress tracking and error logging
@@ -133,7 +134,7 @@ v1Router.get("/modules", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Upload Excel file for data transfer
+ * Step 1: Upload Excel file (without processing)
  */
 v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res) => {
   try {
@@ -173,6 +174,9 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
       });
     }
 
+    // Read Excel file to get headers and preview data
+    const { headers, previewData, totalRecords } = await readExcelHeaders(req.file.path);
+
     // Create data transfer record
     const dataTransfer = await DataTransfer.create({
       company_id: req.user.company_id,
@@ -182,12 +186,13 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
       file_path: req.file.path,
       file_size: req.file.size,
       email: email,
-      status: 'pending',
+      status: 'uploaded', // New status for uploaded but not processed
+      total_records: totalRecords,
       created_by: req.user.id
     });
 
-    // Start processing asynchronously
-    processDataTransfer(dataTransfer.id);
+    // Get database fields for the module
+    const dbFields = getModuleFields(module_name);
 
     res.json({
       success: true,
@@ -196,9 +201,13 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
         file_name: req.file.originalname,
         file_size: req.file.size,
         module_name: module_name,
-        status: 'pending'
+        status: 'uploaded',
+        total_records: totalRecords,
+        excel_headers: headers,
+        preview_data: previewData,
+        database_fields: dbFields
       },
-      message: "File uploaded successfully. Processing started."
+      message: "File uploaded successfully. Please map columns to proceed."
     });
 
   } catch (error) {
@@ -218,7 +227,76 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
 });
 
 /**
- * Get data transfer status
+ * Step 2: Map columns and start processing (temporarily disabled)
+ */
+v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => {
+  try {
+    res.status(503).json({
+      success: false,
+      message: "Column mapping feature is temporarily disabled. Please run the database migration first.",
+      hint: "Execute the SQL commands in add_column_mapping.sql file or run: npm run migrate"
+    });
+  } catch (error) {
+    logger.error('Error mapping columns:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to map columns",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get preview data for column mapping
+ */
+v1Router.get("/preview/:transfer_id", authenticateJWT, async (req, res) => {
+  try {
+    const { transfer_id } = req.params;
+    
+    const dataTransfer = await DataTransfer.findOne({
+      where: {
+        id: transfer_id,
+        company_id: req.user.company_id
+      }
+    });
+
+    if (!dataTransfer) {
+      return res.status(404).json({
+        success: false,
+        message: "Data transfer not found"
+      });
+    }
+
+    // Read Excel file to get headers and preview data
+    const { headers, previewData } = await readExcelHeaders(dataTransfer.file_path);
+    
+    // Get database fields for the module
+    const dbFields = getModuleFields(dataTransfer.module_name);
+
+    res.json({
+      success: true,
+      data: {
+        transfer_id: dataTransfer.id,
+        module_name: dataTransfer.module_name,
+        excel_headers: headers,
+        preview_data: previewData,
+        database_fields: dbFields,
+        total_records: dataTransfer.total_records
+      },
+      message: "Preview data retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('Error getting preview data:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get preview data",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get data transfer status (temporary without column_mapping)
  */
 v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
   try {
@@ -252,6 +330,7 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
         completed_at: dataTransfer.completed_at,
         error_log: dataTransfer.error_log,
         email_sent: dataTransfer.email_sent
+        // column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
       },
       message: "Data transfer status retrieved successfully"
     });
@@ -266,9 +345,9 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Get all data transfers for company
+ * Get all data transfers for company (simple version without associations)
  */
-v1Router.get("/history", authenticateJWT, async (req, res) => {
+v1Router.get("/history-simple", authenticateJWT, async (req, res) => {
   try {
     const { page = 1, limit = 10, status, module_name } = req.query;
     const offset = (page - 1) * limit;
@@ -289,20 +368,85 @@ v1Router.get("/history", authenticateJWT, async (req, res) => {
       where: whereClause,
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
-      offset: parseInt(offset),
-      include: [
-        {
-          model: db.User,
-          as: 'creator',
-          attributes: ['id', 'name', 'email']
-        }
-      ]
+      offset: parseInt(offset)
     });
 
     res.json({
       success: true,
       data: {
         transfers: rows,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      },
+      message: "Data transfer history retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('Error getting transfer history (simple):', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get transfer history",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get all data transfers for company (simplified without associations)
+ */
+v1Router.get("/history", authenticateJWT, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, module_name } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {
+      company_id: req.user.company_id
+    };
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    if (module_name) {
+      whereClause.module_name = module_name;
+    }
+
+    // Use simple query without associations for now
+    const { count, rows } = await DataTransfer.findAndCountAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    // Manually add creator info for each transfer
+    const transfersWithCreator = await Promise.all(
+      rows.map(async (transfer) => {
+        try {
+          const creator = await db.User.findByPk(transfer.created_by, {
+            attributes: ['id', 'name', 'email']
+          });
+          return {
+            ...transfer.toJSON(),
+            creator: creator ? creator.toJSON() : null
+          };
+        } catch (error) {
+          logger.warn(`Could not fetch creator for transfer ${transfer.id}:`, error.message);
+          return {
+            ...transfer.toJSON(),
+            creator: null
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        transfers: transfersWithCreator,
         pagination: {
           total: count,
           page: parseInt(page),
@@ -383,9 +527,267 @@ v1Router.get("/template/:module_name", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Process data transfer asynchronously
+ * Dashboard API Endpoint - Data Transfer Summary
  */
-async function processDataTransfer(transferId) {
+v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
+  try {
+    const { from_date, to_date } = req.query;
+    
+    // Default date range (current month if not provided)
+    const startDate = from_date || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const endDate = to_date || new Date();
+
+    const whereClause = {
+      company_id: req.user.company_id,
+      created_at: {
+        [Op.between]: [startDate, endDate]
+      }
+    };
+
+    // Get transfer statistics
+    const totalTransfers = await DataTransfer.count({ where: whereClause });
+    
+    const statusCounts = await DataTransfer.findAll({
+      where: whereClause,
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status']
+    });
+
+    const moduleCounts = await DataTransfer.findAll({
+      where: whereClause,
+      attributes: [
+        'module_name',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['module_name'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']]
+    });
+
+    // Get recent transfers (simplified without associations)
+    const recentTransfersData = await DataTransfer.findAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: 10
+    });
+
+    // Manually add creator info for recent transfers
+    const recentTransfers = await Promise.all(
+      recentTransfersData.map(async (transfer) => {
+        try {
+          const creator = await db.User.findByPk(transfer.created_by, {
+            attributes: ['id', 'name', 'email']
+          });
+          return {
+            ...transfer.toJSON(),
+            creator: creator ? creator.toJSON() : null
+          };
+        } catch (error) {
+          return {
+            ...transfer.toJSON(),
+            creator: null
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          total_transfers: totalTransfers,
+          status_breakdown: statusCounts.reduce((acc, item) => {
+            acc[item.status] = parseInt(item.get('count'));
+            return acc;
+          }, {}),
+          module_breakdown: moduleCounts.map(item => ({
+            module: item.module_name,
+            count: parseInt(item.get('count'))
+          }))
+        },
+        recent_transfers: recentTransfers
+      },
+      message: "Dashboard data retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('Error getting dashboard data:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get dashboard data",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Read Excel file headers and preview data
+ */
+async function readExcelHeaders(filePath) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      throw new Error('No worksheet found in the Excel file');
+    }
+
+    const headers = [];
+    const previewData = [];
+    let totalRecords = 0;
+
+    // Get headers from first row
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      if (cell.value) {
+        headers.push({
+          index: colNumber - 1,
+          name: cell.value.toString().trim(),
+          letter: String.fromCharCode(64 + colNumber) // A, B, C, etc.
+        });
+      }
+    });
+
+    // Get preview data (first 5 rows)
+    let rowCount = 0;
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) { // Skip header row
+        totalRecords++;
+        if (rowCount < 5) { // Only get first 5 rows for preview
+          const rowData = [];
+          row.eachCell((cell, colNumber) => {
+            rowData[colNumber - 1] = cell.value ? cell.value.toString() : '';
+          });
+          previewData.push(rowData);
+          rowCount++;
+        }
+      }
+    });
+
+    return { headers, previewData, totalRecords };
+  } catch (error) {
+    logger.error('Error reading Excel headers:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get database fields for module
+ */
+function getModuleFields(moduleName) {
+  const fieldMappings = {
+    employee: [
+      { key: 'employee_id', label: 'Employee ID', type: 'string', required: true },
+      { key: 'address', label: 'Address', type: 'text', required: false },
+      { key: 'skills', label: 'Skills', type: 'text', required: false },
+      { key: 'hourly_rate', label: 'Hourly Rate', type: 'number', required: false },
+      { key: 'department_id', label: 'Department ID', type: 'number', required: false },
+      { key: 'designation_id', label: 'Designation ID', type: 'number', required: false },
+      { key: 'joining_date', label: 'Joining Date', type: 'date', required: false },
+      { key: 'employment_type', label: 'Employment Type', type: 'string', required: false },
+      { key: 'date_of_birth', label: 'Date of Birth', type: 'date', required: false },
+      { key: 'marital_status', label: 'Marital Status', type: 'string', required: false }
+    ],
+    sale_order: [
+      { key: 'client_id', label: 'Client ID', type: 'number', required: true },
+      { key: 'order_number', label: 'Order Number', type: 'string', required: true },
+      { key: 'order_date', label: 'Order Date', type: 'date', required: true },
+      { key: 'delivery_date', label: 'Delivery Date', type: 'date', required: false },
+      { key: 'total_amount', label: 'Total Amount', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    work_order: [
+      { key: 'work_order_number', label: 'Work Order Number', type: 'string', required: true },
+      { key: 'sales_order_id', label: 'Sales Order ID', type: 'number', required: false },
+      { key: 'start_date', label: 'Start Date', type: 'date', required: true },
+      { key: 'end_date', label: 'End Date', type: 'date', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'priority', label: 'Priority', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    machine: [
+      { key: 'machine_name', label: 'Machine Name', type: 'string', required: true },
+      { key: 'machine_code', label: 'Machine Code', type: 'string', required: true },
+      { key: 'machine_type', label: 'Machine Type', type: 'string', required: false },
+      { key: 'capacity', label: 'Capacity', type: 'number', required: false },
+      { key: 'location', label: 'Location', type: 'string', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    route: [
+      { key: 'route_name', label: 'Route Name', type: 'string', required: true },
+      { key: 'route_code', label: 'Route Code', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'sequence', label: 'Sequence', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    client: [
+      { key: 'client_name', label: 'Client Name', type: 'string', required: true },
+      { key: 'email', label: 'Email', type: 'email', required: false },
+      { key: 'phone', label: 'Phone', type: 'string', required: false },
+      { key: 'address', label: 'Address', type: 'text', required: false },
+      { key: 'city', label: 'City', type: 'string', required: false },
+      { key: 'state', label: 'State', type: 'string', required: false },
+      { key: 'country', label: 'Country', type: 'string', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    item: [
+      { key: 'item_name', label: 'Item Name', type: 'string', required: true },
+      { key: 'item_code', label: 'Item Code', type: 'string', required: true },
+      { key: 'category', label: 'Category', type: 'string', required: false },
+      { key: 'unit', label: 'Unit', type: 'string', required: false },
+      { key: 'price', label: 'Price', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false },
+      { key: 'description', label: 'Description', type: 'text', required: false }
+    ],
+    purchase_order: [
+      { key: 'po_number', label: 'PO Number', type: 'string', required: true },
+      { key: 'supplier_name', label: 'Supplier Name', type: 'string', required: true },
+      { key: 'po_date', label: 'PO Date', type: 'date', required: true },
+      { key: 'delivery_date', label: 'Delivery Date', type: 'date', required: false },
+      { key: 'total_amount', label: 'Total Amount', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    inventory: [
+      { key: 'item_id', label: 'Item ID', type: 'number', required: true },
+      { key: 'quantity', label: 'Quantity', type: 'number', required: true },
+      { key: 'unit_price', label: 'Unit Price', type: 'number', required: false },
+      { key: 'location', label: 'Location', type: 'string', required: false },
+      { key: 'batch_number', label: 'Batch Number', type: 'string', required: false },
+      { key: 'expiry_date', label: 'Expiry Date', type: 'date', required: false }
+    ],
+    sku: [
+      { key: 'sku_name', label: 'SKU Name', type: 'string', required: true },
+      { key: 'sku_code', label: 'SKU Code', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'price', label: 'Price', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    category: [
+      { key: 'category_name', label: 'Category Name', type: 'string', required: true },
+      { key: 'description', label: 'Description', type: 'text', required: false },
+      { key: 'parent_id', label: 'Parent ID', type: 'number', required: false },
+      { key: 'status', label: 'Status', type: 'string', required: false }
+    ],
+    package: [
+      { key: 'package_name', label: 'Package Name', type: 'string', required: true },
+      { key: 'package_code', label: 'Package Code', type: 'string', required: true },
+      { key: 'dimensions', label: 'Dimensions', type: 'string', required: false },
+      { key: 'weight', label: 'Weight', type: 'number', required: false },
+      { key: 'material', label: 'Material', type: 'string', required: false }
+    ]
+  };
+
+  return fieldMappings[moduleName] || [];
+}
+
+/**
+ * Process data transfer with column mapping
+ */
+async function processDataTransferWithMapping(transferId, columnMapping) {
   let dataTransfer;
   
   try {
@@ -424,10 +826,16 @@ async function processDataTransfer(transferId) {
     // Update total records
     await dataTransfer.update({ total_records: totalRecords });
 
-    // Process each row based on module
+    // Process each row based on module with column mapping
     for (let i = 0; i < rows.length; i++) {
       try {
-        await processModuleRecord(dataTransfer.module_name, rows[i], dataTransfer.company_id, dataTransfer.user_id);
+        await processModuleRecordWithMapping(
+          dataTransfer.module_name, 
+          rows[i], 
+          columnMapping,
+          dataTransfer.company_id, 
+          dataTransfer.user_id
+        );
         processedRecords++;
       } catch (error) {
         failedRecords++;
@@ -473,280 +881,189 @@ async function processDataTransfer(transferId) {
 }
 
 /**
- * Process individual record based on module type
+ * Process individual record with column mapping
  */
-async function processModuleRecord(moduleName, row, companyId, userId) {
+async function processModuleRecordWithMapping(moduleName, row, columnMapping, companyId, userId) {
+  // Skip empty rows
+  if (!row || row.length <= 1) return;
+
+  // Map Excel columns to database fields using column mapping
+  const mappedData = {};
+  
+  Object.entries(columnMapping).forEach(([excelColumn, dbField]) => {
+    if (dbField && dbField !== '') {
+      const columnIndex = parseInt(excelColumn);
+      const value = row[columnIndex + 1]; // Excel is 1-indexed, array is 0-indexed, and row[0] is usually null
+      
+      if (value !== undefined && value !== null && value !== '') {
+        // Process the value based on field type
+        mappedData[dbField] = processFieldValue(value, dbField);
+      }
+    }
+  });
+
+  // Add common fields
+  mappedData.company_id = companyId;
+  mappedData.created_by = userId;
+
+  // Call the appropriate processing function
   switch (moduleName) {
     case 'employee':
-      return await processEmployeeRecord(row, companyId, userId);
+      return await processEmployeeRecordMapped(mappedData, userId);
     case 'sale_order':
-      return await processSalesOrderRecord(row, companyId, userId);
+      return await processSalesOrderRecordMapped(mappedData);
     case 'work_order':
-      return await processWorkOrderRecord(row, companyId, userId);
+      return await processWorkOrderRecordMapped(mappedData);
     case 'machine':
-      return await processMachineRecord(row, companyId, userId);
+      return await processMachineRecordMapped(mappedData);
     case 'route':
-      return await processRouteRecord(row, companyId, userId);
+      return await processRouteRecordMapped(mappedData);
     case 'client':
-      return await processClientRecord(row, companyId, userId);
+      return await processClientRecordMapped(mappedData);
     case 'item':
-      return await processItemRecord(row, companyId, userId);
+      return await processItemRecordMapped(mappedData);
     case 'purchase_order':
-      return await processPurchaseOrderRecord(row, companyId, userId);
+      return await processPurchaseOrderRecordMapped(mappedData);
     case 'inventory':
-      return await processInventoryRecord(row, companyId, userId);
+      return await processInventoryRecordMapped(mappedData);
     case 'sku':
-      return await processSkuRecord(row, companyId, userId);
+      return await processSkuRecordMapped(mappedData);
     case 'category':
-      return await processCategoryRecord(row, companyId, userId);
+      return await processCategoryRecordMapped(mappedData);
     case 'package':
-      return await processPackageRecord(row, companyId, userId);
+      return await processPackageRecordMapped(mappedData);
     default:
       throw new Error(`Unknown module: ${moduleName}`);
   }
 }
 
 /**
- * Process employee record
+ * Process field value based on type
  */
-async function processEmployeeRecord(row, companyId, userId) {
-  // Skip empty rows
-  if (!row || !row[1]) return;
+function processFieldValue(value, fieldName) {
+  const stringValue = value.toString().trim();
+  
+  // Date fields
+  if (fieldName.includes('date') || fieldName.includes('Date')) {
+    if (stringValue === '') return null;
+    const date = new Date(stringValue);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  
+  // Numeric fields
+  if (fieldName.includes('id') || fieldName.includes('Id') || 
+      fieldName.includes('rate') || fieldName.includes('amount') || 
+      fieldName.includes('price') || fieldName.includes('quantity') || 
+      fieldName.includes('weight') || fieldName.includes('capacity')) {
+    const num = parseFloat(stringValue);
+    return isNaN(num) ? null : num;
+  }
+  
+  // Boolean fields
+  if (fieldName.includes('status') && (stringValue.toLowerCase() === 'true' || stringValue.toLowerCase() === 'false')) {
+    return stringValue.toLowerCase() === 'true';
+  }
+  
+  return stringValue;
+}
 
-  const employeeData = {
-    company_id: companyId,
-    user_id: userId, // This might need to be adjusted based on your employee structure
-    employee_id: row[1],
-    address: row[2],
-    skills: row[3],
-    hourly_rate: parseFloat(row[4]) || null,
-    department_id: parseInt(row[5]) || null,
-    designation_id: parseInt(row[6]) || null,
-    joining_date: row[7] ? new Date(row[7]) : null,
-    employment_type: row[8],
-    created_by: userId
-  };
-
-  // Check if Employee model exists, otherwise use User model
+/**
+ * Module-specific processing functions with mapped data
+ */
+async function processEmployeeRecordMapped(mappedData, userId) {
+  // Ensure user_id is set for employee
+  if (!mappedData.user_id) {
+    mappedData.user_id = userId;
+  }
+  
   const model = Employee || db.User;
-  return await model.create(employeeData);
+  return await model.create(mappedData);
 }
 
-/**
- * Process sales order record
- */
-async function processSalesOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const salesOrderData = {
-    company_id: companyId,
-    client_id: parseInt(row[1]) || null,
-    order_number: row[2],
-    order_date: row[3] ? new Date(row[3]) : new Date(),
-    delivery_date: row[4] ? new Date(row[4]) : null,
-    total_amount: parseFloat(row[5]) || 0,
-    status: row[6] || 'pending',
-    created_by: userId
-  };
-
-  return await SalesOrder.create(salesOrderData);
+async function processSalesOrderRecordMapped(mappedData) {
+  if (!mappedData.order_date) {
+    mappedData.order_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  return await SalesOrder.create(mappedData);
 }
 
-/**
- * Process work order record
- */
-async function processWorkOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const workOrderData = {
-    company_id: companyId,
-    work_order_number: row[1],
-    sales_order_id: parseInt(row[2]) || null,
-    start_date: row[3] ? new Date(row[3]) : new Date(),
-    end_date: row[4] ? new Date(row[4]) : null,
-    status: row[5] || 'pending',
-    priority: row[6] || 'medium',
-    created_by: userId
-  };
-
-  return await WorkOrder.create(workOrderData);
+async function processWorkOrderRecordMapped(mappedData) {
+  if (!mappedData.start_date) {
+    mappedData.start_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  if (!mappedData.priority) {
+    mappedData.priority = 'medium';
+  }
+  return await WorkOrder.create(mappedData);
 }
 
-/**
- * Process machine record
- */
-async function processMachineRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const machineData = {
-    company_id: companyId,
-    machine_name: row[1],
-    machine_code: row[2],
-    machine_type: row[3],
-    capacity: parseFloat(row[4]) || null,
-    location: row[5],
-    status: row[6] || 'active',
-    created_by: userId
-  };
-
-  return await Machine.create(machineData);
+async function processMachineRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Machine.create(mappedData);
 }
 
-/**
- * Process route record
- */
-async function processRouteRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const routeData = {
-    company_id: companyId,
-    route_name: row[1],
-    route_code: row[2],
-    description: row[3],
-    sequence: parseInt(row[4]) || 1,
-    status: row[5] || 'active',
-    created_by: userId
-  };
-
-  return await Route.create(routeData);
+async function processRouteRecordMapped(mappedData) {
+  if (!mappedData.sequence) {
+    mappedData.sequence = 1;
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Route.create(mappedData);
 }
 
-/**
- * Process client record
- */
-async function processClientRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const clientData = {
-    company_id: companyId,
-    client_name: row[1],
-    email: row[2],
-    phone: row[3],
-    address: row[4],
-    city: row[5],
-    state: row[6],
-    country: row[7],
-    status: row[8] || 'active',
-    created_by: userId
-  };
-
-  return await Client.create(clientData);
+async function processClientRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Client.create(mappedData);
 }
 
-/**
- * Process item record
- */
-async function processItemRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const itemData = {
-    company_id: companyId,
-    item_name: row[1],
-    item_code: row[2],
-    category: row[3],
-    unit: row[4],
-    price: parseFloat(row[5]) || 0,
-    status: row[6] || 'active',
-    created_by: userId
-  };
-
-  return await ItemMaster.create(itemData);
+async function processItemRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await ItemMaster.create(mappedData);
 }
 
-/**
- * Process purchase order record
- */
-async function processPurchaseOrderRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const poData = {
-    company_id: companyId,
-    po_number: row[1],
-    supplier_name: row[2],
-    po_date: row[3] ? new Date(row[3]) : new Date(),
-    delivery_date: row[4] ? new Date(row[4]) : null,
-    total_amount: parseFloat(row[5]) || 0,
-    status: row[6] || 'pending',
-    created_by: userId
-  };
-
-  return await PurchaseOrder.create(poData);
+async function processPurchaseOrderRecordMapped(mappedData) {
+  if (!mappedData.po_date) {
+    mappedData.po_date = new Date();
+  }
+  if (!mappedData.status) {
+    mappedData.status = 'pending';
+  }
+  return await PurchaseOrder.create(mappedData);
 }
 
-/**
- * Process inventory record
- */
-async function processInventoryRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const inventoryData = {
-    company_id: companyId,
-    item_id: parseInt(row[1]) || null,
-    quantity: parseFloat(row[2]) || 0,
-    unit_price: parseFloat(row[3]) || 0,
-    location: row[4],
-    batch_number: row[5],
-    expiry_date: row[6] ? new Date(row[6]) : null,
-    created_by: userId
-  };
-
-  return await Inventory.create(inventoryData);
+async function processInventoryRecordMapped(mappedData) {
+  return await Inventory.create(mappedData);
 }
 
-/**
- * Process SKU record
- */
-async function processSkuRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const skuData = {
-    company_id: companyId,
-    sku_name: row[1],
-    sku_code: row[2],
-    description: row[3],
-    price: parseFloat(row[4]) || 0,
-    status: row[5] || 'active',
-    created_by: userId
-  };
-
-  return await Sku.create(skuData);
+async function processSkuRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Sku.create(mappedData);
 }
 
-/**
- * Process category record
- */
-async function processCategoryRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const categoryData = {
-    company_id: companyId,
-    category_name: row[1],
-    description: row[2],
-    parent_id: parseInt(row[3]) || null,
-    status: row[4] || 'active',
-    created_by: userId
-  };
-
-  return await Categories.create(categoryData);
+async function processCategoryRecordMapped(mappedData) {
+  if (!mappedData.status) {
+    mappedData.status = 'active';
+  }
+  return await Categories.create(mappedData);
 }
 
-/**
- * Process package record
- */
-async function processPackageRecord(row, companyId, userId) {
-  if (!row || !row[1]) return;
-
-  const packageData = {
-    company_id: companyId,
-    package_name: row[1],
-    package_code: row[2],
-    dimensions: row[3],
-    weight: parseFloat(row[4]) || 0,
-    material: row[5],
-    created_by: userId
-  };
-
-  return await Package.create(packageData);
+async function processPackageRecordMapped(mappedData) {
+  return await Package.create(mappedData);
 }
 
 /**
@@ -792,175 +1109,93 @@ async function sendCompletionEmail(dataTransfer) {
 function getModuleTemplate(moduleName) {
   const templates = {
     employee: {
-      headers: ['S.No', 'Employee ID', 'Address', 'Skills', 'Hourly Rate', 'Department ID', 'Designation ID', 'Joining Date', 'Employment Type'],
+      headers: ['Employee ID', 'Address', 'Skills', 'Hourly Rate', 'Department ID', 'Designation ID', 'Joining Date', 'Employment Type', 'Date of Birth', 'Marital Status'],
       sampleData: [
-        [1, 'EMP001', '123 Main St', 'JavaScript, Node.js', 25.50, 1, 1, '2024-01-15', 'Full-time'],
-        [2, 'EMP002', '456 Oak Ave', 'Python, Django', 30.00, 2, 2, '2024-02-01', 'Part-time']
+        ['EMP001', '123 Main St', 'JavaScript, Node.js', 25.50, 1, 1, '2024-01-15', 'Full-time', '1990-05-15', 'single'],
+        ['EMP002', '456 Oak Ave', 'Python, Django', 30.00, 2, 2, '2024-02-01', 'Part-time', '1985-08-20', 'married']
       ]
     },
     sale_order: {
-      headers: ['S.No', 'Client ID', 'Order Number', 'Order Date', 'Delivery Date', 'Total Amount', 'Status'],
+      headers: ['Client ID', 'Order Number', 'Order Date', 'Delivery Date', 'Total Amount', 'Status', 'Description'],
       sampleData: [
-        [1, 1, 'SO001', '2024-06-01', '2024-06-15', 1500.00, 'pending'],
-        [2, 2, 'SO002', '2024-06-02', '2024-06-16', 2500.00, 'confirmed']
+        [1, 'SO001', '2024-06-01', '2024-06-15', 1500.00, 'pending', 'Sample order'],
+        [2, 'SO002', '2024-06-02', '2024-06-16', 2500.00, 'confirmed', 'Urgent order']
       ]
     },
     work_order: {
-      headers: ['S.No', 'Work Order Number', 'Sales Order ID', 'Start Date', 'End Date', 'Status', 'Priority'],
+      headers: ['Work Order Number', 'Sales Order ID', 'Start Date', 'End Date', 'Status', 'Priority', 'Description'],
       sampleData: [
-        [1, 'WO001', 1, '2024-06-01', '2024-06-10', 'pending', 'high'],
-        [2, 'WO002', 2, '2024-06-05', '2024-06-15', 'in_progress', 'medium']
+        ['WO001', 1, '2024-06-01', '2024-06-10', 'pending', 'high', 'Urgent work order'],
+        ['WO002', 2, '2024-06-05', '2024-06-15', 'in_progress', 'medium', 'Standard work order']
       ]
     },
     machine: {
-      headers: ['S.No', 'Machine Name', 'Machine Code', 'Machine Type', 'Capacity', 'Location', 'Status'],
+      headers: ['Machine Name', 'Machine Code', 'Machine Type', 'Capacity', 'Location', 'Status', 'Description'],
       sampleData: [
-        [1, 'Printing Machine 1', 'PM001', 'Printing', 1000, 'Floor 1', 'active'],
-        [2, 'Cutting Machine 1', 'CM001', 'Cutting', 500, 'Floor 2', 'active']
+        ['Printing Machine 1', 'PM001', 'Printing', 1000, 'Floor 1', 'active', 'Main printing machine'],
+        ['Cutting Machine 1', 'CM001', 'Cutting', 500, 'Floor 2', 'active', 'Primary cutting machine']
       ]
     },
     route: {
-      headers: ['S.No', 'Route Name', 'Route Code', 'Description', 'Sequence', 'Status'],
+      headers: ['Route Name', 'Route Code', 'Description', 'Sequence', 'Status'],
       sampleData: [
-        [1, 'Standard Route', 'RT001', 'Standard production route', 1, 'active'],
-        [2, 'Express Route', 'RT002', 'Express production route', 2, 'active']
+        ['Standard Route', 'RT001', 'Standard production route', 1, 'active'],
+        ['Express Route', 'RT002', 'Express production route', 2, 'active']
       ]
     },
     client: {
-      headers: ['S.No', 'Client Name', 'Email', 'Phone', 'Address', 'City', 'State', 'Country', 'Status'],
+      headers: ['Client Name', 'Email', 'Phone', 'Address', 'City', 'State', 'Country', 'Status'],
       sampleData: [
-        [1, 'ABC Corp', 'contact@abc.com', '+1234567890', '123 Business St', 'New York', 'NY', 'USA', 'active'],
-        [2, 'XYZ Ltd', 'info@xyz.com', '+1987654321', '456 Trade Ave', 'Los Angeles', 'CA', 'USA', 'active']
+        ['ABC Corp', 'contact@abc.com', '+1234567890', '123 Business St', 'New York', 'NY', 'USA', 'active'],
+        ['XYZ Ltd', 'info@xyz.com', '+1987654321', '456 Trade Ave', 'Los Angeles', 'CA', 'USA', 'active']
       ]
     },
     item: {
-      headers: ['S.No', 'Item Name', 'Item Code', 'Category', 'Unit', 'Price', 'Status'],
+      headers: ['Item Name', 'Item Code', 'Category', 'Unit', 'Price', 'Status', 'Description'],
       sampleData: [
-        [1, 'Cardboard Sheet', 'ITM001', 'Raw Material', 'Sheets', 5.00, 'active'],
-        [2, 'Printing Ink', 'ITM002', 'Consumables', 'Liters', 25.00, 'active']
+        ['Cardboard Sheet', 'ITM001', 'Raw Material', 'Sheets', 5.00, 'active', 'Standard cardboard'],
+        ['Printing Ink', 'ITM002', 'Consumables', 'Liters', 25.00, 'active', 'Black printing ink']
       ]
     },
     purchase_order: {
-      headers: ['S.No', 'PO Number', 'Supplier Name', 'PO Date', 'Delivery Date', 'Total Amount', 'Status'],
+      headers: ['PO Number', 'Supplier Name', 'PO Date', 'Delivery Date', 'Total Amount', 'Status'],
       sampleData: [
-        [1, 'PO001', 'Supplier ABC', '2024-06-01', '2024-06-15', 5000.00, 'pending'],
-        [2, 'PO002', 'Supplier XYZ', '2024-06-02', '2024-06-16', 7500.00, 'approved']
+        ['PO001', 'Supplier ABC', '2024-06-01', '2024-06-15', 5000.00, 'pending'],
+        ['PO002', 'Supplier XYZ', '2024-06-02', '2024-06-16', 7500.00, 'approved']
       ]
     },
     inventory: {
-      headers: ['S.No', 'Item ID', 'Quantity', 'Unit Price', 'Location', 'Batch Number', 'Expiry Date'],
+      headers: ['Item ID', 'Quantity', 'Unit Price', 'Location', 'Batch Number', 'Expiry Date'],
       sampleData: [
-        [1, 1, 100, 5.00, 'Warehouse A', 'BATCH001', '2025-12-31'],
-        [2, 2, 50, 25.00, 'Warehouse B', 'BATCH002', '2024-12-31']
+        [1, 100, 5.00, 'Warehouse A', 'BATCH001', '2025-12-31'],
+        [2, 50, 25.00, 'Warehouse B', 'BATCH002', '2024-12-31']
       ]
     },
     sku: {
-      headers: ['S.No', 'SKU Name', 'SKU Code', 'Description', 'Price', 'Status'],
+      headers: ['SKU Name', 'SKU Code', 'Description', 'Price', 'Status'],
       sampleData: [
-        [1, 'Box Type A', 'SKU001', 'Small cardboard box', 10.00, 'active'],
-        [2, 'Box Type B', 'SKU002', 'Large cardboard box', 15.00, 'active']
+        ['Box Type A', 'SKU001', 'Small cardboard box', 10.00, 'active'],
+        ['Box Type B', 'SKU002', 'Large cardboard box', 15.00, 'active']
       ]
     },
     category: {
-      headers: ['S.No', 'Category Name', 'Description', 'Parent ID', 'Status'],
+      headers: ['Category Name', 'Description', 'Parent ID', 'Status'],
       sampleData: [
-        [1, 'Raw Materials', 'All raw materials', null, 'active'],
-        [2, 'Finished Goods', 'All finished products', null, 'active']
+        ['Raw Materials', 'All raw materials', null, 'active'],
+        ['Finished Goods', 'All finished products', null, 'active']
       ]
     },
     package: {
-      headers: ['S.No', 'Package Name', 'Package Code', 'Dimensions', 'Weight', 'Material'],
+      headers: ['Package Name', 'Package Code', 'Dimensions', 'Weight', 'Material'],
       sampleData: [
-        [1, 'Standard Box', 'PKG001', '10x8x6 inches', 0.5, 'Cardboard'],
-        [2, 'Large Box', 'PKG002', '20x16x12 inches', 1.2, 'Corrugated']
+        ['Standard Box', 'PKG001', '10x8x6 inches', 0.5, 'Cardboard'],
+        ['Large Box', 'PKG002', '20x16x12 inches', 1.2, 'Corrugated']
       ]
     }
   };
 
   return templates[moduleName] || null;
 }
-
-/**
- * Dashboard API Endpoint - Data Transfer Summary
- */
-v1Router.get("/dashboard", authenticateJWT, async (req, res) => {
-  try {
-    const { from_date, to_date } = req.query;
-    
-    // Default date range (current month if not provided)
-    const startDate = from_date || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const endDate = to_date || new Date();
-
-    const whereClause = {
-      company_id: req.user.company_id,
-      created_at: {
-        [Op.between]: [startDate, endDate]
-      }
-    };
-
-    // Get transfer statistics
-    const totalTransfers = await DataTransfer.count({ where: whereClause });
-    
-    const statusCounts = await DataTransfer.findAll({
-      where: whereClause,
-      attributes: [
-        'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['status']
-    });
-
-    const moduleCounts = await DataTransfer.findAll({
-      where: whereClause,
-      attributes: [
-        'module_name',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['module_name'],
-      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']]
-    });
-
-    // Get recent transfers
-    const recentTransfers = await DataTransfer.findAll({
-      where: whereClause,
-      order: [['created_at', 'DESC']],
-      limit: 10,
-      include: [
-        {
-          model: db.User,
-          as: 'creator',
-          attributes: ['id', 'name', 'email']
-        }
-      ]
-    });
-
-    res.json({
-      success: true,
-      data: {
-        summary: {
-          total_transfers: totalTransfers,
-          status_breakdown: statusCounts.reduce((acc, item) => {
-            acc[item.status] = parseInt(item.get('count'));
-            return acc;
-          }, {}),
-          module_breakdown: moduleCounts.map(item => ({
-            module: item.module_name,
-            count: parseInt(item.get('count'))
-          }))
-        },
-        recent_transfers: recentTransfers
-      },
-      message: "Dashboard data retrieved successfully"
-    });
-  } catch (error) {
-    logger.error('Error getting dashboard data:', error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get dashboard data",
-      error: error.message
-    });
-  }
-});
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
