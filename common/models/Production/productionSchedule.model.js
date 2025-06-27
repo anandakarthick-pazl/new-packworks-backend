@@ -50,9 +50,13 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
     type: DataTypes.STRING(100),
     allowNull: false,
   },
-  status: {
+  production_status: {
     type: DataTypes.ENUM("Scheduled", "In Progress", "Completed"),
     defaultValue: "Scheduled",
+  },
+  status: {
+    type: DataTypes.ENUM("active", "inactive"),
+    defaultValue: "active",
   },
   notes: {
     type: DataTypes.TEXT,
