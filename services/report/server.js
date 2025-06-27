@@ -498,10 +498,11 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
       const searchTerm = search.trim();
       filter[Op.and].push({
         [Op.or]: [
-          { machine_id: { [Op.like]: `%${searchTerm}%` } },
+          { machine_generate_id: { [Op.like]: `%${searchTerm}%` } },
           { machine_name: { [Op.like]: `%${searchTerm}%` } },
           { machine_type: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } }
+          { description: { [Op.like]: `%${searchTerm}%` } },
+          { manufacturer: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -519,7 +520,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
       });
 
       const columns = [
-        { header: 'Machine ID', key: 'machine_id', width: 15 },
+        { header: 'Machine ID', key: 'machine_generate_id', width: 15 },
         { header: 'Machine Name', key: 'machine_name', width: 20 },
         { header: 'Machine Type', key: 'machine_type', width: 15 },
         { header: 'Description', key: 'description', width: 30 },
@@ -550,7 +551,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
     });
 
     const htmlData = machines.map(machine => ({
-      machine_id: machine.machine_id,
+      machine_id: machine.machine_generate_id,
       machine_name: machine.machine_name,
       machine_type: machine.machine_type,
       status: machine.status
