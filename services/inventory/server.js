@@ -235,7 +235,7 @@ v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
         'updated_at',
       ],
       where: whereCondition,
-      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+      group: ['Inventory.item_id', 'item_info.id', 'item_info->category_info.id', 'item_info->sub_category_info.id'],
       include: [
         {
           model: ItemMaster,
@@ -886,18 +886,6 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         searchConditions.push({ item_id: { [Op.in]: itemIds } });
       }
 
-
-      const matchingSku = await Sku.findAll({
-        attributes: ['id'],
-        where: {
-          [Op.or]: [ { sku_generate_id: { [Op.like]: `%${search}%` } }]
-        }
-      });
-
-      if (matchingSku.length > 0) {
-        const skuIds = matchingItems.map(item => item.id);
-        searchConditions.push({ sku_id: { [Op.in]: skuIds } });
-      }
 
       // 🔍 Category name match
       const matchingCategory = await Categories.findAll({

@@ -283,8 +283,8 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
         [Op.or]: [
           { sales_generate_id: { [Op.like]: `%${searchTerm}%` } },
           { estimated: { [Op.like]: `%${searchTerm}%` } },
-          { sales_status: { [Op.like]: `%${searchTerm}%` } },
-          { reference: { [Op.like]: `%${searchTerm}%` } }
+          // { sales_status: { [Op.like]: `%${searchTerm}%` } },
+          // { reference: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -299,7 +299,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -333,7 +333,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -408,7 +408,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -442,7 +442,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -480,15 +480,16 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
 v1Router.get("/machines", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, machine_type, search, export: isExport } = req.query;
+    const { fromDate, toDate, machine_type, search, status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     // Build base filter using Op.and
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: 'active' },
+        // { status: status || 'active' }, // Default to 'active' if status is not provided
         ...(machine_type ? [{ machine_type }] : []),
+        ...(status ? [{ status }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
     };
@@ -498,10 +499,12 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
       const searchTerm = search.trim();
       filter[Op.and].push({
         [Op.or]: [
-          { machine_id: { [Op.like]: `%${searchTerm}%` } },
+          { machine_generate_id: { [Op.like]: `%${searchTerm}%` } },
           { machine_name: { [Op.like]: `%${searchTerm}%` } },
           { machine_type: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } }
+          { model_number: { [Op.like]: `%${searchTerm}%` } },
+          { serial_number: { [Op.like]: `%${searchTerm}%` } },
+          { manufacturer: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -512,14 +515,14 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
       });
 
       const columns = [
-        { header: 'Machine ID', key: 'machine_id', width: 15 },
+        { header: 'Machine ID', key: 'machine_generate_id', width: 15 },
         { header: 'Machine Name', key: 'machine_name', width: 20 },
         { header: 'Machine Type', key: 'machine_type', width: 15 },
         { header: 'Description', key: 'description', width: 30 },
@@ -541,7 +544,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -550,7 +553,7 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
     });
 
     const htmlData = machines.map(machine => ({
-      machine_id: machine.machine_id,
+      machine_id: machine.machine_generate_id,
       machine_name: machine.machine_name,
       machine_type: machine.machine_type,
       status: machine.status
@@ -577,14 +580,14 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
 v1Router.get("/processes", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, search, export: isExport } = req.query;
+    const { fromDate, toDate, search,status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     // Build base filter using Op.and
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: 'active' },
+        ...(status ? [{ status }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
     };
@@ -595,7 +598,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       filter[Op.and].push({
         [Op.or]: [
           { process_name: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } }
+          // { description: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -606,7 +609,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -615,7 +618,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       const columns = [
         { header: 'Process ID', key: 'id', width: 15 },
         { header: 'Process Name', key: 'process_name', width: 20 },
-        { header: 'Description', key: 'description', width: 30 },
+        // { header: 'Description', key: 'description', width: 30 },
         { header: 'Status', key: 'status', width: 10 },
         { header: 'Created Date', key: 'created_at', width: 15 }
       ];
@@ -634,7 +637,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -645,7 +648,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
     const htmlData = processes.map(process => ({
       id: process.id,
       process_name: process.process_name,
-      description: process.description,
+      // description: process.description,
       status: process.status
     }));
 
@@ -670,14 +673,14 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
 v1Router.get("/routes", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, search, export: isExport } = req.query;
+    const { fromDate, toDate, search,status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     // Build base filter using Op.and
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: 'active' },
+        ...(status ? [{ status }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
     };
@@ -688,7 +691,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
       filter[Op.and].push({
         [Op.or]: [
           { route_name: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } }
+          // { description: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -699,7 +702,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -708,7 +711,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
       const columns = [
         { header: 'Route ID', key: 'id', width: 15 },
         { header: 'Route Name', key: 'route_name', width: 20 },
-        { header: 'Description', key: 'description', width: 30 },
+        // { header: 'Description', key: 'description', width: 30 },
         { header: 'Status', key: 'status', width: 10 },
         { header: 'Created Date', key: 'created_at', width: 15 }
       ];
@@ -727,7 +730,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -738,7 +741,7 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
     const htmlData = routes.map(route => ({
       id: route.id,
       route_name: route.route_name,
-      description: route.description,
+      // description: route.description,
       status: route.status
     }));
 
@@ -798,7 +801,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -832,7 +835,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -904,7 +907,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -938,7 +941,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1008,7 +1011,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
           },
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1042,7 +1045,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         },
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1527,7 +1530,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1558,7 +1561,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -1629,7 +1632,7 @@ v1Router.get("/products", authenticateJWT, async (req, res) => {
         include: [
           {
             model: Company,
-            attributes: ['name']
+            // attributes: ['name']
           }
         ],
         order: [['created_at', 'DESC']]
@@ -1661,7 +1664,7 @@ v1Router.get("/products", authenticateJWT, async (req, res) => {
       include: [
         {
           model: Company,
-          attributes: ['name']
+          // attributes: ['name']
         }
       ],
       order: [['created_at', 'DESC']],
