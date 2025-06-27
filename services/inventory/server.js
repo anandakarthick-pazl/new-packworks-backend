@@ -887,18 +887,6 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       }
 
 
-      const matchingSku = await Sku.findAll({
-        attributes: ['id'],
-        where: {
-          [Op.or]: [ { sku_generate_id: { [Op.like]: `%${search}%` } }]
-        }
-      });
-
-      if (matchingSku.length > 0) {
-        const skuIds = matchingItems.map(item => item.id);
-        searchConditions.push({ sku_id: { [Op.in]: skuIds } });
-      }
-
       // 🔍 Category name match
       const matchingCategory = await Categories.findAll({
         attributes: ['id',],

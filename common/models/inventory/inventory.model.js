@@ -29,11 +29,11 @@ const Inventory = sequelize.define("Inventory", {
   },
   item_id: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: false,
   },
   sku_id: {
     type: DataTypes.INTEGER,
-    allowNull: false
+    allowNull: true
   },
   sku_generate_id:{
     type: DataTypes.STRING(200),
