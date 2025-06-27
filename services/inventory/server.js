@@ -235,7 +235,7 @@ v1Router.get("/inventory/export", authenticateJWT, async (req, res) => {
         'updated_at',
       ],
       where: whereCondition,
-      group: ['Inventory.item_id', 'item.id', 'item->category_info.id', 'item->sub_category_info.id'],
+      group: ['Inventory.item_id', 'item_info.id', 'item_info->category_info.id', 'item_info->sub_category_info.id'],
       include: [
         {
           model: ItemMaster,
