@@ -365,6 +365,7 @@ v1Router.get(
         sku_name,
         status = "active",
         production,
+        temporary_status,
       } = req.query;
 
       // Build where clause for filtering
@@ -389,6 +390,9 @@ v1Router.get(
       // Production filtering - filter by production stage if provided
       if (production) {
         whereClause.production = production;
+      }
+      if (temporary_status) {
+        whereClause.temporary_status = parseInt(temporary_status, 10);
       }
 
       // Filter only production=in_production status
