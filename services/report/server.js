@@ -480,14 +480,14 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
 v1Router.get("/machines", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, machine_type, search, export: isExport } = req.query;
+    const { fromDate, toDate, machine_type, search, status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     // Build base filter using Op.and
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: 'active' },
+        { status: status || 'active' }, // Default to 'active' if status is not provided
         ...(machine_type ? [{ machine_type }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
