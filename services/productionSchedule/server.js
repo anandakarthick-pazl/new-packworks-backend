@@ -35,15 +35,120 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
 });
 
 //get
+// v1Router.get("/get-all", authenticateJWT, async (req, res) => {
+//   try {
+//      const schedules = await ProductionSchedule.findAll({
+//       where: {
+//         company_id: req.user.company_id
+//       }
+//     });    res.status(200).json({ success: true, data: schedules });
+//   } catch (err) {
+//        res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+//get advanced
 v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   try {
-     const schedules = await ProductionSchedule.findAll({
-      where: {
-        company_id: req.user.company_id
+    const { 
+      startDate, 
+      endDate, 
+      date, 
+      month, 
+      year,
+      today,
+      thisWeek,
+      thisMonth 
+    } = req.query;
+    
+    let whereCondition = {
+      company_id: req.user.company_id
+    };
+    
+    // Current date for relative filters
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0];
+    
+    if (date) {
+      // Specific date
+      whereCondition.date = date;
+    } else if (today === 'true') {
+      // Today's schedules
+      whereCondition.date = currentDate;
+    } else if (thisWeek === 'true') {
+      // This week's schedules
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      
+      whereCondition.date = {
+        [Op.between]: [
+          startOfWeek.toISOString().split('T')[0],
+          endOfWeek.toISOString().split('T')[0]
+        ]
+      };
+    } else if (thisMonth === 'true') {
+      // This month's schedules
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      whereCondition.date = {
+        [Op.between]: [
+          startOfMonth.toISOString().split('T')[0],
+          endOfMonth.toISOString().split('T')[0]
+        ]
+      };
+    } else if (month && year) {
+      // Specific month and year
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0);
+      
+      whereCondition.date = {
+        [Op.between]: [
+          startOfMonth.toISOString().split('T')[0],
+          endOfMonth.toISOString().split('T')[0]
+        ]
+      };
+    } else if (year) {
+      // Specific year
+      whereCondition.date = {
+        [Op.between]: [`${year}-01-01`, `${year}-12-31`]
+      };
+    } else if (startDate || endDate) {
+      // Date range
+      whereCondition.date = {};
+      
+      if (startDate) {
+        whereCondition.date[Op.gte] = startDate;
       }
-    });    res.status(200).json({ success: true, data: schedules });
+      
+      if (endDate) {
+        whereCondition.date[Op.lte] = endDate;
+      }
+    }
+    
+    const schedules = await ProductionSchedule.findAll({
+      where: whereCondition,
+      order: [['date', 'ASC'], ['created_at', 'ASC']]
+    });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: schedules,
+      filters: {
+        startDate,
+        endDate,
+        date,
+        month,
+        year,
+        today,
+        thisWeek,
+        thisMonth
+      }
+    });
   } catch (err) {
-       res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
