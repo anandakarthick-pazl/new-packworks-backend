@@ -487,8 +487,9 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: status || 'active' }, // Default to 'active' if status is not provided
+        // { status: status || 'active' }, // Default to 'active' if status is not provided
         ...(machine_type ? [{ machine_type }] : []),
+        ...(status ? [{ status }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
     };
