@@ -458,15 +458,15 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       const currentDebit = parseFloat(client.debit_balance || 0);
 
       // If client has enough debit balance to cover this
-      if (debit_balance_amount > 0 && currentDebit >= debit_balance_amount) {
-        const updatedDebitBalance = currentDebit - debit_balance_amount;
+      if (debit_used_amount > 0 && currentDebit >= debit_used_amount) {
+        const updatedDebitBalance = currentDebit - debit_used_amount;
 
         console.log("updatedDebitNote :", updatedDebitBalance);
 
         await addWalletHistory({
           type: 'credit',
           client_id: client.client_id,
-          amount: debit_balance_amount,
+          amount: debit_used_amount,
           company_id: req.user.company_id,
           reference_number: "Purchase Order " + purchase_generate_id,
           created_by: req.user.id,
@@ -534,7 +534,7 @@ v1Router.post("/purchase-order", authenticateJWT, async (req, res) => {
       po_id: newPO.id,
       purchase_payment_generate_id,
       payment_date: new Date(),
-      amount: debit_balance_amount,
+      amount: debit_used_amount,
       payment_mode: "wallet",
       status: paymentStatus,
       remark: "Paid using wallet credit",
