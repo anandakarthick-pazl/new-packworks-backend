@@ -20,12 +20,15 @@ app.use(cors());
 const v1Router = Router();
 
 
-//post
+//post production_schedule
 v1Router.post("/create", authenticateJWT, async (req, res) => {
   try {
+    const production_schedule_generate_id = await generateId(req.user.company_id, ProductionSchedule, "production_schedule");
     const data = await ProductionSchedule.create({
-      ...req.body,                     
-      company_id: req.user.company_id  
+      ...req.body,        
+      production_schedule_generate_id: production_schedule_generate_id,             
+      company_id: req.user.company_id, 
+      created_by: req.user.id, 
     });
 
     res.status(200).json({ success: true, data: data });
