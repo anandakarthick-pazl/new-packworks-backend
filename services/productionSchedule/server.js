@@ -37,20 +37,8 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
   }
 });
 
-//get
-// v1Router.get("/get-all", authenticateJWT, async (req, res) => {
-//   try {
-//      const schedules = await ProductionSchedule.findAll({
-//       where: {
-//         company_id: req.user.company_id
-//       }
-//     });    res.status(200).json({ success: true, data: schedules });
-//   } catch (err) {
-//        res.status(500).json({ success: false, error: err.message });
-//   }
-// });
 
-//get advanced
+//get all
 v1Router.get("/get-all", authenticateJWT, async (req, res) => {
   try {
     const { 
@@ -130,28 +118,58 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
 
 //get by id
 v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
-   try {
-    const schedule = await ProductionSchedule.findByPk(req.params.id);
-    if (!schedule) return res.status(404).json({ success: false, message: 'Not found' });
-    res.status(200).json({ success: true, data: schedule });
+  try {
+    const schedule = await ProductionSchedule.findOne({
+      where: {
+        id: req.params.id,
+        company_id: req.user.company_id,
+      }
+    });
+
+    if (!schedule) {
+      return res.status(404).json({ success: false, message: "Production schedule not found" });
+    }
+
+    return res.status(200).json({ success: true, data: schedule });
+
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 //update
 v1Router.put("/update/:id", authenticateJWT, async (req, res) => {
   try {
-    const [updated] = await ProductionSchedule.update(req.body, {
-      where: { id: req.params.id },
+    const { id } = req.params;
+    const existingSchedule = await ProductionSchedule.findOne({
+      where: {
+        id,
+        company_id: req.user.company_id,
+        status: "active"
+      }
     });
-    if (!updated) return res.status(404).json({ success: false, message: 'Not found' });
-    const updatedSchedule = await ProductionSchedule.findByPk(req.params.id);
-    res.status(200).json({ success: true, data: updatedSchedule });
+
+    if (!existingSchedule) {
+      return res.status(404).json({ success: false, message: "Production schedule not found" });
+    }
+    await existingSchedule.update({
+      ...req.body,
+      updated_by: req.user.id,
+      updated_at: new Date()
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Production schedule updated successfully",
+      data: existingSchedule
+    });
+
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 
 //delete
@@ -199,7 +217,6 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 
 
 app.use("/api/production-schedule", v1Router);
-// await db.sequelize.sync();
 const PORT = process.env.PORT_PRODUCTION_SCHEDULE;
 app.listen(process.env.PORT_PRODUCTION_SCHEDULE,'0.0.0.0', () => {
   console.log(`Production Schedule Service running on port ${process.env.PORT_PRODUCTION_SCHEDULE}`);
