@@ -19,6 +19,7 @@ const Categories = db.Categories;
 const Sub_categories = db.Sub_categories;
 const PurchaseOrderBilling = db.PurchaseOrderBilling;
 const PurchaseOrderPayment = db.PurchaseOrderPayment;
+const ProductionSchedule = db.ProductionSchedule;
 
 export async function generateId(companyId, model, prefixKey) {
   console.log(companyId, model, prefixKey, "123");
