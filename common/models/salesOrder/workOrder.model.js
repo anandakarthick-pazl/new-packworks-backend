@@ -163,6 +163,11 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+    temporary_status: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       allowNull: false,
