@@ -283,7 +283,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
         [Op.or]: [
           { sales_generate_id: { [Op.like]: `%${searchTerm}%` } },
           { estimated: { [Op.like]: `%${searchTerm}%` } },
-          { sales_status: { [Op.like]: `%${searchTerm}%` } },
+          // { sales_status: { [Op.like]: `%${searchTerm}%` } },
           // { reference: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
