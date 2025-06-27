@@ -580,14 +580,14 @@ v1Router.get("/machines", authenticateJWT, async (req, res) => {
 v1Router.get("/processes", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, search, export: isExport } = req.query;
+    const { fromDate, toDate, search,status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     // Build base filter using Op.and
     const filter = {
       [Op.and]: [
         { company_id },
-        { status: 'active' },
+        ...(status ? [{ status }] : []),
         ...(buildDateFilter(fromDate, toDate) ? [buildDateFilter(fromDate, toDate)] : [])
       ]
     };
@@ -598,7 +598,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       filter[Op.and].push({
         [Op.or]: [
           { process_name: { [Op.like]: `%${searchTerm}%` } },
-          { description: { [Op.like]: `%${searchTerm}%` } }
+          // { description: { [Op.like]: `%${searchTerm}%` } }
         ]
       });
     }
@@ -618,7 +618,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
       const columns = [
         { header: 'Process ID', key: 'id', width: 15 },
         { header: 'Process Name', key: 'process_name', width: 20 },
-        { header: 'Description', key: 'description', width: 30 },
+        // { header: 'Description', key: 'description', width: 30 },
         { header: 'Status', key: 'status', width: 10 },
         { header: 'Created Date', key: 'created_at', width: 15 }
       ];
@@ -648,7 +648,7 @@ v1Router.get("/processes", authenticateJWT, async (req, res) => {
     const htmlData = processes.map(process => ({
       id: process.id,
       process_name: process.process_name,
-      description: process.description,
+      // description: process.description,
       status: process.status
     }));
 
