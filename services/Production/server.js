@@ -406,6 +406,14 @@ v1Router.put("/production-group", authenticateJWT, async (req, res) => {
           continue;
         }
 
+        // Parse JSON fields for proper response format
+        const formattedGroup = {
+          ...updatedProductionGroup.toJSON(),
+          group_value: typeof updatedProductionGroup.group_value === 'string' 
+            ? JSON.parse(updatedProductionGroup.group_value || '[]')
+            : updatedProductionGroup.group_value
+        };
+
         // Process new group_value array to update work_order status
         if (
           groupDetails.group_value &&
@@ -551,7 +559,7 @@ v1Router.put("/production-group", authenticateJWT, async (req, res) => {
           }
         }
 
-        updatedGroups.push(updatedProductionGroup);
+        updatedGroups.push(formattedGroup);
         console.log(
           `✅ Successfully updated group ${i}: ${groupDetails.group_name}`
         );
