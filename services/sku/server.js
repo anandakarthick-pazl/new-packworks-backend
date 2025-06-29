@@ -1766,6 +1766,36 @@ v1Router.delete(
     }
   }
 );
+
+//get sales order generate id
+v1Router.get("/sku-details/get/generate-id", authenticateJWT, async (req, res) => {
+  try {
+     const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
+
+    const sku = await Sku.findAll({
+      attributes: ["id", "sku_ui_id"],
+      where: whereClause,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: sku,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch Sku Details",
+    });
+  }
+});
+
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
