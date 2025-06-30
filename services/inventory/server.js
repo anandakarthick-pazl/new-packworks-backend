@@ -91,6 +91,7 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
     // Get inventory data
     const inventory = await Inventory.findAll({
       attributes: [
+        'id',
         'inventory_generate_id',
         'quantity_available',
         'quantity_blocked',
