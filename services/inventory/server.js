@@ -91,7 +91,7 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
     // Get inventory data
     const inventory = await Inventory.findAll({
       attributes: [
-        'id',
+        'inventory_generate_id',
         'quantity_available',
         'quantity_blocked',
       ],
@@ -101,6 +101,8 @@ v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {
           model: ItemMaster,
           as: 'item_info',
           attributes: [
+            'item_generate_id',
+            'item_name',
             'default_custom_fields'
           ],
           required: true,
@@ -434,7 +436,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
         }
       ],
       attributes: [
-        "id", "bill_reference_number", "bill_date", "status", "created_at"
+        "id","bill_generate_id", "bill_reference_number", "bill_date", "status", "created_at"
       ],
       order: [["created_at", "DESC"]]
     });
