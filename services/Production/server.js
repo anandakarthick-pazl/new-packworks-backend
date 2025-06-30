@@ -1087,7 +1087,7 @@ v1Router.post("/new", authenticateJWT, async (req, res) => {
     const workOrderUpdateResult = await WorkOrder.update(
       { 
         temporary_status: 0,
-        production: "created",
+        // production: "created",
         updated_by: req.user.id 
       },
       {
