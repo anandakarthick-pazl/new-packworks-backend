@@ -676,7 +676,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
     if (sales_order_id) { whereConditions.push('so.id = ?'); queryParams.push(sales_order_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'wo.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['wo.work_order_generate_id', 'wo.progress', 'wo.priority']);
+    const searchFilter = buildSearchFilter(search, ['wo.work_generate_id', 'wo.progress', 'wo.priority']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -693,7 +693,7 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const workOrders = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(workOrders, 'Work Orders Report', [
-        { header: 'Work Order ID', key: 'work_order_generate_id', width: 20 },
+        { header: 'Work Order ID', key: 'work_generate_id', width: 20 },
         { header: 'Sales Order ID', key: 'sales_generate_id', width: 20 },
         { header: 'Work Order Date', key: 'work_order_date_formatted', width: 15 },
         { header: 'Status', key: 'progress', width: 15 },
@@ -711,9 +711,9 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
     const workOrders = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = workOrders.map(order => ({
-      work_order_generate_id: order.work_generate_id,
+      work_generate_id: order.work_generate_id,
       work_order_date: order.work_order_date_formatted,
-      progress: order.production,
+      progress: order.progress,
       priority: order.priority,
       expected_completion_date: order.expected_completion_formatted
     }));
