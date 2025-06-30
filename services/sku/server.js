@@ -1767,7 +1767,7 @@ v1Router.delete(
   }
 );
 
-//get sales order generate id
+//get sku generate id
 v1Router.get("/sku-details/get/generate-id", authenticateJWT, async (req, res) => {
   try {
      const whereClause = {
