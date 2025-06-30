@@ -263,8 +263,6 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
-
-
 v1Router.put("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
 
@@ -1057,7 +1055,6 @@ v1Router.delete("/production-groups", authenticateJWT, async (req, res) => {
   }
 });
 
-// POST create new production - reset temporary status and update production value
 v1Router.post("/new", authenticateJWT, async (req, res) => {
   try {
     console.log("Starting production/new process...");
@@ -1083,13 +1080,12 @@ v1Router.post("/new", authenticateJWT, async (req, res) => {
     console.log(`ProductionGroup update result: ${productionGroupUpdateResult[0]} rows affected`);
     logger.info(`Updated ${productionGroupUpdateResult[0]} ProductionGroup records from temporary_status 1 to 0`);
 
-    // Step 2: Update WorkOrder table - set temporary_status from 1 to 0 and in_production to "created"
-    console.log("Step 2: Updating WorkOrder temporary_status and in_production...");
+    // Step 2: Update WorkOrder table - set temporary_status from 1 to 0 only
+    console.log("Step 2: Updating WorkOrder temporary_status...");
     
     const workOrderUpdateResult = await WorkOrder.update(
       { 
         temporary_status: 0,
-        production: "created",
         updated_by: req.user.id 
       },
       {
@@ -1102,7 +1098,7 @@ v1Router.post("/new", authenticateJWT, async (req, res) => {
     );
 
     console.log(`WorkOrder update result: ${workOrderUpdateResult[0]} rows affected`);
-    logger.info(`Updated ${workOrderUpdateResult[0]} WorkOrder records from temporary_status 1 to 0 and set in_production to "created"`);
+    logger.info(`Updated ${workOrderUpdateResult[0]} WorkOrder records from temporary_status 1 to 0`);
 
     // Prepare response
     const response = {
@@ -1129,6 +1125,78 @@ v1Router.post("/new", authenticateJWT, async (req, res) => {
     });
   }
 });
+// POST create new production - reset temporary status and update production value
+// v1Router.post("/new", authenticateJWT, async (req, res) => {
+//   try {
+//     console.log("Starting production/new process...");
+//     logger.info("Starting production/new process");
+
+//     // Step 1: Update ProductionGroup table - set temporary_status from 1 to 0
+//     console.log("Step 1: Updating ProductionGroup temporary_status...");
+    
+//     const productionGroupUpdateResult = await ProductionGroup.update(
+//       { 
+//         temporary_status: 0,
+//         updated_by: req.user.id 
+//       },
+//       {
+//         where: { 
+//           temporary_status: 1,
+//           company_id: req.user.company_id 
+//         },
+//         returning: true
+//       }
+//     );
+
+//     console.log(`ProductionGroup update result: ${productionGroupUpdateResult[0]} rows affected`);
+//     logger.info(`Updated ${productionGroupUpdateResult[0]} ProductionGroup records from temporary_status 1 to 0`);
+
+//     // Step 2: Update WorkOrder table - set temporary_status from 1 to 0 and in_production to "created"
+//     console.log("Step 2: Updating WorkOrder temporary_status and in_production...");
+    
+//     const workOrderUpdateResult = await WorkOrder.update(
+//       { 
+//         temporary_status: 0,
+//         // production: "created",
+//         updated_by: req.user.id 
+//       },
+//       {
+//         where: { 
+//           temporary_status: 1,
+//           company_id: req.user.company_id 
+//         },
+//         returning: true
+//       }
+//     );
+
+//     console.log(`WorkOrder update result: ${workOrderUpdateResult[0]} rows affected`);
+//     logger.info(`Updated ${workOrderUpdateResult[0]} WorkOrder records from temporary_status 1 to 0 and set in_production to "created"`);
+
+//     // Prepare response
+//     const response = {
+//       message: "Production process completed successfully",
+//       production_groups_updated: productionGroupUpdateResult[0],
+//       work_orders_updated: workOrderUpdateResult[0],
+//       timestamp: new Date().toISOString(),
+//       processed_by: req.user.id
+//     };
+
+//     console.log("✅ Production/new process completed successfully");
+//     logger.info("Production/new process completed successfully", response);
+
+//     res.status(200).json(response);
+
+//   } catch (error) {
+//     console.error("Error in production/new process:", error);
+//     logger.error("Error in production/new process:", error);
+    
+//     res.status(500).json({ 
+//       message: "Internal Server Error during production process", 
+//       error: error.message,
+//       timestamp: new Date().toISOString()
+//     });
+//   }
+// });
 
 v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   try {
@@ -2266,41 +2334,41 @@ v1Router.get(
   }
 );
 
+// v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
+//   const { groupIds, temporary_status } = req.body;
 
+//   if (!Array.isArray(groupIds) || groupIds.length === 0) {
+//     return res.status(400).json({ message: "groupIds must be a non-empty array" });
+//   }
+//   if (typeof temporary_status === 'undefined') {
+//     return res.status(400).json({ message: "temporary_status is required" });
+//   }
 
-v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
-  const { groupIds, temporary_status } = req.body;
-
-  if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ message: "groupIds must be a non-empty array" });
-  }
-  if (typeof temporary_status === 'undefined') {
-    return res.status(400).json({ message: "temporary_status is required" });
-  }
-
-  try {
-    const [updatedCount] = await ProductionGroup.update(
-      { temporary_status },
-      {
-        where: {
-          id: groupIds,
-          company_id: req.user.company_id,
-        },
-      }
-    );
-    if (updatedCount === 0) {
-      return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
-    }
-    res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
-  } catch (error) {
-    logger.error("Error batch updating temporary_status:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
+//   try {
+//     const [updatedCount] = await ProductionGroup.update(
+//       { temporary_status },
+//       {
+//         where: {
+//           id: groupIds,
+//           company_id: req.user.company_id,
+//         },
+//       }
+//     );
+//     if (updatedCount === 0) {
+//       return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
+//     }
+//     res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
+//   } catch (error) {
+//     logger.error("Error batch updating temporary_status:", error);
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 
 
 // ✅ Health Check Endpoint
+
+
 app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
