@@ -1758,11 +1758,11 @@ v1Router.get(
         include: [
           {
             model: Inventory,
-            attributes: ["id", "quantity_available", "quantity_blocked"],
+            attributes: ["id", "inventory_generate_id","quantity_available", "quantity_blocked"],
           },
         ],
         order: [["created_at", "DESC"]],
-        limit: 50, // Limit to recent 50 records
+        limit: 50,
       });
 
       res.status(200).json({
