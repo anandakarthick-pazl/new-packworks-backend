@@ -263,8 +263,6 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
-
-
 v1Router.put("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
 
@@ -2266,41 +2264,41 @@ v1Router.get(
   }
 );
 
+// v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
+//   const { groupIds, temporary_status } = req.body;
 
+//   if (!Array.isArray(groupIds) || groupIds.length === 0) {
+//     return res.status(400).json({ message: "groupIds must be a non-empty array" });
+//   }
+//   if (typeof temporary_status === 'undefined') {
+//     return res.status(400).json({ message: "temporary_status is required" });
+//   }
 
-v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
-  const { groupIds, temporary_status } = req.body;
-
-  if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ message: "groupIds must be a non-empty array" });
-  }
-  if (typeof temporary_status === 'undefined') {
-    return res.status(400).json({ message: "temporary_status is required" });
-  }
-
-  try {
-    const [updatedCount] = await ProductionGroup.update(
-      { temporary_status },
-      {
-        where: {
-          id: groupIds,
-          company_id: req.user.company_id,
-        },
-      }
-    );
-    if (updatedCount === 0) {
-      return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
-    }
-    res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
-  } catch (error) {
-    logger.error("Error batch updating temporary_status:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
+//   try {
+//     const [updatedCount] = await ProductionGroup.update(
+//       { temporary_status },
+//       {
+//         where: {
+//           id: groupIds,
+//           company_id: req.user.company_id,
+//         },
+//       }
+//     );
+//     if (updatedCount === 0) {
+//       return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
+//     }
+//     res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
+//   } catch (error) {
+//     logger.error("Error batch updating temporary_status:", error);
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 
 
 // ✅ Health Check Endpoint
+
+
 app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
