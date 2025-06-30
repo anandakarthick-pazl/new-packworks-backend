@@ -264,6 +264,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
 });
 
 
+
 v1Router.put("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
 
@@ -602,6 +603,532 @@ v1Router.put("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
+// single group delete
+v1Router.delete("/production-group/:id", authenticateJWT, async (req, res) => {
+  const groupId = req.params.id;
+
+  // Validate group ID
+  if (!groupId || isNaN(groupId)) {
+    return res.status(400).json({
+      message: "Invalid group ID provided",
+    });
+  }
+
+  try {
+    // Find the production group first
+    const productionGroup = await ProductionGroup.findByPk(groupId);
+
+    if (!productionGroup) {
+      return res.status(404).json({
+        message: "Production group not found",
+      });
+    }
+
+    // Check if user has permission to delete this group (same company)
+    if (productionGroup.company_id !== req.user.company_id) {
+      return res.status(403).json({
+        message: "Access denied - you can only delete groups from your company",
+      });
+    }
+
+    console.log(`Starting deletion process for group ID: ${groupId}`);
+    console.log("Group details:", {
+      group_name: productionGroup.group_name,
+      group_value: productionGroup.group_value,
+    });
+
+    // Add this critical debug info to the response
+    // const debugInfo = {
+    //   group_value_exists: !!productionGroup.group_value,
+    //   group_value_type: typeof productionGroup.group_value,
+    //   group_value_is_array: Array.isArray(productionGroup.group_value),
+    //   group_value_content: productionGroup.group_value,
+    // };
+
+    const updatedWorkOrders = [];
+    const updateErrors = [];
+
+    // Process group_value to revert layer status back to "ungrouped"
+    let groupValueToProcess = productionGroup.group_value;
+    
+    // Handle different possible formats of group_value
+    if (typeof groupValueToProcess === 'string') {
+      try {
+        groupValueToProcess = JSON.parse(groupValueToProcess);
+        console.log("✅ Parsed group_value from JSON string");
+      } catch (e) {
+        console.log("❌ Failed to parse group_value as JSON:", e);
+        groupValueToProcess = null;
+      }
+    }
+    
+    if (groupValueToProcess && Array.isArray(groupValueToProcess)) {
+      console.log("=== PROCESSING GROUP_VALUE FOR DELETION ===");
+      console.log("Group value:", JSON.stringify(groupValueToProcess, null, 2));
+
+      for (const item of groupValueToProcess) {
+        const { work_order_id, layer_id } = item;
+        console.log(`\n🔍 Processing: work_order_id=${work_order_id}, layer_id=${layer_id}`);
+
+        if (work_order_id && layer_id) {
+          try {
+            // Find work order by id
+            const workOrder = await WorkOrder.findByPk(work_order_id);
+            console.log(`WorkOrder found: ${workOrder ? 'YES' : 'NO'}`);
+
+            if (workOrder && workOrder.work_order_sku_values) {
+              let skuValues = workOrder.work_order_sku_values;
+              console.log("Original sku_values type:", typeof skuValues);
+
+              // Parse if it's a JSON string
+              if (typeof skuValues === "string") {
+                try {
+                  skuValues = JSON.parse(skuValues);
+                  console.log("✅ Parsed JSON string successfully");
+                } catch (parseError) {
+                  console.error("❌ JSON Parse Error:", parseError);
+                  updateErrors.push(`Failed to parse work_order_sku_values for work_order_id ${work_order_id}`);
+                  continue;
+                }
+              }
+
+              if (Array.isArray(skuValues)) {
+                console.log(`📋 Found ${skuValues.length} layers in work order`);
+                
+                // Show all layers for debugging
+                skuValues.forEach((layer, idx) => {
+                  console.log(`  Layer ${idx}: id=${layer.layer_id}, status=${layer.layer_status}`);
+                });
+
+                let updated = false;
+                const revertedSkuValues = skuValues.map((layer) => {
+                  // Convert both to numbers for comparison
+                  const layerIdNum = Number(layer.layer_id);
+                  const targetLayerIdNum = Number(layer_id);
+                  const isTargetLayer = layerIdNum === targetLayerIdNum;
+                  const isGrouped = layer.layer_status === "grouped";
+
+                  console.log(`  Checking layer_id ${layer.layer_id}: isTarget=${isTargetLayer}, isGrouped=${isGrouped}`);
+
+                  if (isTargetLayer && isGrouped) {
+                    updated = true;
+                    console.log(`    ✅ REVERTING layer_id ${layer_id} from 'grouped' to 'ungrouped'`);
+                    return { ...layer, layer_status: "ungrouped" };
+                  }
+                  return layer;
+                });
+
+                if (updated) {
+                  console.log("💾 Updating work order with reverted values...");
+                  
+                  await WorkOrder.update(
+                    {
+                      work_order_sku_values: revertedSkuValues,
+                      updated_by: req.user.id,
+                    },
+                    {
+                      where: { id: work_order_id },
+                    }
+                  );
+
+                  updatedWorkOrders.push({
+                    work_order_id,
+                    layer_id,
+                    status: "reverted to ungrouped",
+                  });
+
+                  console.log("✅ Successfully updated work order");
+                } else {
+                  console.log(`❌ No update needed - layer_id ${layer_id} not found or not grouped`);
+                }
+              } else {
+                console.log("❌ sku_values is not an array after parsing");
+                updateErrors.push(`work_order_sku_values is not an array for work_order_id ${work_order_id}`);
+              }
+            } else {
+              console.log(`❌ Work order ${work_order_id} not found or has no sku_values`);
+              updateErrors.push(`Work order not found or missing sku_values for work_order_id ${work_order_id}`);
+            }
+          } catch (updateError) {
+            console.error(`❌ Error processing work order ${work_order_id}:`, updateError);
+            updateErrors.push(`Failed to update work_order_id ${work_order_id}: ${updateError.message}`);
+          }
+        } else {
+          console.log(`❌ Missing work_order_id or layer_id in item:`, item);
+          updateErrors.push(`Missing work_order_id or layer_id in group_value item`);
+        }
+      }
+      console.log("=== PROCESSING COMPLETE ===\n");
+    } else {
+      console.log("❌ No valid group_value found");
+      console.log("group_value type:", typeof productionGroup.group_value);
+      console.log("group_value content:", productionGroup.group_value);
+      console.log("Is array:", Array.isArray(productionGroup.group_value));
+    }
+
+    // Now delete the production group
+    await ProductionGroup.destroy({
+      where: { 
+        id: groupId,
+        company_id: req.user.company_id // Additional safety check
+      },
+    });
+
+    console.log(`✅ Successfully deleted production group ID: ${groupId}`);
+    logger.info(`Production group ${groupId} deleted by user ${req.user.id}`);
+
+    // Prepare response
+    const response = {
+      message: "Production group deleted successfully",
+      deleted_group: {
+        id: productionGroup.id,
+        group_name: productionGroup.group_name,
+      },
+      updated_work_orders: updatedWorkOrders,
+      total_layers_reverted: updatedWorkOrders.length,
+      // debug_info: debugInfo, 
+    };
+
+    // Include update errors if any occurred
+    if (updateErrors.length > 0) {
+      response.update_errors = updateErrors;
+      response.message += ` (with ${updateErrors.length} layer update errors)`;
+    }
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error("Error deleting production group:", error);
+    logger.error("Error deleting production group:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message 
+    });
+  }
+});
+
+// multiple group delete
+v1Router.delete("/production-groups", authenticateJWT, async (req, res) => {
+  const { groupIds } = req.body;
+
+  // Validate input
+  if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({
+      message: "Invalid input - groupIds must be a non-empty array",
+    });
+  }
+
+  // Validate all group IDs
+  const invalidIds = groupIds.filter(id => !id || isNaN(id));
+  if (invalidIds.length > 0) {
+    return res.status(400).json({
+      message: "Invalid group IDs provided",
+      invalid_ids: invalidIds,
+    });
+  }
+
+  try {
+    console.log(`Starting deletion process for ${groupIds.length} groups:`, groupIds);
+
+    const deletionResults = [];
+    const errors = [];
+    let totalLayersReverted = 0;
+
+    // Process each group
+    for (const groupId of groupIds) {
+      try {
+        console.log(`\n=== Processing Group ID: ${groupId} ===`);
+        
+        // Find the production group first
+        const productionGroup = await ProductionGroup.findByPk(groupId);
+
+        if (!productionGroup) {
+          errors.push({
+            group_id: groupId,
+            error: "Production group not found",
+          });
+          continue;
+        }
+
+        // Check if user has permission to delete this group (same company)
+        if (productionGroup.company_id !== req.user.company_id) {
+          errors.push({
+            group_id: groupId,
+            error: "Access denied - you can only delete groups from your company",
+          });
+          continue;
+        }
+
+        console.log("Group details:", {
+          group_name: productionGroup.group_name,
+          group_value: productionGroup.group_value,
+        });
+
+        const updatedWorkOrders = [];
+        const updateErrors = [];
+
+        // Process group_value to revert layer status back to "ungrouped"
+        let groupValueToProcess = productionGroup.group_value;
+        
+        // Handle different possible formats of group_value
+        if (typeof groupValueToProcess === 'string') {
+          try {
+            groupValueToProcess = JSON.parse(groupValueToProcess);
+            console.log("✅ Parsed group_value from JSON string");
+          } catch (e) {
+            console.log("❌ Failed to parse group_value as JSON:", e);
+            groupValueToProcess = null;
+          }
+        }
+        
+        if (groupValueToProcess && Array.isArray(groupValueToProcess)) {
+          console.log("=== PROCESSING GROUP_VALUE FOR DELETION ===");
+          console.log("Group value:", JSON.stringify(groupValueToProcess, null, 2));
+
+          for (const item of groupValueToProcess) {
+            const { work_order_id, layer_id } = item;
+            console.log(`\n🔍 Processing: work_order_id=${work_order_id}, layer_id=${layer_id}`);
+
+            if (work_order_id && layer_id) {
+              try {
+                // Find work order by id
+                const workOrder = await WorkOrder.findByPk(work_order_id);
+                console.log(`WorkOrder found: ${workOrder ? 'YES' : 'NO'}`);
+
+                if (workOrder && workOrder.work_order_sku_values) {
+                  let skuValues = workOrder.work_order_sku_values;
+                  console.log("Original sku_values type:", typeof skuValues);
+
+                  // Parse if it's a JSON string
+                  if (typeof skuValues === "string") {
+                    try {
+                      skuValues = JSON.parse(skuValues);
+                      console.log("✅ Parsed JSON string successfully");
+                    } catch (parseError) {
+                      console.error("❌ JSON Parse Error:", parseError);
+                      updateErrors.push(`Failed to parse work_order_sku_values for work_order_id ${work_order_id}`);
+                      continue;
+                    }
+                  }
+
+                  if (Array.isArray(skuValues)) {
+                    console.log(`📋 Found ${skuValues.length} layers in work order`);
+                    
+                    // Show all layers for debugging
+                    skuValues.forEach((layer, idx) => {
+                      console.log(`  Layer ${idx}: id=${layer.layer_id}, status=${layer.layer_status}`);
+                    });
+
+                    let updated = false;
+                    const revertedSkuValues = skuValues.map((layer) => {
+                      // Convert both to numbers for comparison
+                      const layerIdNum = Number(layer.layer_id);
+                      const targetLayerIdNum = Number(layer_id);
+                      const isTargetLayer = layerIdNum === targetLayerIdNum;
+                      const isGrouped = layer.layer_status === "grouped";
+
+                      console.log(`  Checking layer_id ${layer.layer_id}: isTarget=${isTargetLayer}, isGrouped=${isGrouped}`);
+
+                      if (isTargetLayer && isGrouped) {
+                        updated = true;
+                        console.log(`    ✅ REVERTING layer_id ${layer_id} from 'grouped' to 'ungrouped'`);
+                        return { ...layer, layer_status: "ungrouped" };
+                      }
+                      return layer;
+                    });
+
+                    if (updated) {
+                      console.log("💾 Updating work order with reverted values...");
+                      
+                      await WorkOrder.update(
+                        {
+                          work_order_sku_values: revertedSkuValues,
+                          updated_by: req.user.id,
+                        },
+                        {
+                          where: { id: work_order_id },
+                        }
+                      );
+
+                      updatedWorkOrders.push({
+                        work_order_id,
+                        layer_id,
+                        status: "reverted to ungrouped",
+                      });
+
+                      console.log("✅ Successfully updated work order");
+                    } else {
+                      console.log(`❌ No update needed - layer_id ${layer_id} not found or not grouped`);
+                    }
+                  } else {
+                    console.log("❌ sku_values is not an array after parsing");
+                    updateErrors.push(`work_order_sku_values is not an array for work_order_id ${work_order_id}`);
+                  }
+                } else {
+                  console.log(`❌ Work order ${work_order_id} not found or has no sku_values`);
+                  updateErrors.push(`Work order not found or missing sku_values for work_order_id ${work_order_id}`);
+                }
+              } catch (updateError) {
+                console.error(`❌ Error processing work order ${work_order_id}:`, updateError);
+                updateErrors.push(`Failed to update work_order_id ${work_order_id}: ${updateError.message}`);
+              }
+            } else {
+              console.log(`❌ Missing work_order_id or layer_id in item:`, item);
+              updateErrors.push(`Missing work_order_id or layer_id in group_value item`);
+            }
+          }
+          console.log("=== PROCESSING COMPLETE ===\n");
+        } else {
+          console.log("❌ No valid group_value found");
+          console.log("group_value type:", typeof productionGroup.group_value);
+          console.log("group_value content:", productionGroup.group_value);
+          console.log("Is array:", Array.isArray(productionGroup.group_value));
+        }
+
+        // Now delete the production group
+        await ProductionGroup.destroy({
+          where: { 
+            id: groupId,
+            company_id: req.user.company_id // Additional safety check
+          },
+        });
+
+        console.log(`✅ Successfully deleted production group ID: ${groupId}`);
+        logger.info(`Production group ${groupId} deleted by user ${req.user.id}`);
+
+        // Add to successful deletions
+        const groupResult = {
+          group_id: groupId,
+          group_name: productionGroup.group_name,
+          updated_work_orders: updatedWorkOrders,
+          layers_reverted: updatedWorkOrders.length,
+          status: "deleted successfully",
+        };
+
+        // Include update errors if any occurred for this group
+        if (updateErrors.length > 0) {
+          groupResult.update_errors = updateErrors;
+          groupResult.status = `deleted with ${updateErrors.length} layer update errors`;
+        }
+
+        deletionResults.push(groupResult);
+        totalLayersReverted += updatedWorkOrders.length;
+
+      } catch (groupError) {
+        console.error(`Error processing group ${groupId}:`, groupError);
+        errors.push({
+          group_id: groupId,
+          error: `Failed to delete group: ${groupError.message}`,
+        });
+      }
+    }
+
+    // Prepare final response
+    const response = {
+      message: `Processed ${groupIds.length} groups`,
+      summary: {
+        total_requested: groupIds.length,
+        successfully_deleted: deletionResults.length,
+        failed: errors.length,
+        total_layers_reverted: totalLayersReverted,
+      },
+      deleted_groups: deletionResults,
+    };
+
+    // Include errors if any occurred
+    if (errors.length > 0) {
+      response.errors = errors;
+      response.message += ` (${errors.length} failed)`;
+    }
+
+    // Determine response status
+    const statusCode = errors.length === 0 ? 200 : 
+                      deletionResults.length === 0 ? 400 : 207; // 207 = Multi-Status
+
+    res.status(statusCode).json(response);
+
+  } catch (error) {
+    console.error("Error in bulk deletion process:", error);
+    logger.error("Error in bulk deletion process:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message 
+    });
+  }
+});
+
+// POST create new production - reset temporary status and update production value
+v1Router.post("/new", authenticateJWT, async (req, res) => {
+  try {
+    console.log("Starting production/new process...");
+    logger.info("Starting production/new process");
+
+    // Step 1: Update ProductionGroup table - set temporary_status from 1 to 0
+    console.log("Step 1: Updating ProductionGroup temporary_status...");
+    
+    const productionGroupUpdateResult = await ProductionGroup.update(
+      { 
+        temporary_status: 0,
+        updated_by: req.user.id 
+      },
+      {
+        where: { 
+          temporary_status: 1,
+          company_id: req.user.company_id 
+        },
+        returning: true
+      }
+    );
+
+    console.log(`ProductionGroup update result: ${productionGroupUpdateResult[0]} rows affected`);
+    logger.info(`Updated ${productionGroupUpdateResult[0]} ProductionGroup records from temporary_status 1 to 0`);
+
+    // Step 2: Update WorkOrder table - set temporary_status from 1 to 0 and in_production to "created"
+    console.log("Step 2: Updating WorkOrder temporary_status and in_production...");
+    
+    const workOrderUpdateResult = await WorkOrder.update(
+      { 
+        temporary_status: 0,
+        production: "created",
+        updated_by: req.user.id 
+      },
+      {
+        where: { 
+          temporary_status: 1,
+          company_id: req.user.company_id 
+        },
+        returning: true
+      }
+    );
+
+    console.log(`WorkOrder update result: ${workOrderUpdateResult[0]} rows affected`);
+    logger.info(`Updated ${workOrderUpdateResult[0]} WorkOrder records from temporary_status 1 to 0 and set in_production to "created"`);
+
+    // Prepare response
+    const response = {
+      message: "Production process completed successfully",
+      production_groups_updated: productionGroupUpdateResult[0],
+      work_orders_updated: workOrderUpdateResult[0],
+      timestamp: new Date().toISOString(),
+      processed_by: req.user.id
+    };
+
+    console.log("✅ Production/new process completed successfully");
+    logger.info("Production/new process completed successfully", response);
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error("Error in production/new process:", error);
+    logger.error("Error in production/new process:", error);
+    
+    res.status(500).json({ 
+      message: "Internal Server Error during production process", 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   try {
@@ -1556,11 +2083,11 @@ v1Router.get(
         include: [
           {
             model: Inventory,
-            attributes: ["id", "quantity_available", "quantity_blocked"],
+            attributes: ["id", "inventory_generate_id","quantity_available", "quantity_blocked"],
           },
         ],
         order: [["created_at", "DESC"]],
-        limit: 50, // Limit to recent 50 records
+        limit: 50,
       });
 
       res.status(200).json({
