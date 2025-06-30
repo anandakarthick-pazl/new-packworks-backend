@@ -741,7 +741,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     if (sku_type_id) { whereConditions.push('s.sku_type = ?'); queryParams.push(sku_type_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 's.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['s.sku_id', 's.sku_name', 's.description']);
+    const searchFilter = buildSearchFilter(search, ['s.sku_ui_id', 's.sku_name']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -750,7 +750,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const skuDetails = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(skuDetails, 'SKU Details Report', [
-        { header: 'SKU ID', key: 'sku_id', width: 15 },
+        { header: 'SKU ID', key: 'sku_ui_id', width: 15 },
         { header: 'SKU Name', key: 'sku_name', width: 20 },
         { header: 'SKU Type', key: 'sku_type_name', width: 15 },
         { header: 'Description', key: 'description', width: 30 },
