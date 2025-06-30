@@ -488,8 +488,8 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     const purchaseOrders = await sequelize.query(paginatedQuery, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = purchaseOrders.map(po => ({
-      po_number: po.po_number,
-      vendor_name: po.vendor_name,
+      po_number: po.purchase_generate_id,
+      vendor_name: po.vendor_display_name,
       po_date: po.po_date_formatted,
       po_status: po.po_status,
       total_amount: po.total_amount,
@@ -666,16 +666,17 @@ v1Router.get("/routes", authenticateJWT, async (req, res) => {
 v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, status_wo, search, export: isExport } = req.query;
+    const { fromDate, toDate, progress, sales_order_id, search, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['wo.company_id = ?', 'wo.status = ?'];
     const queryParams = [company_id, 'active'];
 
-    if (status_wo) { whereConditions.push('wo.status_wo = ?'); queryParams.push(status_wo); }
+    if (progress) { whereConditions.push('wo.progress = ?'); queryParams.push(progress); }
+    if (sales_order_id) { whereConditions.push('so.id = ?'); queryParams.push(sales_order_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'wo.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['wo.work_order_generate_id', 'wo.status_wo', 'wo.priority']);
+    const searchFilter = buildSearchFilter(search, ['wo.work_generate_id', 'wo.progress', 'wo.priority']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -692,10 +693,10 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const workOrders = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(workOrders, 'Work Orders Report', [
-        { header: 'Work Order ID', key: 'work_order_generate_id', width: 20 },
+        { header: 'Work Order ID', key: 'work_generate_id', width: 20 },
         { header: 'Sales Order ID', key: 'sales_generate_id', width: 20 },
         { header: 'Work Order Date', key: 'work_order_date_formatted', width: 15 },
-        { header: 'Status', key: 'status_wo', width: 15 },
+        { header: 'Status', key: 'progress', width: 15 },
         { header: 'Priority', key: 'priority', width: 10 },
         { header: 'Expected Completion', key: 'expected_completion_formatted', width: 20 },
         { header: 'Created Date', key: 'created_at', width: 15 }
@@ -710,12 +711,14 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
     const workOrders = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = workOrders.map(order => ({
-      work_order_generate_id: order.work_order_generate_id,
+      work_generate_id: order.work_generate_id,
       work_order_date: order.work_order_date_formatted,
-      status_wo: order.status_wo,
+      progress: order.progress,
       priority: order.priority,
       expected_completion_date: order.expected_completion_formatted
     }));
+    console.log("HTML Data:", htmlData);
+    console.log("Count Result:", countResult);
 
     res.status(200).json({ success: true, message: "Work orders report retrieved successfully", ...formatPaginatedResponse(htmlData, countResult.total, page, limit) });
 
@@ -742,7 +745,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
-    const baseQuery = `SELECT s.*, st.sku_type AS sku_type_name, comp.company_name FROM sku s LEFT JOIN sku_type st ON s.sku_type = st.id LEFT JOIN companies comp ON s.company_id = comp.id ${whereClause} ORDER BY s.created_at DESC`;
+    const baseQuery = `SELECT s.*,c.display_name, st.sku_type AS sku_type_name, comp.company_name FROM sku s LEFT JOIN sku_type st ON s.sku_type = st.id LEFT JOIN companies comp ON s.company_id = comp.id LEFT JOIN clients c ON s.client_id = c.client_id  ${whereClause} ORDER BY s.created_at DESC`;
 
     if (isExport === 'excel') {
       const skuDetails = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
@@ -764,7 +767,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     const [countResult] = await sequelize.query(`SELECT COUNT(*) as total FROM sku s LEFT JOIN sku_type st ON s.sku_type = st.id LEFT JOIN companies comp ON s.company_id = comp.id ${whereClause}`, { replacements: queryParams, type: QueryTypes.SELECT });
     const skuDetails = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
-    const htmlData = skuDetails.map(sku => ({ sku_id: sku.sku_id, sku_name: sku.sku_name, description: sku.description, unit_price: sku.unit_price, status: sku.status }));
+    const htmlData = skuDetails.map(sku => ({ sku_id: sku.sku_ui_id, sku_name: sku.sku_name, display_name: sku.display_name, ply: sku.ply, status: sku.status, LWH: `${sku.length}X${sku.width}X${sku.height}`, joints: sku.joints, ups: sku.ups, customer_reference: sku.customer_reference, reference_number: sku.reference_number }));
     res.status(200).json({ success: true, message: "SKU details report retrieved successfully", ...formatPaginatedResponse(htmlData, countResult.total, page, limit) });
 
   } catch (error) {
