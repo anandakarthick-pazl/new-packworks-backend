@@ -22,6 +22,7 @@ const Inventory = db.Inventory;
 const AllocationHistory = db.AllocationHistory;
 const User = db.User;
 
+
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
@@ -60,6 +61,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           status: groupDetails.status || "active",
           created_by: req.user.id,
           updated_by: req.user.id,
+          temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : 0,
         });
 
         // Process group_value array to update work_order status
@@ -261,873 +263,565 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   }
 });
 
-// PATCH API to ungroup layers (set layer_status back to "ungrouped")
-v1Router.patch(
-  "/production-group/ungroup",
-  authenticateJWT,
-  async (req, res) => {
-    const { work_order_layers } = req.body;
 
-    // Validate input
-    if (!work_order_layers || !Array.isArray(work_order_layers)) {
-      return res.status(400).json({
-        message: "work_order_layers array is required",
+v1Router.put("/production-group", authenticateJWT, async (req, res) => {
+  const groupDetailsArray = req.body;
+
+  // Validate that we received an array
+  if (!Array.isArray(groupDetailsArray) || groupDetailsArray.length === 0) {
+    return res
+      .status(400)
+      .json({
+        message: "Invalid input data - expected array of group objects",
       });
-    }
+  }
 
-    try {
-      const updateResults = [];
+  const updatedGroups = [];
+  const errors = [];
 
-      for (const item of work_order_layers) {
-        const { work_order_id, layer_id } = item;
-        console.log(
-          `Processing ungroup - work_order_id: ${work_order_id}, layer_id: ${layer_id}`
-        );
+  try {
+    // Process each group in the array
+    for (let i = 0; i < groupDetailsArray.length; i++) {
+      const groupDetails = groupDetailsArray[i];
 
-        if (!work_order_id || !layer_id) {
-          updateResults.push({
-            work_order_id,
-            layer_id,
-            status: "failed",
-            message: "work_order_id and layer_id are required",
-          });
+      try {
+        // Validate required fields for this group
+        if (!groupDetails.id) {
+          errors.push(`Group at index ${i}: Group ID is required for update`);
           continue;
         }
 
-        // Find work order by id
-        const workOrder = await WorkOrder.findByPk(work_order_id);
-        console.log(`Found work order:`, workOrder ? "Yes" : "No");
-
-        if (!workOrder || !workOrder.work_order_sku_values) {
-          updateResults.push({
-            work_order_id,
-            layer_id,
-            status: "failed",
-            message: "Work order not found or missing sku_values",
-          });
+        if (!groupDetails.group_name) {
+          errors.push(`Group at index ${i}: Group name is required`);
           continue;
         }
 
-        console.log(
-          "Original work_order_sku_values:",
-          workOrder.work_order_sku_values
-        );
-        console.log(
-          "Type of work_order_sku_values:",
-          typeof workOrder.work_order_sku_values
-        );
+        // Check if the production group exists and belongs to the user's company
+        const existingGroup = await ProductionGroup.findOne({
+          where: {
+            id: groupDetails.id,
+            company_id: req.user.company_id
+          }
+        });
 
-        let skuValues = workOrder.work_order_sku_values;
+        if (!existingGroup) {
+          errors.push(`Group at index ${i}: Production group not found or access denied`);
+          continue;
+        }
 
-        // Parse if it's a JSON string, otherwise use as-is if it's already an array
-        if (typeof skuValues === "string") {
-          try {
-            skuValues = JSON.parse(skuValues);
-            console.log("Parsed sku values:", skuValues);
-          } catch (parseError) {
-            logger.error(
-              `Error parsing work_order_sku_values for work_order_id ${work_order_id}:`,
-              parseError
-            );
-            updateResults.push({
-              work_order_id,
-              layer_id,
-              status: "failed",
-              message: "Error parsing work order sku values",
-            });
-            continue;
+        // First, handle the removal of previous group_value items (set back to ungrouped)
+        if (existingGroup.group_value && Array.isArray(existingGroup.group_value)) {
+          console.log(`Processing existing group_value for removal - group ${i}:`, existingGroup.group_value);
+
+          for (const item of existingGroup.group_value) {
+            const { work_order_id, layer_id } = item;
+
+            if (work_order_id && layer_id) {
+              const workOrder = await WorkOrder.findByPk(work_order_id);
+
+              if (workOrder && workOrder.work_order_sku_values) {
+                let skuValues = workOrder.work_order_sku_values;
+
+                if (typeof skuValues === "string") {
+                  try {
+                    skuValues = JSON.parse(skuValues);
+                  } catch (parseError) {
+                    logger.error(
+                      `Error parsing work_order_sku_values for work_order_id ${work_order_id}:`,
+                      parseError
+                    );
+                    continue;
+                  }
+                }
+
+                if (Array.isArray(skuValues)) {
+                  let updated = false;
+                  const updatedSkuValues = skuValues.map((layer) => {
+                    const layerIdNum = Number(layer.layer_id);
+                    const targetLayerIdNum = Number(layer_id);
+
+                    if (
+                      layerIdNum === targetLayerIdNum &&
+                      layer.layer_status === "grouped"
+                    ) {
+                      updated = true;
+                      console.log(
+                        `✅ Reverting layer_id ${layer_id} from 'grouped' to 'ungrouped'`
+                      );
+                      return { ...layer, layer_status: "ungrouped" };
+                    }
+                    return layer;
+                  });
+
+                  if (updated) {
+                    await WorkOrder.update(
+                      {
+                        work_order_sku_values: updatedSkuValues,
+                        updated_by: req.user.id,
+                      },
+                      {
+                        where: { id: work_order_id },
+                      }
+                    );
+
+                    logger.info(
+                      `Reverted layer_id ${layer_id} to 'ungrouped' status in work_order_id ${work_order_id}`
+                    );
+                  }
+                }
+              }
+            }
           }
         }
 
-        // Update status for matching layer_id
-        if (Array.isArray(skuValues)) {
+        // Update Production Group (Solution 2: Separate update and fetch)
+        const [updatedRowsCount] = await ProductionGroup.update(
+          {
+            group_name: groupDetails.group_name,
+            group_value: groupDetails.group_value || null,
+            group_Qty: groupDetails.group_Qty || null,
+            allocated_Qty: groupDetails.allocated_Qty || null,
+            status: groupDetails.status || existingGroup.status,
+            updated_by: req.user.id,
+            temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : existingGroup.temporary_status,
+          },
+          {
+            where: { 
+              id: groupDetails.id,
+              company_id: req.user.company_id
+            }
+          }
+        );
+
+        if (updatedRowsCount === 0) {
+          errors.push(`Group at index ${i}: Failed to update production group`);
+          continue;
+        }
+
+        // Fetch the updated record
+        const updatedProductionGroup = await ProductionGroup.findByPk(groupDetails.id);
+
+        if (!updatedProductionGroup) {
+          errors.push(`Group at index ${i}: Failed to retrieve updated production group`);
+          continue;
+        }
+
+        // Parse JSON fields for proper response format
+        const formattedGroup = {
+          ...updatedProductionGroup.toJSON(),
+          group_value: typeof updatedProductionGroup.group_value === 'string' 
+            ? JSON.parse(updatedProductionGroup.group_value || '[]')
+            : updatedProductionGroup.group_value
+        };
+
+        // Process new group_value array to update work_order status
+        if (
+          groupDetails.group_value &&
+          Array.isArray(groupDetails.group_value)
+        ) {
           console.log(
-            `Looking for layer_id: ${layer_id} in array of ${skuValues.length} items`
+            `Processing new group_value array for group ${i}:`,
+            groupDetails.group_value
           );
 
-          let updated = false;
-          const updatedSkuValues = skuValues.map((layer, index) => {
-            console.log(`Processing layer ${index}:`, {
-              layer_id: layer.layer_id,
-              layer_status: layer.layer_status,
-              matches_target: layer.layer_id === layer_id,
-              is_grouped: layer.layer_status === "grouped",
-            });
+          for (const item of groupDetails.group_value) {
+            const { work_order_id, layer_id } = item;
+            console.log(
+              `Processing item - work_order_id: ${work_order_id}, layer_id: ${layer_id}`
+            );
 
-            // Important: Make sure layer_id comparison uses correct data types
-            // Convert both to numbers for comparison to avoid type mismatch
-            const layerIdNum = Number(layer.layer_id);
-            const targetLayerIdNum = Number(layer_id);
+            if (work_order_id && layer_id) {
+              // Find work order by id
+              const workOrder = await WorkOrder.findByPk(work_order_id);
+              console.log(`Found work order:`, workOrder ? "Yes" : "No");
 
-            if (
-              layerIdNum === targetLayerIdNum &&
-              layer.layer_status === "grouped"
-            ) {
-              updated = true;
-              console.log(
-                `✅ Updating layer_id ${layer_id} from 'grouped' to 'ungrouped'`
-              );
-              return { ...layer, layer_status: "ungrouped" };
-            }
-            return layer;
-          });
+              if (workOrder && workOrder.work_order_sku_values) {
+                console.log(
+                  "Original work_order_sku_values:",
+                  workOrder.work_order_sku_values
+                );
 
-          console.log(`Update needed: ${updated}`);
+                let skuValues = workOrder.work_order_sku_values;
 
-          // Update work order if any changes were made
-          if (updated) {
-            console.log("Updated sku values:", updatedSkuValues);
+                // Parse if it's a JSON string, otherwise use as-is if it's already an array
+                if (typeof skuValues === "string") {
+                  try {
+                    skuValues = JSON.parse(skuValues);
+                    console.log("Parsed sku values:", skuValues);
+                  } catch (parseError) {
+                    logger.error(
+                      `Error parsing work_order_sku_values for work_order_id ${work_order_id}:`,
+                      parseError
+                    );
+                    continue;
+                  }
+                }
 
-            // Store as JavaScript object/array - Sequelize will handle JSON serialization
-            // This matches the POST endpoint approach
-            const finalSkuValues = updatedSkuValues;
+                // Update status for matching layer_id
+                if (Array.isArray(skuValues)) {
+                  console.log(
+                    `Looking for layer_id: ${layer_id} in array of ${skuValues.length} items`
+                  );
 
-            console.log("Final sku values to save:", finalSkuValues);
+                  let updated = false;
+                  const updatedSkuValues = skuValues.map((layer, index) => {
+                    console.log(`Processing layer ${index}:`, {
+                      layer_id: layer.layer_id,
+                      layer_status: layer.layer_status,
+                      matches_target: layer.layer_id === layer_id,
+                      is_ungrouped: layer.layer_status === "ungrouped",
+                    });
 
-            const updateResult = await WorkOrder.update(
-              {
-                work_order_sku_values: finalSkuValues,
-                updated_by: req.user.id,
-              },
-              {
-                where: { id: work_order_id },
-                returning: true,
+                    // Convert both to numbers for comparison to avoid type mismatch
+                    const layerIdNum = Number(layer.layer_id);
+                    const targetLayerIdNum = Number(layer_id);
+
+                    if (
+                      layerIdNum === targetLayerIdNum &&
+                      layer.layer_status === "ungrouped"
+                    ) {
+                      updated = true;
+                      console.log(
+                        `✅ Updating layer_id ${layer_id} from 'ungrouped' to 'grouped'`
+                      );
+                      return { ...layer, layer_status: "grouped" };
+                    }
+                    return layer;
+                  });
+
+                  console.log(`Update needed: ${updated}`);
+
+                  // Update work order if any changes were made
+                  if (updated) {
+                    console.log("Updated sku values:", updatedSkuValues);
+
+                    const updateResult = await WorkOrder.update(
+                      {
+                        work_order_sku_values: updatedSkuValues,
+                        updated_by: req.user.id,
+                      },
+                      {
+                        where: { id: work_order_id },
+                      }
+                    );
+
+                    console.log("Update result:", updateResult);
+
+                    logger.info(
+                      `Successfully updated layer_id ${layer_id} to 'grouped' status in work_order_id ${work_order_id}`
+                    );
+                  } else {
+                    console.log(
+                      `❌ No update needed for layer_id ${layer_id} in work_order_id ${work_order_id}`
+                    );
+
+                    // Let's see what layers we actually have
+                    console.log(
+                      "Available layers:",
+                      skuValues.map((l) => ({
+                        layer_id: l.layer_id,
+                        layer_status: l.layer_status,
+                        type_of_layer_id: typeof l.layer_id,
+                      }))
+                    );
+
+                    logger.warn(
+                      `No update needed for layer_id ${layer_id} in work_order_id ${work_order_id} - layer not found or already grouped`
+                    );
+                  }
+                } else {
+                  console.log(
+                    "❌ work_order_sku_values is not an array:",
+                    typeof skuValues
+                  );
+                  logger.error(
+                    `work_order_sku_values is not an array for work_order_id ${work_order_id}`
+                  );
+                }
+              } else {
+                console.log(
+                  `❌ Work order not found or missing work_order_sku_values for work_order_id: ${work_order_id}`
+                );
+                logger.warn(
+                  `Work order not found or missing work_order_sku_values for work_order_id: ${work_order_id}`
+                );
               }
-            );
+            } else {
+              console.log(
+                `❌ Missing work_order_id or layer_id in group_value item:`,
+                item
+              );
+              logger.warn(
+                `Missing work_order_id or layer_id in group_value item:`,
+                item
+              );
+            }
+          }
+        }
 
-            console.log("Update result:", updateResult);
+        updatedGroups.push(formattedGroup);
+        console.log(
+          `✅ Successfully updated group ${i}: ${groupDetails.group_name}`
+        );
+      } catch (groupError) {
+        console.error(`Error updating group at index ${i}:`, groupError);
+        logger.error(`Error updating group at index ${i}:`, groupError);
+        errors.push(`Group at index ${i}: ${groupError.message}`);
+      }
+    }
 
-            updateResults.push({
-              work_order_id,
-              layer_id,
-              status: "success",
-              message: "Layer status updated to ungrouped",
-            });
+    // Prepare response
+    const response = {
+      message: `Processed ${groupDetailsArray.length} groups for update`,
+      updated_count: updatedGroups.length,
+      error_count: errors.length,
+      data: updatedGroups,
+    };
 
-            logger.info(
-              `Successfully updated layer_id ${layer_id} to 'ungrouped' status in work_order_id ${work_order_id}`
-            );
-          } else {
-            console.log(
-              `❌ No update needed for layer_id ${layer_id} in work_order_id ${work_order_id}`
-            );
+    if (errors.length > 0) {
+      response.errors = errors;
+    }
 
-            // Let's see what layers we actually have
-            console.log(
-              "Available layers:",
-              skuValues.map((l) => ({
-                layer_id: l.layer_id,
-                layer_status: l.layer_status,
-                type_of_layer_id: typeof l.layer_id,
-              }))
-            );
+    // Return appropriate status code
+    if (updatedGroups.length > 0 && errors.length === 0) {
+      // All groups updated successfully
+      res.status(200).json(response);
+    } else if (updatedGroups.length > 0 && errors.length > 0) {
+      // Some groups updated, some failed
+      res.status(207).json(response); // 207 Multi-Status
+    } else {
+      // No groups updated (all failed)
+      res.status(400).json(response);
+    }
+  } catch (error) {
+    console.error("Error updating production groups:", error);
+    logger.error("Error updating production groups:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
 
-            updateResults.push({
-              work_order_id,
-              layer_id,
-              status: "skipped",
-              message: "Layer not found or already ungrouped",
-            });
+v1Router.delete("/production-group/:id", authenticateJWT, async (req, res) => {
+  const groupId = req.params.id;
+
+  // Validate group ID
+  if (!groupId || isNaN(groupId)) {
+    return res.status(400).json({
+      message: "Invalid group ID provided",
+    });
+  }
+
+  try {
+    // Find the production group first
+    const productionGroup = await ProductionGroup.findByPk(groupId);
+
+    if (!productionGroup) {
+      return res.status(404).json({
+        message: "Production group not found",
+      });
+    }
+
+    // Check if user has permission to delete this group (same company)
+    if (productionGroup.company_id !== req.user.company_id) {
+      return res.status(403).json({
+        message: "Access denied - you can only delete groups from your company",
+      });
+    }
+
+    console.log(`Starting deletion process for group ID: ${groupId}`);
+    console.log("Group details:", {
+      group_name: productionGroup.group_name,
+      group_value: productionGroup.group_value,
+    });
+
+    // Add this critical debug info to the response
+    // const debugInfo = {
+    //   group_value_exists: !!productionGroup.group_value,
+    //   group_value_type: typeof productionGroup.group_value,
+    //   group_value_is_array: Array.isArray(productionGroup.group_value),
+    //   group_value_content: productionGroup.group_value,
+    // };
+
+    const updatedWorkOrders = [];
+    const updateErrors = [];
+
+    // Process group_value to revert layer status back to "ungrouped"
+    let groupValueToProcess = productionGroup.group_value;
+    
+    // Handle different possible formats of group_value
+    if (typeof groupValueToProcess === 'string') {
+      try {
+        groupValueToProcess = JSON.parse(groupValueToProcess);
+        console.log("✅ Parsed group_value from JSON string");
+      } catch (e) {
+        console.log("❌ Failed to parse group_value as JSON:", e);
+        groupValueToProcess = null;
+      }
+    }
+    
+    if (groupValueToProcess && Array.isArray(groupValueToProcess)) {
+      console.log("=== PROCESSING GROUP_VALUE FOR DELETION ===");
+      console.log("Group value:", JSON.stringify(groupValueToProcess, null, 2));
+
+      for (const item of groupValueToProcess) {
+        const { work_order_id, layer_id } = item;
+        console.log(`\n🔍 Processing: work_order_id=${work_order_id}, layer_id=${layer_id}`);
+
+        if (work_order_id && layer_id) {
+          try {
+            // Find work order by id
+            const workOrder = await WorkOrder.findByPk(work_order_id);
+            console.log(`WorkOrder found: ${workOrder ? 'YES' : 'NO'}`);
+
+            if (workOrder && workOrder.work_order_sku_values) {
+              let skuValues = workOrder.work_order_sku_values;
+              console.log("Original sku_values type:", typeof skuValues);
+
+              // Parse if it's a JSON string
+              if (typeof skuValues === "string") {
+                try {
+                  skuValues = JSON.parse(skuValues);
+                  console.log("✅ Parsed JSON string successfully");
+                } catch (parseError) {
+                  console.error("❌ JSON Parse Error:", parseError);
+                  updateErrors.push(`Failed to parse work_order_sku_values for work_order_id ${work_order_id}`);
+                  continue;
+                }
+              }
+
+              if (Array.isArray(skuValues)) {
+                console.log(`📋 Found ${skuValues.length} layers in work order`);
+                
+                // Show all layers for debugging
+                skuValues.forEach((layer, idx) => {
+                  console.log(`  Layer ${idx}: id=${layer.layer_id}, status=${layer.layer_status}`);
+                });
+
+                let updated = false;
+                const revertedSkuValues = skuValues.map((layer) => {
+                  // Convert both to numbers for comparison
+                  const layerIdNum = Number(layer.layer_id);
+                  const targetLayerIdNum = Number(layer_id);
+                  const isTargetLayer = layerIdNum === targetLayerIdNum;
+                  const isGrouped = layer.layer_status === "grouped";
+
+                  console.log(`  Checking layer_id ${layer.layer_id}: isTarget=${isTargetLayer}, isGrouped=${isGrouped}`);
+
+                  if (isTargetLayer && isGrouped) {
+                    updated = true;
+                    console.log(`    ✅ REVERTING layer_id ${layer_id} from 'grouped' to 'ungrouped'`);
+                    return { ...layer, layer_status: "ungrouped" };
+                  }
+                  return layer;
+                });
+
+                if (updated) {
+                  console.log("💾 Updating work order with reverted values...");
+                  
+                  await WorkOrder.update(
+                    {
+                      work_order_sku_values: revertedSkuValues,
+                      updated_by: req.user.id,
+                    },
+                    {
+                      where: { id: work_order_id },
+                    }
+                  );
+
+                  updatedWorkOrders.push({
+                    work_order_id,
+                    layer_id,
+                    status: "reverted to ungrouped",
+                  });
+
+                  console.log("✅ Successfully updated work order");
+                } else {
+                  console.log(`❌ No update needed - layer_id ${layer_id} not found or not grouped`);
+                }
+              } else {
+                console.log("❌ sku_values is not an array after parsing");
+                updateErrors.push(`work_order_sku_values is not an array for work_order_id ${work_order_id}`);
+              }
+            } else {
+              console.log(`❌ Work order ${work_order_id} not found or has no sku_values`);
+              updateErrors.push(`Work order not found or missing sku_values for work_order_id ${work_order_id}`);
+            }
+          } catch (updateError) {
+            console.error(`❌ Error processing work order ${work_order_id}:`, updateError);
+            updateErrors.push(`Failed to update work_order_id ${work_order_id}: ${updateError.message}`);
           }
         } else {
-          console.log(
-            "❌ work_order_sku_values is not an array:",
-            typeof skuValues
-          );
-          updateResults.push({
-            work_order_id,
-            layer_id,
-            status: "failed",
-            message: "Invalid sku_values format",
-          });
+          console.log(`❌ Missing work_order_id or layer_id in item:`, item);
+          updateErrors.push(`Missing work_order_id or layer_id in group_value item`);
         }
       }
-
-      // Check if any updates were successful
-      const successCount = updateResults.filter(
-        (result) => result.status === "success"
-      ).length;
-      const failedCount = updateResults.filter(
-        (result) => result.status === "failed"
-      ).length;
-
-      res.status(200).json({
-        message: `Ungroup operation completed. ${successCount} successful, ${failedCount} failed.`,
-        results: updateResults,
-        summary: {
-          total: updateResults.length,
-          successful: successCount,
-          failed: failedCount,
-          skipped: updateResults.filter((result) => result.status === "skipped")
-            .length,
-        },
-      });
-    } catch (error) {
-      console.error("Error ungrouping layers:", error);
-      logger.error("Error ungrouping layers:", error);
-      res.status(500).json({
-        message: "Internal Server Error",
-        error: error.message,
-      });
+      console.log("=== PROCESSING COMPLETE ===\n");
+    } else {
+      console.log("❌ No valid group_value found");
+      console.log("group_value type:", typeof productionGroup.group_value);
+      console.log("group_value content:", productionGroup.group_value);
+      console.log("Is array:", Array.isArray(productionGroup.group_value));
     }
+
+    // Now delete the production group
+    await ProductionGroup.destroy({
+      where: { 
+        id: groupId,
+        company_id: req.user.company_id // Additional safety check
+      },
+    });
+
+    console.log(`✅ Successfully deleted production group ID: ${groupId}`);
+    logger.info(`Production group ${groupId} deleted by user ${req.user.id}`);
+
+    // Prepare response
+    const response = {
+      message: "Production group deleted successfully",
+      deleted_group: {
+        id: productionGroup.id,
+        group_name: productionGroup.group_name,
+      },
+      updated_work_orders: updatedWorkOrders,
+      total_layers_reverted: updatedWorkOrders.length,
+      // debug_info: debugInfo, 
+    };
+
+    // Include update errors if any occurred
+    if (updateErrors.length > 0) {
+      response.update_errors = updateErrors;
+      response.message += ` (with ${updateErrors.length} layer update errors)`;
+    }
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error("Error deleting production group:", error);
+    logger.error("Error deleting production group:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message 
+    });
   }
-);
-
-// v1Router.get("/production-group", authenticateJWT, async (req, res) => {
-//   try {
-//     const { include_work_orders = "false" } = req.query;
-
-//     // Get all production groups for the company
-//     const productionGroups = await ProductionGroup.findAll({
-//       where: {
-//         company_id: req.user.company_id,
-//       },
-//       order: [["created_at", "DESC"]],
-//       attributes: [
-//         "id",
-//         "group_name",
-//         "group_value",
-//         "group_Qty",
-//         "allocated_Qty",
-//         "status",
-//         "created_at",
-//         "updated_at",
-//         "created_by",
-//         "updated_by",
-//       ],
-//     });
-
-//     // Process each production group to include work order layer details if requested
-//     const processedGroups = await Promise.all(
-//       productionGroups.map(async (group) => {
-//         const groupData = group.toJSON();
-
-//         // Parse group_value if it's a string
-//         let groupValue = groupData.group_value;
-//         if (typeof groupValue === "string") {
-//           try {
-//             groupValue = JSON.parse(groupValue);
-//           } catch (parseError) {
-//             logger.warn(
-//               `Error parsing group_value for group ${group.id}:`,
-//               parseError
-//             );
-//             groupValue = [];
-//           }
-//         }
-
-//         groupData.group_value = groupValue || [];
-
-//         // Calculate balance_Qty = group_Qty - allocated_Qty
-//         groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
-
-//         // Include only layer details if requested
-//         if (include_work_orders === "true" && Array.isArray(groupValue)) {
-//           const layerDetails = await Promise.all(
-//             groupValue.map(async (item) => {
-//               const { work_order_id, layer_id, sales_order_id } = item;
-
-//               try {
-//                 // Only fetch work_order_sku_values to extract layer details
-//                 const workOrder = await WorkOrder.findByPk(work_order_id, {
-//                   attributes: ["id", "work_generate_id", "work_order_sku_values"],
-//                 });
-
-//                 if (!workOrder) {
-//                   return {
-//                     work_order_id,
-//                     layer_id,
-//                     sales_order_id,
-//                     layer_found: false,
-//                     error: "Work order not found",
-//                   };
-//                 }
-
-//                 // Parse work_order_sku_values to get layer details
-//                 let skuValues = workOrder.work_order_sku_values;
-//                 if (typeof skuValues === "string") {
-//                   try {
-//                     skuValues = JSON.parse(skuValues);
-//                   } catch (parseError) {
-//                     skuValues = [];
-//                   }
-//                 }
-
-//                 // Find the specific layer by layer_id
-//                 const layerDetail = Array.isArray(skuValues)
-//                   ? skuValues.find((layer) => layer.layer_id === layer_id)
-//                   : null;
-
-//                 if (!layerDetail) {
-//                   return {
-//                     work_order_id,
-//                     work_generate_id: workOrder.work_generate_id,
-//                     layer_id,
-//                     sales_order_id,
-//                     layer_found: false,
-//                     error: "Layer not found in work order",
-//                   };
-//                 }
-
-//                 return {
-//                   work_order_id,
-//                   work_generate_id: workOrder.work_generate_id,
-//                   layer_id,
-//                   sales_order_id,
-//                   layer_found: true,
-//                   layer_detail: layerDetail,
-//                 };
-//               } catch (error) {
-//                 logger.error(
-//                   `Error fetching layer details for work order ${work_order_id}:`,
-//                   error
-//                 );
-//                 return {
-//                   work_order_id,
-//                   layer_id,
-//                   sales_order_id,
-//                   layer_found: false,
-//                   error: "Error fetching layer details",
-//                 };
-//               }
-//             })
-//           );
-
-//           groupData.layer_details = layerDetails;
-//         }
-
-//         return groupData;
-//       })
-//     );
-
-//     res.status(200).json({
-//       message: "Production groups retrieved successfully",
-//       data: processedGroups,
-//       total: processedGroups.length,
-//     });
-//   } catch (error) {
-//     logger.error("Error fetching production groups:", error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     });
-//   }
-// });
-
-// allocation -------------------------
-
-// // PATCH API to allocate raw materials
-// v1Router.patch("/production-group/allocate", authenticateJWT, async (req, res) => {
-//   const { allocations } = req.body;
-
-//   // Validate input
-//   if (!allocations || !Array.isArray(allocations) || allocations.length === 0) {
-//     return res.status(400).json({
-//       message: "allocations array is required and must not be empty",
-//     });
-//   }
-
-//   // Start a database transaction
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const allocationResults = [];
-//     const errors = [];
-
-//     for (let i = 0; i < allocations.length; i++) {
-//       const allocation = allocations[i];
-//       const { production_group_id, inventory_id, quantity_to_allocate } = allocation;
-
-//       try {
-//         // Validate required fields for this allocation
-//         if (!production_group_id || !inventory_id || !quantity_to_allocate) {
-//           errors.push(`Allocation at index ${i}: production_group_id, inventory_id, and quantity_to_allocate are required`);
-//           continue;
-//         }
-
-//         // Validate quantity is positive
-//         if (quantity_to_allocate <= 0) {
-//           errors.push(`Allocation at index ${i}: quantity_to_allocate must be greater than 0`);
-//           continue;
-//         }
-
-//         // Find the production group
-//         const productionGroup = await ProductionGroup.findOne({
-//           where: {
-//             id: production_group_id,
-//             company_id: req.user.company_id
-//           },
-//           transaction
-//         });
-
-//         if (!productionGroup) {
-//           errors.push(`Allocation at index ${i}: Production group not found or doesn't belong to your company`);
-//           continue;
-//         }
-
-//         // Find the inventory item
-//         const inventoryItem = await Inventory.findOne({
-//           where: {
-//             id: inventory_id,
-//             company_id: req.user.company_id
-//           },
-//           transaction
-//         });
-
-//         if (!inventoryItem) {
-//           errors.push(`Allocation at index ${i}: Inventory item not found or doesn't belong to your company`);
-//           continue;
-//         }
-
-//         // Check if sufficient quantity is available
-//         const currentAvailable = inventoryItem.quantity_available || 0;
-//         if (currentAvailable < quantity_to_allocate) {
-//           errors.push(`Allocation at index ${i}: Insufficient inventory. Available: ${currentAvailable}, Requested: ${quantity_to_allocate}`);
-//           continue;
-//         }
-
-//         // Calculate new quantities
-//         const newInventoryQuantity = currentAvailable - quantity_to_allocate;
-//         const currentAllocatedQty = productionGroup.allocated_Qty || 0;
-//         const newAllocatedQty = currentAllocatedQty + quantity_to_allocate;
-
-//         // Update inventory quantity_available
-//         await Inventory.update(
-//           {
-//             quantity_available: newInventoryQuantity,
-//             updated_by: req.user.id,
-//           },
-//           {
-//             where: { id: inventory_id },
-//             transaction
-//           }
-//         );
-
-//         // Update production group allocated_Qty
-//         await ProductionGroup.update(
-//           {
-//             allocated_Qty: newAllocatedQty,
-//             updated_by: req.user.id,
-//           },
-//           {
-//             where: { id: production_group_id },
-//             transaction
-//           }
-//         );
-
-//         // Record the allocation in AllocationHistory
-//         await AllocationHistory.create(
-//           {
-//             company_id: req.user.company_id,
-//             inventory_id: inventory_id,
-//             group_id: production_group_id,
-//             allocated_Qty: quantity_to_allocate,
-//             status: "active",
-//             created_by: req.user.id,
-//             updated_by: req.user.id,
-//           },
-//           { transaction }
-//         );
-
-//         allocationResults.push({
-//           index: i,
-//           production_group_id,
-//           inventory_id,
-//           quantity_allocated: quantity_to_allocate,
-//           inventory_remaining: newInventoryQuantity,
-//           total_allocated_qty: newAllocatedQty,
-//           status: "success",
-//           message: "Allocation completed successfully"
-//         });
-
-//         logger.info(
-//           `Successfully allocated ${quantity_to_allocate} units from inventory ${inventory_id} to production group ${production_group_id}`
-//         );
-
-//       } catch (allocationError) {
-//         console.error(`Error processing allocation at index ${i}:`, allocationError);
-//         logger.error(`Error processing allocation at index ${i}:`, allocationError);
-//         errors.push(`Allocation at index ${i}: ${allocationError.message}`);
-//       }
-//     }
-
-//     // If there are any errors, rollback the transaction
-//     if (errors.length > 0) {
-//       await transaction.rollback();
-//       return res.status(400).json({
-//         message: "Allocation failed due to errors",
-//         errors,
-//         successful_allocations: 0,
-//         failed_allocations: errors.length
-//       });
-//     }
-
-//     // If all allocations were successful, commit the transaction
-//     await transaction.commit();
-
-//     res.status(200).json({
-//       message: `Successfully processed ${allocationResults.length} allocations`,
-//       data: allocationResults,
-//       summary: {
-//         total_processed: allocationResults.length,
-//         successful: allocationResults.length,
-//         failed: 0
-//       }
-//     });
-
-//   } catch (error) {
-//     // Rollback transaction on any unexpected error
-//     await transaction.rollback();
-//     console.error("Error processing raw material allocations:", error);
-//     logger.error("Error processing raw material allocations:", error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     });
-//   }
-// });
-// // GET API to view allocation details for a production group
-// v1Router.get("/production-group/:id/allocations", authenticateJWT, async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Find the production group with its details
-//     const productionGroup = await ProductionGroup.findOne({
-//       where: {
-//         id: id,
-//         company_id: req.user.company_id
-//       },
-//       attributes: [
-//         "id",
-//         "group_name",
-//         "group_Qty",
-//         "allocated_Qty",
-//         "status",
-//         "created_at",
-//         "updated_at"
-//       ]
-//     });
-
-//     if (!productionGroup) {
-//       return res.status(404).json({
-//         message: "Production group not found or doesn't belong to your company"
-//       });
-//     }
-
-//     // Get allocation history for this production group
-//     const allocationHistory = await AllocationHistory.findAll({
-//       where: {
-//         group_id: id,
-//         company_id: req.user.company_id
-//       },
-//       include: [
-//         {
-//           model: Inventory,
-//           attributes: ["id", 'quantity_available'],
-//         }
-//       ],
-//       order: [["created_at", "DESC"]],
-//       limit: 50 // Limit to recent 50 records
-//     });
-
-//     res.status(200).json({
-//       message: "Production group allocation details retrieved successfully",
-//       data: {
-//         production_group: productionGroup,
-//         allocation_status: {
-//           required_qty: productionGroup.group_Qty || 0,
-//           allocated_qty: productionGroup.allocated_Qty || 0,
-//           remaining_to_allocate: Math.max(0, (productionGroup.group_Qty || 0) - (productionGroup.allocated_Qty || 0)),
-//           allocation_percentage: productionGroup.group_Qty > 0
-//             ? Math.round(((productionGroup.allocated_Qty || 0) / productionGroup.group_Qty) * 100)
-//             : 0
-//         },
-//         allocation_history: allocationHistory
-//       }
-//     });
-
-//   } catch (error) {
-//     logger.error("Error fetching production group allocation details:", error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     });
-//   }
-// });
-// // PATCH API to deallocate raw materials (reverse allocation)
-// v1Router.patch("/production-group/deallocate", authenticateJWT, async (req, res) => {
-//   const { deallocations } = req.body;
-
-//   // Validate input
-//   if (!deallocations || !Array.isArray(deallocations) || deallocations.length === 0) {
-//     return res.status(400).json({
-//       message: "deallocations array is required and must not be empty",
-//     });
-//   }
-
-//   // Start a database transaction
-//   const transaction = await sequelize.transaction();
-
-//   try {
-//     const deallocationResults = [];
-//     const errors = [];
-
-//     for (let i = 0; i < deallocations.length; i++) {
-//       const deallocation = deallocations[i];
-//       const { production_group_id, inventory_id, quantity_to_deallocate } = deallocation;
-
-//       try {
-//         // Validate required fields
-//         if (!production_group_id || !inventory_id || !quantity_to_deallocate) {
-//           errors.push(`Deallocation at index ${i}: production_group_id, inventory_id, and quantity_to_deallocate are required`);
-//           continue;
-//         }
-
-//         // Validate quantity is positive
-//         if (quantity_to_deallocate <= 0) {
-//           errors.push(`Deallocation at index ${i}: quantity_to_deallocate must be greater than 0`);
-//           continue;
-//         }
-
-//         // Find the production group
-//         const productionGroup = await ProductionGroup.findOne({
-//           where: {
-//             id: production_group_id,
-//             company_id: req.user.company_id
-//           },
-//           transaction
-//         });
-
-//         if (!productionGroup) {
-//           errors.push(`Deallocation at index ${i}: Production group not found or doesn't belong to your company`);
-//           continue;
-//         }
-
-//         // Find the inventory item with lock to prevent race conditions
-//         const inventoryItem = await Inventory.findOne({
-//           where: {
-//             id: inventory_id,
-//             company_id: req.user.company_id
-//           },
-//           lock: transaction.LOCK.UPDATE, // Add pessimistic lock
-//           transaction
-//         });
-
-//         if (!inventoryItem) {
-//           errors.push(`Deallocation at index ${i}: Inventory item not found or doesn't belong to your company`);
-//           continue;
-//         }
-
-//         // Log current values for debugging
-//         console.log(`Before deallocation - Inventory ${inventory_id}:`, {
-//           current_available: inventoryItem.quantity_available,
-//           quantity_to_deallocate: quantity_to_deallocate
-//         });
-
-//         // Check allocation history to verify if this quantity was actually allocated
-//         const allocationRecord = await AllocationHistory.findOne({
-//           where: {
-//             company_id: req.user.company_id,
-//             inventory_id: inventory_id,
-//             group_id: production_group_id,
-//             status: 'active' // Only consider active allocations
-//           },
-//           order: [["created_at", "DESC"]], // Get the most recent allocation
-//           transaction
-//         });
-
-//         if (!allocationRecord) {
-//           errors.push(`Deallocation at index ${i}: No active allocation found for this inventory item and production group`);
-//           continue;
-//         }
-
-//         // Check if sufficient quantity is allocated to deallocate
-//         const currentAllocatedQty = productionGroup.allocated_Qty || 0;
-//         if (currentAllocatedQty < quantity_to_deallocate) {
-//           errors.push(`Deallocation at index ${i}: Insufficient allocated quantity. Currently allocated: ${currentAllocatedQty}, Requested to deallocate: ${quantity_to_deallocate}`);
-//           continue;
-//         }
-
-//         // Calculate new quantities
-//         const currentAvailable = parseFloat(inventoryItem.quantity_available) || 0;
-//         const deallocateQty = parseFloat(quantity_to_deallocate);
-//         const newInventoryQuantity = currentAvailable + deallocateQty;
-//         const newAllocatedQty = currentAllocatedQty - deallocateQty;
-
-//         // Update inventory quantity_available (add back the deallocated quantity)
-//         const [inventoryUpdateCount] = await Inventory.update(
-//           {
-//             quantity_available: newInventoryQuantity,
-//             updated_by: req.user.id,
-//             updated_at: new Date() // Explicitly set updated_at
-//           },
-//           {
-//             where: {
-//               id: inventory_id,
-//               company_id: req.user.company_id // Extra safety check
-//             },
-//             transaction
-//           }
-//         );
-
-//         // Verify inventory update was successful
-//         if (inventoryUpdateCount === 0) {
-//           throw new Error(`Failed to update inventory item ${inventory_id}`);
-//         }
-
-//         // Verify the update by fetching the updated record
-//         const updatedInventory = await Inventory.findOne({
-//           where: { id: inventory_id },
-//           attributes: ['id', 'quantity_available'],
-//           transaction
-//         });
-
-//         console.log(`After inventory update - Inventory ${inventory_id}:`, {
-//           new_available: updatedInventory.quantity_available,
-//           expected: newInventoryQuantity
-//         });
-
-//         // Update production group allocated_Qty (subtract the deallocated quantity)
-//         const [productionGroupUpdateCount] = await ProductionGroup.update(
-//           {
-//             allocated_Qty: newAllocatedQty,
-//             updated_by: req.user.id,
-//             updated_at: new Date()
-//           },
-//           {
-//             where: {
-//               id: production_group_id,
-//               company_id: req.user.company_id
-//             },
-//             transaction
-//           }
-//         );
-
-//         // Verify production group update was successful
-//         if (productionGroupUpdateCount === 0) {
-//           throw new Error(`Failed to update production group ${production_group_id}`);
-//         }
-
-//         // Record the deallocation in AllocationHistory with negative quantity
-//         await AllocationHistory.create(
-//           {
-//             company_id: req.user.company_id,
-//             inventory_id: inventory_id,
-//             group_id: production_group_id,
-//             allocated_Qty: -deallocateQty, // Negative to indicate deallocation
-//             status: "inactive", // Use inactive status to indicate deallocation
-//             created_by: req.user.id,
-//             updated_by: req.user.id,
-//             created_at: new Date(),
-//             updated_at: new Date()
-//           },
-//           { transaction }
-//         );
-
-//         deallocationResults.push({
-//           index: i,
-//           production_group_id,
-//           inventory_id,
-//           quantity_deallocated: deallocateQty,
-//           inventory_available_before: currentAvailable,
-//           inventory_available_after: newInventoryQuantity,
-//           remaining_allocated_qty: newAllocatedQty,
-//           status: "success",
-//           message: "Deallocation completed successfully"
-//         });
-
-//         logger.info(
-//           `Successfully deallocated ${deallocateQty} units from production group ${production_group_id} back to inventory ${inventory_id}. Available quantity: ${currentAvailable} -> ${newInventoryQuantity}`
-//         );
-
-//       } catch (deallocationError) {
-//         console.error(`Error processing deallocation at index ${i}:`, deallocationError);
-//         logger.error(`Error processing deallocation at index ${i}:`, deallocationError);
-//         errors.push(`Deallocation at index ${i}: ${deallocationError.message}`);
-//       }
-//     }
-
-//     // If there are any errors, rollback the transaction
-//     if (errors.length > 0) {
-//       await transaction.rollback();
-//       return res.status(400).json({
-//         message: "Deallocation failed due to errors",
-//         errors,
-//         successful_deallocations: 0,
-//         failed_deallocations: errors.length
-//       });
-//     }
-
-//     // If all deallocations were successful, commit the transaction
-//     await transaction.commit();
-
-//     res.status(200).json({
-//       message: `Successfully processed ${deallocationResults.length} deallocations`,
-//       data: deallocationResults,
-//       summary: {
-//         total_processed: deallocationResults.length,
-//         successful: deallocationResults.length,
-//         failed: 0
-//       }
-//     });
-
-//   } catch (error) {
-//     // Rollback transaction on any unexpected error
-//     await transaction.rollback();
-//     console.error("Error processing raw material deallocations:", error);
-//     logger.error("Error processing raw material deallocations:", error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     });
-//   }
-// });
-// v1Router.get("/allocation-history/inventory/:inventory_id", authenticateJWT, async (req, res) => {
-//   try {
-//     const { inventory_id } = req.params;
-
-//     // Get allocation history for this specific inventory
-//     const allocationHistory = await AllocationHistory.findAll({
-//       where: {
-//         inventory_id: inventory_id,
-//         company_id: req.user.company_id
-//       },
-//       order: [["created_at", "DESC"]]
-//     });
-
-//     if (allocationHistory.length === 0) {
-//       return res.status(404).json({
-//         message: "No allocation history found for this inventory"
-//       });
-//     }
-
-//     res.status(200).json({
-//       message: "Allocation history retrieved successfully",
-//       data: allocationHistory,
-//       count: allocationHistory.length
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching allocation history:", error);
-//     logger.error("Error fetching allocation history:", error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     });
-//   }
-// });
-
-// PATCH API to allocate raw materials
+});
 
 v1Router.get("/production-group", authenticateJWT, async (req, res) => {
   try {
-    const { include_work_orders = "false" } = req.query;
+    const { include_work_orders = "false", temporary_status } = req.query;
+
+    // Build where clause
+    const whereClause = {
+      company_id: req.user.company_id,
+    };
+
+    // Add temporary_status filter if provided
+    if (temporary_status) {
+      whereClause.temporary_status = parseInt(temporary_status, 10);
+    }
 
     // Get all production groups for the company
     const productionGroups = await ProductionGroup.findAll({
-      where: {
-        company_id: req.user.company_id,
-      },
+      where: whereClause,
       order: [["created_at", "DESC"]],
       attributes: [
         "id",
@@ -1140,6 +834,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         "updated_at",
         "created_by",
         "updated_by",
+        "temporary_status",
       ],
     });
 
@@ -1326,6 +1021,225 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { include_work_orders = "false" } = req.query;
+
+    // Validate ID parameter
+    if (!id) {
+      return res.status(400).json({
+        message: "Production group ID is required",
+      });
+    }
+
+    // Get specific production group for the company
+    const productionGroup = await ProductionGroup.findOne({
+      where: {
+        id: id,
+        company_id: req.user.company_id,
+      },
+      attributes: [
+        "id",
+        "group_name",
+        "group_value",
+        "group_Qty",
+        "allocated_Qty",
+        "status",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+        "temporary_status",
+      ],
+    });
+
+    // Check if production group exists
+    if (!productionGroup) {
+      return res.status(404).json({
+        message: "Production group not found",
+      });
+    }
+
+    // Process the production group data
+    const groupData = productionGroup.toJSON();
+
+    // Parse group_value if it's a string
+    let groupValue = groupData.group_value;
+    if (typeof groupValue === "string") {
+      try {
+        groupValue = JSON.parse(groupValue);
+      } catch (parseError) {
+        logger.warn(
+          `Error parsing group_value for group ${productionGroup.id}:`,
+          parseError
+        );
+        groupValue = [];
+      }
+    }
+
+    groupData.group_value = groupValue || [];
+
+    // Calculate balance_Qty = group_Qty - allocated_Qty
+    groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+
+    // Fetch allocation history for this group
+    try {
+      const allocationHistory = await AllocationHistory.findAll({
+        where: {
+          group_id: productionGroup.id,
+          company_id: req.user.company_id,
+        },
+        attributes: [
+          "id",
+          "inventory_id",
+          "allocated_qty",
+          "status",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at",
+        ],
+        order: [["created_at", "DESC"]],
+      });
+
+      // Process allocation history data
+      const allocationData = allocationHistory.map(item => item.toJSON());
+      
+      // Calculate total allocated quantity by inventory_id
+      const allocationSummary = {};
+      let totalAllocatedQty = 0;
+      
+      allocationData.forEach(allocation => {
+        const inventoryId = allocation.inventory_id;
+        const allocatedQty = allocation.allocated_qty || 0;
+        
+        if (!allocationSummary[inventoryId]) {
+          allocationSummary[inventoryId] = {
+            inventory_id: inventoryId,
+            total_allocated_qty: 0,
+            allocation_records: []
+          };
+        }
+        
+        allocationSummary[inventoryId].total_allocated_qty += allocatedQty;
+        allocationSummary[inventoryId].allocation_records.push(allocation);
+        totalAllocatedQty += allocatedQty;
+      });
+
+      // Convert summary object to array
+      const allocationSummaryArray = Object.values(allocationSummary);
+
+      // Add allocation data to group
+      groupData.allocation_history = {
+        total_allocated_qty: totalAllocatedQty,
+        allocation_by_inventory: allocationSummaryArray,
+        all_allocation_records: allocationData
+      };
+
+    } catch (allocationError) {
+      logger.error(
+        `Error fetching allocation history for group ${productionGroup.id}:`,
+        allocationError
+      );
+      groupData.allocation_history = {
+        total_allocated_qty: 0,
+        allocation_by_inventory: [],
+        all_allocation_records: [],
+        error: "Error fetching allocation history"
+      };
+    }
+
+    // Include only layer details if requested
+    if (include_work_orders === "true" && Array.isArray(groupValue)) {
+      const layerDetails = await Promise.all(
+        groupValue.map(async (item) => {
+          const { work_order_id, layer_id, sales_order_id } = item;
+
+          try {
+            // Only fetch work_order_sku_values to extract layer details
+            const workOrder = await WorkOrder.findByPk(work_order_id, {
+              attributes: ["id", "work_generate_id", "work_order_sku_values"],
+            });
+
+            if (!workOrder) {
+              return {
+                work_order_id,
+                layer_id,
+                sales_order_id,
+                layer_found: false,
+                error: "Work order not found",
+              };
+            }
+
+            // Parse work_order_sku_values to get layer details
+            let skuValues = workOrder.work_order_sku_values;
+            if (typeof skuValues === "string") {
+              try {
+                skuValues = JSON.parse(skuValues);
+              } catch (parseError) {
+                skuValues = [];
+              }
+            }
+
+            // Find the specific layer by layer_id
+            const layerDetail = Array.isArray(skuValues)
+              ? skuValues.find((layer) => layer.layer_id === layer_id)
+              : null;
+
+            if (!layerDetail) {
+              return {
+                work_order_id,
+                work_generate_id: workOrder.work_generate_id,
+                layer_id,
+                sales_order_id,
+                layer_found: false,
+                error: "Layer not found in work order",
+              };
+            }
+
+            return {
+              work_order_id,
+              work_generate_id: workOrder.work_generate_id,
+              layer_id,
+              sales_order_id,
+              layer_found: true,
+              layer_detail: layerDetail,
+            };
+          } catch (error) {
+            logger.error(
+              `Error fetching layer details for work order ${work_order_id}:`,
+              error
+            );
+            return {
+              work_order_id,
+              layer_id,
+              sales_order_id,
+              layer_found: false,
+              error: "Error fetching layer details",
+            };
+          }
+        })
+      );
+
+      groupData.layer_details = layerDetails;
+    }
+
+    res.status(200).json({
+      message: "Production group retrieved successfully",
+      data: groupData,
+    });
+  } catch (error) {
+    logger.error("Error fetching production group:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
 v1Router.patch(
   "/production-group/allocate",
   authenticateJWT,
@@ -1524,92 +1438,6 @@ v1Router.patch(
     }
   }
 );
-
-// GET API to view allocation details for a production group
-v1Router.get(
-  "/production-group/:id/allocations",
-  authenticateJWT,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // Find the production group with its details
-      const productionGroup = await ProductionGroup.findOne({
-        where: {
-          id: id,
-          company_id: req.user.company_id,
-        },
-        attributes: [
-          "id",
-          "group_name",
-          "group_Qty",
-          "allocated_Qty",
-          "status",
-          "created_at",
-          "updated_at",
-        ],
-      });
-
-      if (!productionGroup) {
-        return res.status(404).json({
-          message:
-            "Production group not found or doesn't belong to your company",
-        });
-      }
-
-      // Get allocation history for this production group
-      const allocationHistory = await AllocationHistory.findAll({
-        where: {
-          group_id: id,
-          company_id: req.user.company_id,
-        },
-        include: [
-          {
-            model: Inventory,
-            attributes: ["id", "quantity_available", "quantity_blocked"],
-          },
-        ],
-        order: [["created_at", "DESC"]],
-        limit: 50, // Limit to recent 50 records
-      });
-
-      res.status(200).json({
-        message: "Production group allocation details retrieved successfully",
-        data: {
-          production_group: productionGroup,
-          allocation_status: {
-            required_qty: productionGroup.group_Qty || 0,
-            allocated_qty: productionGroup.allocated_Qty || 0,
-            remaining_to_allocate: Math.max(
-              0,
-              (productionGroup.group_Qty || 0) -
-                (productionGroup.allocated_Qty || 0)
-            ),
-            allocation_percentage:
-              productionGroup.group_Qty > 0
-                ? Math.round(
-                    ((productionGroup.allocated_Qty || 0) /
-                      productionGroup.group_Qty) *
-                      100
-                  )
-                : 0,
-          },
-          allocation_history: allocationHistory,
-        },
-      });
-    } catch (error) {
-      logger.error(
-        "Error fetching production group allocation details:",
-        error
-      );
-      res.status(500).json({
-        message: "Internal Server Error",
-        error: error.message,
-      });
-    }
-  }
-);
-
 // PATCH API to deallocate raw materials (reverse allocation)
 v1Router.patch(
   "/production-group/deallocate",
@@ -1889,6 +1717,90 @@ v1Router.patch(
   }
 );
 
+// GET API to view allocation details for a production group
+v1Router.get(
+  "/production-group/:id/allocations",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Find the production group with its details
+      const productionGroup = await ProductionGroup.findOne({
+        where: {
+          id: id,
+          company_id: req.user.company_id,
+        },
+        attributes: [
+          "id",
+          "group_name",
+          "group_Qty",
+          "allocated_Qty",
+          "status",
+          "created_at",
+          "updated_at",
+        ],
+      });
+
+      if (!productionGroup) {
+        return res.status(404).json({
+          message:
+            "Production group not found or doesn't belong to your company",
+        });
+      }
+
+      // Get allocation history for this production group
+      const allocationHistory = await AllocationHistory.findAll({
+        where: {
+          group_id: id,
+          company_id: req.user.company_id,
+        },
+        include: [
+          {
+            model: Inventory,
+            attributes: ["id", "inventory_generate_id","quantity_available", "quantity_blocked"],
+          },
+        ],
+        order: [["created_at", "DESC"]],
+        limit: 50,
+      });
+
+      res.status(200).json({
+        message: "Production group allocation details retrieved successfully",
+        data: {
+          production_group: productionGroup,
+          allocation_status: {
+            required_qty: productionGroup.group_Qty || 0,
+            allocated_qty: productionGroup.allocated_Qty || 0,
+            remaining_to_allocate: Math.max(
+              0,
+              (productionGroup.group_Qty || 0) -
+                (productionGroup.allocated_Qty || 0)
+            ),
+            allocation_percentage:
+              productionGroup.group_Qty > 0
+                ? Math.round(
+                    ((productionGroup.allocated_Qty || 0) /
+                      productionGroup.group_Qty) *
+                      100
+                  )
+                : 0,
+          },
+          allocation_history: allocationHistory,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        "Error fetching production group allocation details:",
+        error
+      );
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+);
 v1Router.get(
   "/allocation-history/inventory/:inventory_id",
   authenticateJWT,
@@ -2029,6 +1941,40 @@ v1Router.get(
   }
 );
 
+
+
+v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, async (req, res) => {
+  const { groupIds, temporary_status } = req.body;
+
+  if (!Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({ message: "groupIds must be a non-empty array" });
+  }
+  if (typeof temporary_status === 'undefined') {
+    return res.status(400).json({ message: "temporary_status is required" });
+  }
+
+  try {
+    const [updatedCount] = await ProductionGroup.update(
+      { temporary_status },
+      {
+        where: {
+          id: groupIds,
+          company_id: req.user.company_id,
+        },
+      }
+    );
+    if (updatedCount === 0) {
+      return res.status(404).json({ message: "No production groups updated. Check groupIds and permissions." });
+    }
+    res.json({ message: "temporary_status updated for groups", groupIds, temporary_status, updated_count: updatedCount });
+  } catch (error) {
+    logger.error("Error batch updating temporary_status:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -2046,3 +1992,5 @@ app.listen(process.env.PORT_PRODUCTION, "0.0.0.0", () => {
     `Production Service running on port ${process.env.PORT_PRODUCTION}`
   );
 });
+
+

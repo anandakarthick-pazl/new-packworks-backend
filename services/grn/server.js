@@ -478,7 +478,7 @@ v1Router.get("/grn/:id", authenticateJWT, async (req, res) => {
             {
               model: ItemMaster,
               as: "item_info", // Alias from GRNItem → ItemMaster association
-              attributes: ["id", "item_generate_id"]
+              attributes: ["id", "item_generate_id","item_name"]
             },
           ]
           },
