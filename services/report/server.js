@@ -739,7 +739,7 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
     const queryParams = [company_id, 'active'];
 
     if (sku_type_id) { whereConditions.push('s.sku_type = ?'); queryParams.push(sku_type_id); }
-    if (client_id) { whereConditions.push('c.client_id = ?'); queryParams.push(client_id); }
+    if (client_id) { whereConditions.push('s.client_id = ?'); queryParams.push(client_id); }
     if (status) { whereConditions.push('s.status = ?'); queryParams.push(status); }
     const dateFilter = buildDateFilter(fromDate, toDate, 's.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
