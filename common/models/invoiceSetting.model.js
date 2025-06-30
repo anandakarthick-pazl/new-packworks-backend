@@ -507,6 +507,19 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
+     production_schedule_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    production_schedule_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    production_schedule_digit: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 3,
+    },
   },
   {
     tableName: "invoice_settings",

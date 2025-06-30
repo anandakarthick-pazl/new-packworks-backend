@@ -192,6 +192,10 @@ const WorkOrderInvoice = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    invoice_pdf_url: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     tableName: "work_order_invoice",
