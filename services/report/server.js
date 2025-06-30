@@ -416,7 +416,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
 v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, vendor_id, po_status, search, export: isExport } = req.query;
+    const { fromDate, toDate, vendor_id, po_status, payment_status, search, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['po.company_id = ?', 'po.status = ?'];
@@ -425,6 +425,10 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     if (vendor_id) {
       whereConditions.push('po.supplier_id = ?');
       queryParams.push(vendor_id);
+    }
+    if (payment_status) {
+      whereConditions.push('po.payment_status = ?');
+      queryParams.push(payment_status);
     }
     if (po_status) {
       whereConditions.push('po.po_status = ?');
@@ -436,7 +440,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     queryParams.push(...dateFilter.params);
 
     const searchFilter = buildSearchFilter(search, [
-      'po.po_number', 'po.vendor_name', 'po.po_status', 'po.reference'
+      'po.purchase_generate_id', 'po.vendor_name', 'po.po_status', 'po.reference'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
@@ -464,7 +468,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
       });
 
       const columns = [
-        { header: 'PO Number', key: 'po_number', width: 20 },
+        { header: 'PO Number', key: 'purchase_generate_id', width: 20 },
         { header: 'Vendor', key: 'vendor_name', width: 20 },
         { header: 'PO Date', key: 'po_date_formatted', width: 15 },
         { header: 'PO Status', key: 'po_status', width: 15 },
