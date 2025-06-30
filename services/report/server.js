@@ -732,13 +732,15 @@ v1Router.get("/work-orders", authenticateJWT, async (req, res) => {
 v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, sku_type_id, search, export: isExport } = req.query;
+    const { fromDate, toDate, sku_type_id, search, client_id, status, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['s.company_id = ?', 's.status = ?'];
     const queryParams = [company_id, 'active'];
 
     if (sku_type_id) { whereConditions.push('s.sku_type = ?'); queryParams.push(sku_type_id); }
+    if (client_id) { whereConditions.push('c.client_id = ?'); queryParams.push(client_id); }
+    if (status) { whereConditions.push('s.status = ?'); queryParams.push(status); }
     const dateFilter = buildDateFilter(fromDate, toDate, 's.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
     const searchFilter = buildSearchFilter(search, ['s.sku_ui_id', 's.sku_name']);
