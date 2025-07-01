@@ -709,6 +709,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         [fn('SUM', col('total_amount')), 'total_amount'],
         // 'sub_category',
         'location',
+        'qr_code_url',
         //  'rate',
         'status',
         'created_at',
@@ -1034,6 +1035,7 @@ const itemMasterInventory = await Inventory.findAll({
   attributes: [
     'id',
     'item_id',
+    'qr_code_url',
     'quantity_available',
     'total_amount',
     'location',
