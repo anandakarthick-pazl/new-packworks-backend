@@ -7,6 +7,7 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import moment from "moment-timezone";
+import Employee from "../../common/models/employee.model.js";
 
 const Company = db.Company;
 const User =db.User;
@@ -24,9 +25,18 @@ const v1Router = Router();
 v1Router.post("/create", authenticateJWT, async (req, res) => {
   try {
     const production_schedule_generate_id = await generateId(req.user.company_id, ProductionSchedule, "production_schedule");
+    
+    const user = await Employee.findOne({
+      where: {
+        company_id: req.user.company_id,
+        employee_id: req.body.employee_id
+      },
+      attributes: ['id', 'user_id', 'company_id']
+    });
     const data = await ProductionSchedule.create({
       ...req.body,        
-      production_schedule_generate_id: production_schedule_generate_id,             
+      production_schedule_generate_id: production_schedule_generate_id,  
+      user_id:  user.id,         
       company_id: req.user.company_id, 
       created_by: req.user.id, 
     });
@@ -213,17 +223,32 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 
 
 
-//get prodution-schedule
+//mobile
+//get employee prodution-schedule
 v1Router.get("/employee/schedule", authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const companyId = req.user.company_id;
-
     console.log("Fetching schedule for user:", userId, "in company:", companyId);
-
-    const schedule = await ProductionSchedule.findOne({
+    const employee = await Employee.findOne({
       where: {
-        employee_id: userId,
+        user_id: userId,
+        company_id: companyId,
+      },
+      attributes: ['id', 'user_id', 'company_id']
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    // Step 2: Fetch the Production Schedule for this employee
+    const schedule = await ProductionSchedule.findAll({
+      where: {
+        employee_id: employee.id, // use employee.id instead of user_id
         company_id: companyId,
       },
     });
@@ -235,6 +260,7 @@ v1Router.get("/employee/schedule", authenticateJWT, async (req, res) => {
       });
     }
 
+    // Step 3: Return the schedule
     return res.status(200).json({
       success: true,
       data: schedule,
@@ -249,7 +275,6 @@ v1Router.get("/employee/schedule", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 
 
 
