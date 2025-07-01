@@ -823,13 +823,13 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     if (stock_status) {
       switch (stock_status) {
         case 'out_of_stock':
-          whereConditions.push('(i.available_qty IS NULL OR i.available_qty <= 0)');
+          whereConditions.push('(i.quantity_available IS NULL OR i.quantity_available <= 0)');
           break;
         case 'low_stock':
-          whereConditions.push('(i.available_qty > 0 AND i.available_qty <= IFNULL(im.min_stock_level, 0))');
+          whereConditions.push('(i.quantity_available > 0 AND i.quantity_available <= IFNULL(im.min_stock_level, 0))');
           break;
         case 'in_stock':
-          whereConditions.push('(i.available_qty > IFNULL(im.min_stock_level, 0))');
+          whereConditions.push('(i.quantity_available > IFNULL(im.min_stock_level, 0))');
           break;
       }
     }
@@ -863,7 +863,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       const workbook = await createExcelWorkbook(inventory, 'Inventory Report', [
         { header: 'Item Code', key: 'item_code', width: 15 },
         { header: 'Item Name', key: 'item_name', width: 20 },
-        { header: 'Available Qty', key: 'available_qty', width: 15 },
+        { header: 'Available Qty', key: 'quantity_available', width: 15 },
         { header: 'Total Qty', key: 'total_qty', width: 15 },
         { header: 'Unit Price', key: 'unit_price', width: 15 },
         { header: 'Location', key: 'location', width: 20 },
@@ -892,7 +892,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const htmlData = inventory.map(item => ({
       item_code: item.item_code,
       item_name: item.item_name,
-      available_qty: item.available_qty,
+      quantity_available: item.quantity_available,
       total_qty: item.total_qty,
       unit_price: item.unit_price,
       location: item.location,
@@ -913,7 +913,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 // 🔁 Stock Status Function
 const getStockStatus = (item) => {
-  const quantity = parseFloat(item.available_qty) || 0;
+  const quantity = parseFloat(item.quantity_available) || 0;
   const minStock = parseFloat(item.min_stock_level) || 0;
 
   if (quantity <= 0) return 'out_of_stock';
