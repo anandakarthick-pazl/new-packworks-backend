@@ -6,6 +6,13 @@ import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
+import QRCode from "qrcode";
+import path from "path";
+import fs from "fs";
+import axios from "axios";
+import FormData from "form-data";
+import { fileURLToPath } from "url";
+
 
 const Company = db.Company;
 const User =db.User;
@@ -28,226 +35,92 @@ const v1Router = Router();
 
 
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
+// FIX 1: Ensure the public directory structure is correct
+const publicDir = path.join(__dirname, "../../public");
+const qrCodeDir = path.join(publicDir, "inventory_qrcodes");
+
+// Ensure directories exist
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+if (!fs.existsSync(qrCodeDir)) {
+  fs.mkdirSync(qrCodeDir, { recursive: true });
+}
+
+// Serve the entire public directory, not just qrcodes
+app.use("/public", express.static(publicDir));
+// Also serve qrcodes directly for backward compatibility
+app.use("/qrcodes", express.static(qrCodeDir));
+
+async function generateQRCode(inventoryData, token) {
+  try {
+    const { inventory_generate_id } = inventoryData;
+
+    if (!inventory_generate_id) {
+      throw new Error("Missing inventory_generate_id in inventoryData");
+    }
 
 
+    const textContent = `Inventory: ${inventoryData.inventory_generate_id}`.trim();
+    const sanitizedId = inventory_generate_id.replace(/[^a-zA-Z0-9]/g, "_");
+    const timestamp = Date.now();
+    const qrFileName = `inventory_${sanitizedId}_${timestamp}.png`;
+    const qrFilePath = path.join(qrCodeDir, qrFileName);
 
-// v1Router.post("/grn", authenticateJWT, async (req, res) => {
-//   const transaction = await sequelize.transaction();
-//   try {
-//     const grn_generate_id = await generateId(req.user.company_id, GRN, "grn");
-//     const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
-//     console.log("inventory_generate_id :", inventory_generate_id);
+
+    await QRCode.toFile(qrFilePath, textContent, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 300,
+    });
+
+    if (!fs.existsSync(qrFilePath)) {
+      throw new Error("QR code file was not created successfully");
+    }
+
+    // Prepare form data for upload
+    const form = new FormData();
+    form.append("file", fs.createReadStream(qrFilePath));
+
+      // const qrCodeUrl =`http://localhost:4024/public/qrcodes/${qrFileName}`;
+      // return qrCodeUrl;
+
+    const uploadUrl = `http://localhost:${process.env.PORT_STORAGE}/file/upload`;
     
-//     const { items, ...grnData } = req.body;
+    if (!process.env.PORT_STORAGE) {
+      throw new Error("BASE_URL not defined in environment");
+    }
 
-//     grnData.created_by = req.user.id;
-//     grnData.updated_by = req.user.id;
-//     grnData.grn_generate_id = grn_generate_id;
-//     grnData.company_id = req.user.company_id;
+    const config = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: uploadUrl,
+      headers: {
+        Authorization: `Bearer ${token}`, 
+        ...form.getHeaders(),
+      },
+      data: form,
+    };
 
-//     const validatePo = await PurchaseOrder.findOne({
-//       where: { id: grnData.po_id, status: "active" },
-//       transaction
-//     });
-
-//     if (!validatePo) {
-//       throw new Error("Invalid or inactive Purchase Order.");
-//     }
-//     let newGRN = null;
-
-//     for (const item of items) {
-//       const {
-//         po_item_id, item_id, item_code, grn_item_name, description,
-//         quantity_ordered, quantity_received, accepted_quantity,
-//         rejected_quantity, notes,unit_price,  cgst, cgst_amount, sgst, sgst_amount, amount, tax_amount, total_amount, work_order_no, batch_no, location
-//       } = item;
-
-
-//       const poItem = await PurchaseOrderItem.findOne({
-//         where: { id: po_item_id },
-//         attributes: ['quantity'],
-//         transaction
-//       });
-//       if (!poItem) throw new Error(`PO Item ${po_item_id} not found`);
-
-//       const grnStatus = (parseFloat(accepted_quantity) === parseFloat(poItem.quantity))
-//         ? "fully_received"
-//         : "partially_received";
+    const uploadResponse = await axios.request(config);
+    console.log("Upload response:", uploadResponse);
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
+      throw new Error("Failed to upload QR code image.");
+    }
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || "";
+    fs.unlinkSync(qrFilePath);
+    return uploadedImageUrl;
+  } catch (error) {
+    console.error("GRN creation error:", error);    
+  }
+}
 
 
-//       if (!newGRN) {
-//         grnData.grn_status = grnStatus;
-//         newGRN = await GRN.create(grnData, { transaction });
-//       }
-
-//       // const newGRN = await GRN.create(grnData, { transaction });
-
-
-//       const itemMaster = await ItemMaster.findOne({
-//         where: { id: item_id },
-//         transaction
-//       });
-//       if (!itemMaster) throw new Error(`Item ${item_id} not found`);
-
-//       const category = itemMaster.category;
-//       const sub_category = itemMaster.sub_category;
-
-//       const newGRNItem = await GRNItem.create({
-//         grn_id: newGRN.id,
-//         po_item_id,
-//         item_id,
-//         item_code,
-//         grn_item_name,
-//         description,
-//         quantity_ordered,
-//         quantity_received,
-//         accepted_quantity,
-//         rejected_quantity,
-//         unit_price,
-//         notes,
-//         work_order_no,
-//         batch_no,
-//         location,
-//         cgst, 
-//         cgst_amount, 
-//         sgst, 
-//         sgst_amount, 
-//         amount, 
-//         tax_amount, 
-//         total_amount,
-//         created_by: req.user.id,
-//         updated_by: req.user.id,
-//         company_id: req.user.company_id,
-//         grn_item_status: grnStatus,
-//       }, { transaction });
-
-//       const acceptedQty = parseFloat(accepted_quantity) || 0;
-
-//       // const existingInventory = await Inventory.findOne({
-//       //   where: {
-//       //     item_id,
-//       //     batch_no: batch_no || null,
-//       //     location: location || null,
-//       //     status: 'active'
-//       //   },
-//       //   transaction
-//       // });
-
-//       // if (existingInventory) {
-       
-//       //   // existingInventory.quantity_available =
-//       //   //   (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
-//       //   // existingInventory.updated_by = req.user.id;
-//       //   // await existingInventory.save({ transaction });
-        
-//       //   const updatedQuantity = (parseFloat(existingInventory.quantity_available) || 0) + acceptedQty;
-        
-//       //   await Inventory.create({
-//       //     company_id: req.user.company_id,
-//       //     item_id,
-//       //     item_code,
-//       //     grn_id: newGRN.id,
-//       //     grn_item_id: newGRNItem.id,
-//       //     po_id: grnData.po_id,
-//       //     category:category,
-//       //     sub_category:sub_category,
-//       //     // inventory_type: itemType,
-//       //     work_order_no,
-//       //     description,
-//       //     quantity_available: updatedQuantity,
-//       //     batch_no,
-//       //     location,
-//       //     status: 'active',
-//       //     created_by: req.user.id,
-//       //     updated_by: req.user.id
-//       //   }, { transaction });
-//       // } else {
-//         await Inventory.create({
-//           inventory_generate_id :inventory_generate_id,
-//           company_id: req.user.company_id,
-//           item_id,
-//           item_code,
-//           grn_id: newGRN.id,
-//           grn_item_id: newGRNItem.id,
-//           po_id: grnData.po_id,
-//           category:category,
-//           sub_category:sub_category,
-//           po_item_id:po_item_id,
-//           // inventory_type: itemType,
-//           work_order_no,
-//           description,
-//           quantity_available: acceptedQty,
-//           rate :newGRNItem.amount,
-//           total_amount: acceptedQty * newGRNItem.amount,
-//           batch_no,
-//           location,
-//           status: 'active',
-//           created_by: req.user.id,
-//           updated_by: req.user.id
-//         }, { transaction });
-//       }
-//     // }
-
-//     const allPoItems = await PurchaseOrderItem.findAll({
-//       where: { po_id: grnData.po_id },
-//       transaction
-//     });
-
-//     const allGrns = await GRN.findAll({
-//       where: { po_id: grnData.po_id },
-//       transaction
-//     });
-//     const allGrnIds = allGrns.map(grn => grn.id);
-
-//     const allGrnItems = await GRNItem.findAll({
-//       where: { grn_id: allGrnIds },
-//       transaction
-//     });
-
-//     // const allReceived = allPoItems.every(poItem =>
-//     //   allGrnItems.some(grnItem => grnItem.po_item_id === poItem.id)
-//     // );
-
-//     const allReceived = allPoItems.every(poItem =>
-//       allGrnItems
-//         .filter(grnItem => grnItem.po_item_id === poItem.id)
-//         .reduce((total, grnItem) => total + parseFloat(grnItem.quantity_received || 0), 0) >= parseFloat(poItem.quantity || 0)
-//     );
-
-//     await PurchaseOrder.update(
-//       { po_status: allReceived ? "received" : "partialy-recieved" },
-//       { where: { id: grnData.po_id }, transaction }      
-//     );
-
-//     await transaction.commit();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "GRN and inventory updated successfully",
-//       data: newGRN
-//     });
-
-//   } catch (error) {
-//     await transaction.rollback();
-//     console.error("GRN creation error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: `GRN creation failed: ${error.message}`
-//     });
-//   }
-// });
-
-
-
-
-
-
-
-
-
-
+// post grn
 v1Router.post("/grn", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -336,7 +209,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         grn_item_status: grnStatus
       }, { transaction });
 
-      await Inventory.create({
+      const newInventory = await Inventory.create({
         inventory_generate_id: inventory_generate_id,
         company_id: req.user.company_id,
         item_id,
@@ -358,6 +231,20 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         created_by: req.user.id,
         updated_by: req.user.id
       }, { transaction });
+
+      const authHeader = req.headers.authorization;
+      const token = authHeader.split(" ")[1];
+      const qrCodeUrl = await generateQRCode(newInventory, token);
+  
+      // Update work order with QR code URL
+    if (qrCodeUrl) {
+      await newInventory.update({ qr_code_url: qrCodeUrl }, { transaction });
+    } else {
+      throw new Error("QR code URL generation failed");
+    }
+
+
+
     }
     const allPoItems = await PurchaseOrderItem.findAll({ where: { po_id: grnData.po_id }, transaction });
     const allGrns = await GRN.findAll({ where: { po_id: grnData.po_id }, transaction });

@@ -32,3 +32,7 @@ public/
 
 # Temporary or dummy files
 dummy.js
+
+# QR code output inside public folder
+/public/inventory_qrcodes/
+
