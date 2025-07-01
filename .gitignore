@@ -36,3 +36,5 @@ dummy.js
 # QR code output inside public folder
 /public/inventory_qrcodes/
 
+package.json
+

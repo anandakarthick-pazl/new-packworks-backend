@@ -2971,6 +2971,36 @@ app.use('/whatsapp-media', express.static(path.join(process.cwd(), 'public', 'wh
   }
 }));
 
+
+//get client by client_ui_id
+// Get all WorkOrderInvoice IDs and invoice numbers
+v1Router.get("/get/invoice/generate-id", authenticateJWT, async (req, res) => {
+  try {
+    const invoices = await WorkOrderInvoice.findAll({
+      attributes: ["id", "invoice_number"],
+      where: {
+        company_id: req.user.company_id,
+        status: "active",
+      },
+      order: [["created_at", "DESC"]], // Optional: latest first
+      raw: true, // Optional: return plain objects
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching WorkOrderInvoices:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch WorkOrderInvoices",
+      error: error.message,
+    });
+  }
+});
+
+
 // Use Version 1 Router
 app.use("/api/work-order-invoice", v1Router);
 
