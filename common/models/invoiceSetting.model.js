@@ -417,7 +417,7 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-     stock_adjustment_prefix: {
+    stock_adjustment_prefix: {
       type: DataTypes.STRING(191),
       allowNull: true,
     },
@@ -429,7 +429,7 @@ const InvoiceSetting = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-     category_prefix: {
+    category_prefix: {
       type: DataTypes.STRING(191),
       allowNull: true,
     },
@@ -468,7 +468,7 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
-      billings_prefix: {
+    billings_prefix: {
       type: DataTypes.STRING(191),
       allowNull: false,
     },
@@ -481,7 +481,7 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
-     sales_returns_prefix: {
+    sales_returns_prefix: {
       type: DataTypes.STRING(191),
       allowNull: false,
     },
@@ -494,7 +494,7 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
-     purchase_order_payment_prefix: {
+    purchase_order_payment_prefix: {
       type: DataTypes.STRING(191),
       allowNull: false,
     },
@@ -507,7 +507,7 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
       defaultValue: 3,
     },
-     production_schedule_prefix: {
+    production_schedule_prefix: {
       type: DataTypes.STRING(191),
       allowNull: false,
     },
@@ -516,6 +516,19 @@ const InvoiceSetting = sequelize.define(
       allowNull: false,
     },
     production_schedule_digit: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 3,
+    },
+    production_group_prefix: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    production_group_number_separator: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
+    production_group_digit: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       defaultValue: 3,
