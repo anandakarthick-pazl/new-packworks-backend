@@ -933,7 +933,7 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
     if (client_id) { whereConditions.push('sr.client_id = ?'); queryParams.push(client_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'sr.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['sr.return_id', 'sr.return_reason']);
+    const searchFilter = buildSearchFilter(search, ['sr.return_generate_id', 'sr.reason','sr.notes']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -968,7 +968,8 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
     const salesReturns = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = salesReturns.map(ret => ({
-      return_id: ret.return_id,
+      return_id: ret.return_generate_id,
+      sales_order_id: ret.sales_generate_id,
       return_date: ret.return_date_formatted,
       return_reason: ret.return_reason,
       return_amount: ret.return_amount,
