@@ -1572,14 +1572,23 @@ v1Router.post( "/employee/login",authenticateStaticToken,validateLogin,async (re
       await User.update({ last_login: new Date() }, { where: { id: user.id } });
 
       // Return response with employee data included
-      return res.status(200).json({
-        status: true,
-        message: "Login successful",
-        token,
-        user,
-        employee, // Include employee details
-        company_state_id: company ? company.company_state_id : null,
-      });
+      // return res.status(200).json({
+      //   status: true,
+      //   message: "Login successful",
+      //   token,
+      //   user,
+      //   employee, // Include employee details
+      //   company_state_id: company ? company.company_state_id : null,
+      // });
+
+return res.status(200).json({
+  ...employee.toJSON(),
+  company_state_id: company ? company.company_state_id : null,
+  status: true,
+  message: "Login successful",
+  token,
+  user,
+});
 
     } catch (error) {
       console.error("❌ Error:", error.message);
