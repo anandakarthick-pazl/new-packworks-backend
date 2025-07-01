@@ -148,6 +148,10 @@ const Inventory = sequelize.define("Inventory", {
     onUpdate: "CASCADE",
     onDelete: "SET NULL",
   },
+  qr_code_url: {
+    type: Sequelize.TEXT,
+    allowNull: true,
+  },
   updated_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
