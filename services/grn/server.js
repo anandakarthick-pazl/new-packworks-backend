@@ -89,16 +89,11 @@ async function generateQRCode(inventoryData, token) {
       // const qrCodeUrl =`http://localhost:4024/public/qrcodes/${qrFileName}`;
       // return qrCodeUrl;
 
-    const uploadUrl = `http://localhost:${process.env.PORT_STORAGE}/file/upload`;
-    
-    if (!process.env.PORT_STORAGE) {
-      throw new Error("BASE_URL not defined in environment");
-    }
 
     const config = {
       method: "post",
       maxBodyLength: Infinity,
-      url: uploadUrl,
+      url: `${process.env.BASE_URL}/file/upload`,
       headers: {
         Authorization: `Bearer ${token}`, 
         ...form.getHeaders(),
