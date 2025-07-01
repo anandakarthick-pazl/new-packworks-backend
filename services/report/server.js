@@ -788,13 +788,15 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
 v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, item_id, search, export: isExport } = req.query;
+    const { fromDate, toDate, item_id, search, category, subCategory, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['i.company_id = ?', 'i.status = ?'];
     const queryParams = [company_id, 'active'];
 
     if (item_id) { whereConditions.push('i.item_id = ?'); queryParams.push(item_id); }
+    if (category) { whereConditions.push('i.category = ?'); queryParams.push(category); }
+    if (subCategory) { whereConditions.push('i.sub_category = ?'); queryParams.push(subCategory); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'i.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
     const searchFilter = buildSearchFilter(search, ['i.location']);
@@ -829,7 +831,8 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       available_qty: item.available_qty,
       total_qty: item.total_qty,
       unit_price: item.unit_price,
-      location: item.location
+      location: item.location,
+      stock_status: getStockStatus(item),
     }));
 
     res.status(200).json({ success: true, message: "Inventory report retrieved successfully", ...formatPaginatedResponse(htmlData, countResult.total, page, limit) });
@@ -839,7 +842,18 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+const getStockStatus = (item) => {
+  const quantity = parseFloat(item.quantity_available) || 0
+  const minStock = parseFloat(item.item_info?.min_stock_level) || 0
 
+  if (quantity <= 0) {
+    return 'out_of_stock'
+  } else if (quantity > 0 && quantity <= minStock) {
+    return 'low_stock'
+  } else {
+    return 'in_stock'
+  }
+}
 // =================== SALES RETURN REPORTS ===================
 v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
   try {
