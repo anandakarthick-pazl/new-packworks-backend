@@ -788,25 +788,78 @@ v1Router.get("/sku-details", authenticateJWT, async (req, res) => {
 v1Router.get("/inventory", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, item_id, search, category, subCategory, export: isExport } = req.query;
+    const {
+      fromDate,
+      toDate,
+      item_id,
+      search,
+      category,
+      subCategory,
+      stock_status, // NEW
+      export: isExport
+    } = req.query;
+
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['i.company_id = ?', 'i.status = ?'];
     const queryParams = [company_id, 'active'];
 
-    if (item_id) { whereConditions.push('i.item_id = ?'); queryParams.push(item_id); }
-    if (category) { whereConditions.push('i.category = ?'); queryParams.push(category); }
-    if (subCategory) { whereConditions.push('i.sub_category = ?'); queryParams.push(subCategory); }
+    if (item_id) {
+      whereConditions.push('i.item_id = ?');
+      queryParams.push(item_id);
+    }
+
+    if (category) {
+      whereConditions.push('i.category = ?');
+      queryParams.push(category);
+    }
+
+    if (subCategory) {
+      whereConditions.push('i.sub_category = ?');
+      queryParams.push(subCategory);
+    }
+
+    // 🔍 Filter by stock_status
+    if (stock_status) {
+      switch (stock_status) {
+        case 'out_of_stock':
+          whereConditions.push('(i.available_qty IS NULL OR i.available_qty <= 0)');
+          break;
+        case 'low_stock':
+          whereConditions.push('(i.available_qty > 0 AND i.available_qty <= IFNULL(im.min_stock_level, 0))');
+          break;
+        case 'in_stock':
+          whereConditions.push('(i.available_qty > IFNULL(im.min_stock_level, 0))');
+          break;
+      }
+    }
+
     const dateFilter = buildDateFilter(fromDate, toDate, 'i.created_at');
-    whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['i.location']);
-    whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
+    whereConditions.push(...dateFilter.conditions);
+    queryParams.push(...dateFilter.params);
+
+    const searchFilter = buildSearchFilter(search, ['i.location', 'im.item_name', 'im.item_code', 'im.description']);
+    whereConditions.push(...searchFilter.conditions);
+    queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
-    const baseQuery = `SELECT i.*, im.item_name, im.item_code, comp.company_name FROM inventory i LEFT JOIN item_master im ON i.item_id = im.id LEFT JOIN companies comp ON i.company_id = comp.id ${whereClause} ORDER BY i.created_at DESC`;
 
+    const baseQuery = `
+      SELECT i.*, im.item_name, im.item_code, im.min_stock_level, comp.company_name
+      FROM inventory i
+      LEFT JOIN item_master im ON i.item_id = im.id
+      LEFT JOIN companies comp ON i.company_id = comp.id
+      ${whereClause}
+      ORDER BY i.created_at DESC
+    `;
+
+    // Export as Excel
     if (isExport === 'excel') {
-      const inventory = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
+      const inventory = await sequelize.query(baseQuery, {
+        replacements: queryParams,
+        type: QueryTypes.SELECT
+      });
+
       const workbook = await createExcelWorkbook(inventory, 'Inventory Report', [
         { header: 'Item Code', key: 'item_code', width: 15 },
         { header: 'Item Name', key: 'item_name', width: 20 },
@@ -816,14 +869,25 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         { header: 'Location', key: 'location', width: 20 },
         { header: 'Last Updated', key: 'updated_at', width: 15 }
       ]);
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="inventory_report.xlsx"');
       await workbook.xlsx.write(res);
       return res.end();
     }
 
-    const [countResult] = await sequelize.query(`SELECT COUNT(*) as total FROM inventory i LEFT JOIN item_master im ON i.item_id = im.id LEFT JOIN companies comp ON i.company_id = comp.id ${whereClause}`, { replacements: queryParams, type: QueryTypes.SELECT });
-    const inventory = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
+    const [countResult] = await sequelize.query(
+      `SELECT COUNT(*) as total FROM inventory i
+      LEFT JOIN item_master im ON i.item_id = im.id
+      LEFT JOIN companies comp ON i.company_id = comp.id
+      ${whereClause}`,
+      { replacements: queryParams, type: QueryTypes.SELECT }
+    );
+
+    const inventory = await sequelize.query(
+      `${baseQuery} LIMIT ? OFFSET ?`,
+      { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT }
+    );
 
     const htmlData = inventory.map(item => ({
       item_code: item.item_code,
@@ -835,25 +899,27 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       stock_status: getStockStatus(item),
     }));
 
-    res.status(200).json({ success: true, message: "Inventory report retrieved successfully", ...formatPaginatedResponse(htmlData, countResult.total, page, limit) });
+    res.status(200).json({
+      success: true,
+      message: "Inventory report retrieved successfully",
+      ...formatPaginatedResponse(htmlData, countResult.total, page, limit)
+    });
 
   } catch (error) {
     logger.error("Error fetching inventory report:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
-const getStockStatus = (item) => {
-  const quantity = parseFloat(item.quantity_available) || 0
-  const minStock = parseFloat(item.item_info?.min_stock_level) || 0
 
-  if (quantity <= 0) {
-    return 'out_of_stock'
-  } else if (quantity > 0 && quantity <= minStock) {
-    return 'low_stock'
-  } else {
-    return 'in_stock'
-  }
-}
+// 🔁 Stock Status Function
+const getStockStatus = (item) => {
+  const quantity = parseFloat(item.available_qty) || 0;
+  const minStock = parseFloat(item.min_stock_level) || 0;
+
+  if (quantity <= 0) return 'out_of_stock';
+  if (quantity > 0 && quantity <= minStock) return 'low_stock';
+  return 'in_stock';
+};
 // =================== SALES RETURN REPORTS ===================
 v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
   try {
