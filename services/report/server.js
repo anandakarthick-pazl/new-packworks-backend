@@ -440,7 +440,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     queryParams.push(...dateFilter.params);
 
     const searchFilter = buildSearchFilter(search, [
-      'po.purchase_generate_id', 'po.vendor_name', 'po.po_status', 'po.reference'
+      'po.purchase_generate_id', 'c.display_name', 'po.po_status', 'po.reference'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
@@ -469,7 +469,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
 
       const columns = [
         { header: 'PO Number', key: 'purchase_generate_id', width: 20 },
-        { header: 'Vendor', key: 'vendor_name', width: 20 },
+        { header: 'Vendor', key: 'vendor_display_name', width: 20 },
         { header: 'PO Date', key: 'po_date_formatted', width: 15 },
         { header: 'PO Status', key: 'po_status', width: 15 },
         { header: 'Payment Status', key: 'payment_status', width: 15 },
