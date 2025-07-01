@@ -22,18 +22,15 @@ const Inventory = db.Inventory;
 const AllocationHistory = db.AllocationHistory;
 const User = db.User;
 
-
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
   const groupDetailsArray = req.body;
 
   // Validate that we received an array
   if (!Array.isArray(groupDetailsArray) || groupDetailsArray.length === 0) {
-    return res
-      .status(400)
-      .json({
-        message: "Invalid input data - expected array of group objects",
-      });
+    return res.status(400).json({
+      message: "Invalid input data - expected array of group objects",
+    });
   }
 
   const createdGroups = [];
@@ -52,15 +49,15 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
         }
 
         const production_group_generate_id = await generateId(
-                  req.user.company_id,
-                  ProductionGroup,
-                  "production_group"
-                );
+          req.user.company_id,
+          ProductionGroup,
+          "production_group"
+        );
 
         // Create Production Group
         const newProductionGroup = await ProductionGroup.create({
-          company_id: req.user.company_id,
           production_group_generate_id: production_group_generate_id,
+          company_id: req.user.company_id,
           group_name: groupDetails.group_name,
           group_value: groupDetails.group_value || null,
           group_Qty: groupDetails.group_Qty || null,
@@ -68,7 +65,6 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           status: groupDetails.status || "active",
           created_by: req.user.id,
           updated_by: req.user.id,
-          temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : 0,
         });
 
         // Process group_value array to update work_order status
@@ -268,13 +264,12 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
   }
-});
-// PATCH API to ungroup layers (set layer_status back to "ungrouped")
-v1Router.patch(
-  "/production-group/ungroup",
-  authenticateJWT,
-  async (req, res) => {
-    const { work_order_layers } = req.body;
+}); 
+
+
+
+v1Router.put("/production-group", authenticateJWT, async (req, res) => {
+  const groupDetailsArray = req.body;
 
     // Validate input
     if (!work_order_layers || !Array.isArray(work_order_layers)) {
@@ -527,7 +522,8 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         groupData.group_value = groupValue || [];
 
         // Calculate balance_Qty = group_Qty - allocated_Qty
-        groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+        groupData.balance_Qty =
+          (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
 
         // Fetch allocation history for this group
         try {
@@ -550,24 +546,24 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
           });
 
           // Process allocation history data
-          const allocationData = allocationHistory.map(item => item.toJSON());
-          
+          const allocationData = allocationHistory.map((item) => item.toJSON());
+
           // Calculate total allocated quantity by inventory_id
           const allocationSummary = {};
           let totalAllocatedQty = 0;
-          
-          allocationData.forEach(allocation => {
+
+          allocationData.forEach((allocation) => {
             const inventoryId = allocation.inventory_id;
             const allocatedQty = allocation.allocated_qty || 0;
-            
+
             if (!allocationSummary[inventoryId]) {
               allocationSummary[inventoryId] = {
                 inventory_id: inventoryId,
                 total_allocated_qty: 0,
-                allocation_records: []
+                allocation_records: [],
               };
             }
-            
+
             allocationSummary[inventoryId].total_allocated_qty += allocatedQty;
             allocationSummary[inventoryId].allocation_records.push(allocation);
             totalAllocatedQty += allocatedQty;
@@ -580,9 +576,8 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
           groupData.allocation_history = {
             total_allocated_qty: totalAllocatedQty,
             allocation_by_inventory: allocationSummaryArray,
-            all_allocation_records: allocationData
+            all_allocation_records: allocationData,
           };
-
         } catch (allocationError) {
           logger.error(
             `Error fetching allocation history for group ${group.id}:`,
@@ -592,7 +587,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
             total_allocated_qty: 0,
             allocation_by_inventory: [],
             all_allocation_records: [],
-            error: "Error fetching allocation history"
+            error: "Error fetching allocation history",
           };
         }
 
@@ -605,7 +600,11 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
               try {
                 // Only fetch work_order_sku_values to extract layer details
                 const workOrder = await WorkOrder.findByPk(work_order_id, {
-                  attributes: ["id", "work_generate_id", "work_order_sku_values"],
+                  attributes: [
+                    "id",
+                    "work_generate_id",
+                    "work_order_sku_values",
+                  ],
                 });
 
                 if (!workOrder) {
@@ -686,8 +685,258 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
       message: "Internal Server Error",
       error: error.message,
     });
+  } 
+});
+
+v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) => {
+  try {
+    const { group_ids, include_work_orders = "false" } = req.body;
+
+    // Validate input
+    if (!group_ids || !Array.isArray(group_ids) || group_ids.length === 0) {
+      return res.status(400).json({
+        message: "group_ids is required and must be a non-empty array",
+      });
+    }
+
+    // Validate that all group_ids are valid (numbers or strings that can be converted to numbers)
+    const validGroupIds = group_ids.filter(id => {
+      const numId = parseInt(id);
+      return !isNaN(numId) && numId > 0;
+    });
+
+    if (validGroupIds.length === 0) {
+      return res.status(400).json({
+        message: "No valid group IDs provided",
+      });
+    }
+
+    // Get production groups for the specified IDs and company
+    const productionGroups = await ProductionGroup.findAll({
+      where: {
+        id: validGroupIds,
+        company_id: req.user.company_id,
+      },
+      order: [["created_at", "DESC"]],
+      attributes: [
+        "id",
+        "production_group_generate_id",
+        "group_name",
+        "group_value",
+        "group_Qty",
+        "allocated_Qty",
+        "status",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+      ],
+    });
+
+    // Check if all requested groups were found
+    const foundGroupIds = productionGroups.map(group => group.id);
+    const notFoundGroupIds = validGroupIds.filter(id => !foundGroupIds.includes(parseInt(id)));
+
+    // Process each production group to include work order layer details if requested
+    const processedGroups = await Promise.all(
+      productionGroups.map(async (group) => {
+        const groupData = group.toJSON();
+
+        // Parse group_value if it's a string
+        let groupValue = groupData.group_value;
+        if (typeof groupValue === "string") {
+          try {
+            groupValue = JSON.parse(groupValue);
+          } catch (parseError) {
+            logger.warn(
+              `Error parsing group_value for group ${group.id}:`,
+              parseError
+            );
+            groupValue = [];
+          }
+        }
+
+        groupData.group_value = groupValue || [];
+
+        // Calculate balance_Qty = group_Qty - allocated_Qty
+        groupData.balance_Qty =
+          (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+
+        // Fetch allocation history for this group
+        try {
+          const allocationHistory = await AllocationHistory.findAll({
+            where: {
+              group_id: group.id,
+              company_id: req.user.company_id,
+            },
+            attributes: [
+              "id",
+              "inventory_id",
+              "allocated_qty",
+              "status",
+              "created_by",
+              "updated_by",
+              "created_at",
+              "updated_at",
+            ],
+            order: [["created_at", "DESC"]],
+          });
+
+          // Process allocation history data
+          const allocationData = allocationHistory.map((item) => item.toJSON());
+
+          // Calculate total allocated quantity by inventory_id
+          const allocationSummary = {};
+          let totalAllocatedQty = 0;
+
+          allocationData.forEach((allocation) => {
+            const inventoryId = allocation.inventory_id;
+            const allocatedQty = allocation.allocated_qty || 0;
+
+            if (!allocationSummary[inventoryId]) {
+              allocationSummary[inventoryId] = {
+                inventory_id: inventoryId,
+                total_allocated_qty: 0,
+                allocation_records: [],
+              };
+            }
+
+            allocationSummary[inventoryId].total_allocated_qty += allocatedQty;
+            allocationSummary[inventoryId].allocation_records.push(allocation);
+            totalAllocatedQty += allocatedQty;
+          });
+
+          // Convert summary object to array
+          const allocationSummaryArray = Object.values(allocationSummary);
+
+          // Add allocation data to group
+          groupData.allocation_history = {
+            total_allocated_qty: totalAllocatedQty,
+            allocation_by_inventory: allocationSummaryArray,
+            all_allocation_records: allocationData,
+          };
+        } catch (allocationError) {
+          logger.error(
+            `Error fetching allocation history for group ${group.id}:`,
+            allocationError
+          );
+          groupData.allocation_history = {
+            total_allocated_qty: 0,
+            allocation_by_inventory: [],
+            all_allocation_records: [],
+            error: "Error fetching allocation history",
+          };
+        }
+
+        // Include only layer details if requested
+        if (include_work_orders === "true" && Array.isArray(groupValue)) {
+          const layerDetails = await Promise.all(
+            groupValue.map(async (item) => {
+              const { work_order_id, layer_id, sales_order_id } = item;
+
+              try {
+                // Only fetch work_order_sku_values to extract layer details
+                const workOrder = await WorkOrder.findByPk(work_order_id, {
+                  attributes: [
+                    "id",
+                    "work_generate_id",
+                    "work_order_sku_values",
+                  ],
+                });
+
+                if (!workOrder) {
+                  return {
+                    work_order_id,
+                    layer_id,
+                    sales_order_id,
+                    layer_found: false,
+                    error: "Work order not found",
+                  };
+                }
+
+                // Parse work_order_sku_values to get layer details
+                let skuValues = workOrder.work_order_sku_values;
+                if (typeof skuValues === "string") {
+                  try {
+                    skuValues = JSON.parse(skuValues);
+                  } catch (parseError) {
+                    skuValues = [];
+                  }
+                }
+
+                // Find the specific layer by layer_id
+                const layerDetail = Array.isArray(skuValues)
+                  ? skuValues.find((layer) => layer.layer_id === layer_id)
+                  : null;
+
+                if (!layerDetail) {
+                  return {
+                    work_order_id,
+                    work_generate_id: workOrder.work_generate_id,
+                    layer_id,
+                    sales_order_id,
+                    layer_found: false,
+                    error: "Layer not found in work order",
+                  };
+                }
+
+                return {
+                  work_order_id,
+                  work_generate_id: workOrder.work_generate_id,
+                  layer_id,
+                  sales_order_id,
+                  layer_found: true,
+                  layer_detail: layerDetail,
+                };
+              } catch (error) {
+                logger.error(
+                  `Error fetching layer details for work order ${work_order_id}:`,
+                  error
+                );
+                return {
+                  work_order_id,
+                  layer_id,
+                  sales_order_id,
+                  layer_found: false,
+                  error: "Error fetching layer details",
+                };
+              }
+            })
+          );
+
+          groupData.layer_details = layerDetails;
+        }
+
+        return groupData;
+      })
+    );
+
+    // Prepare response
+    const response = {
+      message: "Production groups retrieved successfully",
+      data: processedGroups,
+      total: processedGroups.length,
+      requested_count: validGroupIds.length,
+      found_count: foundGroupIds.length,
+    };
+
+    // Include information about not found groups if any
+    if (notFoundGroupIds.length > 0) {
+      response.not_found_group_ids = notFoundGroupIds;
+      response.message = `${foundGroupIds.length} of ${validGroupIds.length} production groups retrieved successfully`;
+    }
+
+    res.status(200).json(response);
+  } catch (error) {
+    logger.error("Error fetching multiple production groups:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
+
+
 v1Router.patch(
   "/production-group/allocate",
   authenticateJWT,
@@ -1268,13 +1517,13 @@ v1Router.get(
           "quantity_available",
           "quantity_blocked",
           "created_at",
-          "updated_at"
-        ]
+          "updated_at",
+        ],
       });
 
       if (!inventoryItem) {
         return res.status(404).json({
-          message: "Inventory item not found or doesn't belong to your company"
+          message: "Inventory item not found or doesn't belong to your company",
         });
       }
 
@@ -1287,9 +1536,9 @@ v1Router.get(
         include: [
           {
             model: ProductionGroup,
-            attributes: ["id", "group_name", "group_Qty", "status"],
-            required: false
-          }
+            attributes: ["id","production_group_generate_id","group_name", "group_Qty", "status"],
+            required: false,
+          },
         ],
         order: [["created_at", "DESC"]],
       });
@@ -1300,9 +1549,9 @@ v1Router.get(
           data: {
             inventory: inventoryItem,
             group_allocations: [],
-            total_allocated: 0
+            total_allocated: 0,
           },
-          count: 0
+          count: 0,
         });
       }
 
@@ -1310,62 +1559,76 @@ v1Router.get(
       const groupedAllocations = {};
       let totalAllocated = 0;
 
-      allocationHistory.forEach(record => {
+      allocationHistory.forEach((record) => {
         const groupId = record.group_id;
         const allocatedQty = parseFloat(record.allocated_Qty) || 0;
-        
+
         if (!groupedAllocations[groupId]) {
           groupedAllocations[groupId] = {
             group_id: groupId,
-            group_name: record.ProductionGroup ? record.ProductionGroup.group_name : null,
-            group_qty: record.ProductionGroup ? parseFloat(record.ProductionGroup.group_Qty) || 0 : 0,
-            group_status: record.ProductionGroup ? record.ProductionGroup.status : null,
+            group_name: record.ProductionGroup
+              ? record.ProductionGroup.group_name
+              : null,
+            group_qty: record.ProductionGroup
+              ? parseFloat(record.ProductionGroup.group_Qty) || 0
+              : 0,
+            group_status: record.ProductionGroup
+              ? record.ProductionGroup.status
+              : null,
             net_allocated_qty: 0,
             allocation_records: [],
-            last_allocation_date: record.created_at
+            last_allocation_date: record.created_at,
           };
         }
 
         // Sum up the allocated quantities (positive for allocations, negative for deallocations)
         groupedAllocations[groupId].net_allocated_qty += allocatedQty;
-        
+
         // Add individual record to allocation_records array
         groupedAllocations[groupId].allocation_records.push({
           id: record.id,
           allocated_qty: allocatedQty,
           status: record.status,
           created_at: record.created_at,
-          created_by: record.created_by
+          created_by: record.created_by,
         });
 
         // Update last allocation date if this record is more recent
-        if (new Date(record.created_at) > new Date(groupedAllocations[groupId].last_allocation_date)) {
+        if (
+          new Date(record.created_at) >
+          new Date(groupedAllocations[groupId].last_allocation_date)
+        ) {
           groupedAllocations[groupId].last_allocation_date = record.created_at;
         }
       });
 
       // Convert to array and calculate total allocated
-      const groupAllocations = Object.values(groupedAllocations).map(group => {
-        // Only count positive net allocations for total
-        if (group.net_allocated_qty > 0) {
-          totalAllocated += group.net_allocated_qty;
+      const groupAllocations = Object.values(groupedAllocations).map(
+        (group) => {
+          // Only count positive net allocations for total
+          if (group.net_allocated_qty > 0) {
+            totalAllocated += group.net_allocated_qty;
+          }
+
+          return {
+            ...group,
+            net_allocated_qty: parseFloat(group.net_allocated_qty.toFixed(2)), // Round to 2 decimal places
+          };
         }
-        
-        return {
-          ...group,
-          net_allocated_qty: parseFloat(group.net_allocated_qty.toFixed(2)) // Round to 2 decimal places
-        };
-      });
+      );
 
       // Sort by net_allocated_qty descending (most allocated first)
-      groupAllocations.sort((a, b) => b.net_allocated_qty - a.net_allocated_qty);
+      groupAllocations.sort(
+        (a, b) => b.net_allocated_qty - a.net_allocated_qty
+      );
 
       res.status(200).json({
         message: "Allocation history retrieved successfully",
         data: {
           inventory: {
             ...inventoryItem.toJSON(),
-            quantity_available: parseFloat(inventoryItem.quantity_available) || 0,
+            quantity_available:
+              parseFloat(inventoryItem.quantity_available) || 0,
             quantity_blocked: parseFloat(inventoryItem.quantity_blocked) || 0,
             // total_quantity: parseFloat(inventoryItem.total_quantity) || 0
           },
@@ -1373,10 +1636,10 @@ v1Router.get(
           summary: {
             total_groups: groupAllocations.length,
             total_allocated: parseFloat(totalAllocated.toFixed(2)),
-            total_records: allocationHistory.length
-          }
+            total_records: allocationHistory.length,
+          },
         },
-        count: allocationHistory.length
+        count: allocationHistory.length,
       });
     } catch (error) {
       console.error("Error fetching allocation history:", error);
