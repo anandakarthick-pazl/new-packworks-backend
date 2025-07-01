@@ -1397,12 +1397,9 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
         "updated_at",
         "created_by",
         "updated_by",
+        "temporary_status",
       ],
     });
-
-    // Check if all requested groups were found
-    const foundGroupIds = productionGroups.map(group => group.id);
-    const notFoundGroupIds = validGroupIds.filter(id => !foundGroupIds.includes(parseInt(id)));
 
     // Process each production group to include work order layer details if requested
     const processedGroups = await Promise.all(
@@ -1495,8 +1492,8 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
           };
         }
 
-        // Include only layer details if requested
-        if (include_work_orders === "true" && Array.isArray(groupValue)) {
+        // Always include layer details for all objects
+        if (Array.isArray(groupValue)) {
           const layerDetails = await Promise.all(
             groupValue.map(async (item) => {
               const { work_order_id, layer_id, sales_order_id } = item;
@@ -1572,28 +1569,21 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
           );
 
           groupData.layer_details = layerDetails;
+        } else {
+          // If no group_value, include empty layer_details
+          groupData.layer_details = [];
         }
 
         return groupData;
       })
     );
 
-    // Prepare response
-    const response = {
+    // Return the exact same format as GET endpoint
+    res.status(200).json({
       message: "Production groups retrieved successfully",
       data: processedGroups,
       total: processedGroups.length,
-      requested_count: validGroupIds.length,
-      found_count: foundGroupIds.length,
-    };
-
-    // Include information about not found groups if any
-    if (notFoundGroupIds.length > 0) {
-      response.not_found_group_ids = notFoundGroupIds;
-      response.message = `${foundGroupIds.length} of ${validGroupIds.length} production groups retrieved successfully`;
-    }
-
-    res.status(200).json(response);
+    });
   } catch (error) {
     logger.error("Error fetching multiple production groups:", error);
     res.status(500).json({
@@ -1602,7 +1592,6 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
     });
   }
 });
-
 
 
 v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
