@@ -213,6 +213,45 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 
 
 
+//get prodution-schedule
+v1Router.get("/employee/schedule", authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const companyId = req.user.company_id;
+
+    console.log("Fetching schedule for user:", userId, "in company:", companyId);
+
+    const schedule = await ProductionSchedule.findOne({
+      where: {
+        employee_id: userId,
+        company_id: companyId,
+      },
+    });
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Production schedule not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: schedule,
+    });
+
+  } catch (err) {
+    console.error("Error fetching production schedule:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching production schedule",
+      error: err.message,
+    });
+  }
+});
+
+
+
 
 
 
