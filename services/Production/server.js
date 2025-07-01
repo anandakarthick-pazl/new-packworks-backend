@@ -355,6 +355,7 @@ v1Router.patch("/production-group/final-status", authenticateJWT, async (req, re
         "group_name",
         "group_value",
         "group_Qty",
+        "group_status",
         "allocated_Qty",
         "group_status",
         "created_at",
@@ -516,6 +517,7 @@ v1Router.put("/production-group", authenticateJWT, async (req, res) => {
             group_name: groupDetails.group_name,
             group_value: groupDetails.group_value || null,
             group_Qty: groupDetails.group_Qty || null,
+            group_status: groupDetails.group_status || existingGroup.group_status,
             allocated_Qty: groupDetails.allocated_Qty || null,
             status: groupDetails.status || existingGroup.status,
             updated_by: req.user.id,
@@ -1547,6 +1549,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         "group_name",
         "group_value",
         "group_Qty",
+        "group_status",
         "allocated_Qty",
         "status",
         "created_at",
@@ -1786,6 +1789,7 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
         "group_name",
         "group_value",
         "group_Qty",
+        "group_status",
         "allocated_Qty",
         "status",
         "created_at",
@@ -2029,6 +2033,7 @@ v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
         "group_name",
         "group_value",
         "group_Qty",
+        "group_status",
         "allocated_Qty",
         "status",
         "created_at",
@@ -2719,6 +2724,7 @@ v1Router.get(
           "production_group_generate_id",
           "group_name",
           "group_Qty",
+          "group_status",
           "allocated_Qty",
           "status",
           "created_at",
@@ -2823,7 +2829,7 @@ v1Router.get(
         include: [
           {
             model: ProductionGroup,
-            attributes: ["id","production_group_generate_id", "group_name", "group_Qty", "status"],
+            attributes: ["id","production_group_generate_id", "group_name", "group_Qty","group_status", "status"],
             required: false
           }
         ],
