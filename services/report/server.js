@@ -924,13 +924,14 @@ const getStockStatus = (item) => {
 v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, client_id, search, export: isExport } = req.query;
+    const { fromDate, toDate, client_id,invoice, search, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['sr.company_id = ?'];
     const queryParams = [company_id];
 
     if (client_id) { whereConditions.push('sr.client_id = ?'); queryParams.push(client_id); }
+    if (invoice) { whereConditions.push('so.sales_generate_id = ?'); queryParams.push(invoice); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'sr.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
     const searchFilter = buildSearchFilter(search, ['sr.return_generate_id', 'sr.reason','sr.notes']);
