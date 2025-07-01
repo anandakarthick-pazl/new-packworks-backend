@@ -37,4 +37,5 @@ dummy.js
 /public/inventory_qrcodes/
 
 package.json
+package-lock.json
 
