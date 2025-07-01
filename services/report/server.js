@@ -440,7 +440,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     queryParams.push(...dateFilter.params);
 
     const searchFilter = buildSearchFilter(search, [
-      'po.purchase_generate_id', 'po.vendor_name', 'po.po_status', 'po.reference'
+      'po.purchase_generate_id', 'c.display_name', 'po.po_status'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
@@ -469,9 +469,10 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
 
       const columns = [
         { header: 'PO Number', key: 'purchase_generate_id', width: 20 },
-        { header: 'Vendor', key: 'vendor_name', width: 20 },
+        { header: 'Vendor', key: 'vendor_display_name', width: 20 },
         { header: 'PO Date', key: 'po_date_formatted', width: 15 },
         { header: 'PO Status', key: 'po_status', width: 15 },
+        { header: 'Payment Status', key: 'payment_status', width: 15 },
         { header: 'Total Amount', key: 'total_amount', width: 15 },
         { header: 'Total Incl GST', key: 'total_incl_gst', width: 15 },
         { header: 'Created Date', key: 'created_at', width: 15 }
@@ -496,6 +497,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
       vendor_name: po.vendor_display_name,
       po_date: po.po_date_formatted,
       po_status: po.po_status,
+      payment_status: po.payment_status,
       total_amount: po.total_amount,
       total_incl_gst: po.total_incl_gst
     }));
