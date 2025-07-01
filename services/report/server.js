@@ -440,7 +440,7 @@ v1Router.get("/purchase-orders", authenticateJWT, async (req, res) => {
     queryParams.push(...dateFilter.params);
 
     const searchFilter = buildSearchFilter(search, [
-      'po.purchase_generate_id', 'c.display_name', 'po.po_status', 'po.reference'
+      'po.purchase_generate_id', 'c.display_name', 'po.po_status'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
