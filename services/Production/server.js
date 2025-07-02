@@ -2747,6 +2747,9 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
   try {
     const allocationData = req.body;
     
+    // Debug: Log the incoming request body
+    logger.info('Incoming request body:', JSON.stringify(allocationData, null, 2));
+    
     // Validate request body
     if (!Array.isArray(allocationData) || allocationData.length === 0) {
       await transaction.rollback();
@@ -2758,10 +2761,18 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
     // Validate each item in the array
     for (let i = 0; i < allocationData.length; i++) {
       const item = allocationData[i];
-      if (!item.group_id || !item.inventory_id || !item.balance_allocate) {
+      if (!item.group_id || !item.inventory_id || item.balance_allocate === undefined || item.balance_allocate === null) {
         await transaction.rollback();
         return res.status(400).json({ 
-          message: `Invalid data at index ${i}. Required fields: group_id, inventory_id, balance_allocate` 
+          message: `Invalid data at index ${i}. Required fields: group_id, inventory_id, balance_allocate. Received: ${JSON.stringify(item)}` 
+        });
+      }
+      
+      // Validate that balance_allocate is a valid number
+      if (isNaN(item.balance_allocate) || item.balance_allocate <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({ 
+          message: `Invalid balance_allocate at index ${i}. Must be a positive number. Received: ${item.balance_allocate}` 
         });
       }
     }
@@ -2771,6 +2782,9 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
     // Process each allocation item
     for (let i = 0; i < allocationData.length; i++) {
       const { group_id, inventory_id, balance_allocate } = allocationData[i];
+      
+      // Debug log to check incoming values
+      logger.info(`Processing index ${i} - group_id: ${group_id}, inventory_id: ${inventory_id}, balance_allocate: ${balance_allocate}`);
       
       try {
         // Step 1: Find the existing inventory record
@@ -2786,13 +2800,13 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
           });
         }
 
-        // Step 2: Create new inventory entry with updated quantity_available
+        // Step 2: Create new inventory entry with updated quantities
         const inventoryData = existingInventory.get({ plain: true });
         delete inventoryData.id; // Remove the primary key to create new record
         delete inventoryData.created_at; // Let database set new timestamp
         delete inventoryData.updated_at; // Let database set new timestamp
         
-        // Update quantity_available with balance_allocate value
+        // Update quantities as requested
         inventoryData.quantity_available = 0;
         inventoryData.quantity_blocked = balance_allocate;
         inventoryData.company_id = req.user.company_id; // Ensure correct company
@@ -2812,17 +2826,56 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
         const newStockAdjustment = await stockAdjustment.create(stockAdjustmentData, { transaction });
 
         // Step 4: Create allocation history entry
+        // Ensure balance_allocate is a valid number
+        const allocatedQuantity = Number(balance_allocate);
+        if (isNaN(allocatedQuantity)) {
+          throw new Error(`Invalid balance_allocate value: ${balance_allocate}`);
+        }
+
         const allocationHistoryData = {
           company_id: req.user.company_id,
           inventory_id: newInventory.id,
-          group_id: group_id,
-          allocated_qty: balance_allocate,
+          group_id: parseInt(group_id),
+          allocated_qty: allocatedQuantity,
           status: 'active',
           created_by: req.user.id,
           updated_by: req.user.id
         };
 
+        // Debug log to check the values before database insertion
+        logger.info(`Creating allocation history with data:`, {
+          ...allocationHistoryData,
+          allocated_qty_type: typeof allocationHistoryData.allocated_qty,
+          allocated_qty_value: allocationHistoryData.allocated_qty
+        });
+
         const newAllocationHistory = await db.AllocationHistory.create(allocationHistoryData, { transaction });
+
+        // Step 5: Update production_group allocated_qty
+        const productionGroup = await db.ProductionGroup.findOne({
+          where: { 
+            id: group_id,
+            company_id: req.user.company_id 
+          },
+          transaction
+        });
+
+        if (productionGroup) {
+          const currentAllocatedQty = productionGroup.allocated_qty || 0;
+          const newAllocatedQty = currentAllocatedQty + balance_allocate;
+          
+          await productionGroup.update(
+            { allocated_qty: newAllocatedQty },
+            { transaction }
+          );
+          
+          logger.info(`Updated production group ${group_id} allocated_qty from ${currentAllocatedQty} to ${newAllocatedQty}`);
+        } else {
+          logger.warn(`Production group with id ${group_id} not found for company ${req.user.company_id}`);
+        }
+        
+        // Debug log to check what was actually created
+        logger.info(`Created allocation history:`, newAllocationHistory.get({ plain: true }));
 
         // Store result for this iteration
         results.push({
