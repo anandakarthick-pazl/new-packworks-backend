@@ -312,7 +312,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
 
     // Search filter
     const searchFilter = buildSearchFilter(search, [
-      'so.sales_generate_id', 'so.estimated', 'ssd.sku_name', 'c.display_name', 'c.email'
+      'so.sales_generate_id', 'so.estimated', 'ssd.sku', 'c.display_name', 'c.email'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
