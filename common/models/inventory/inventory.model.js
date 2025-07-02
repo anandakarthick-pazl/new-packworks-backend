@@ -152,6 +152,11 @@ const Inventory = sequelize.define("Inventory", {
     type: Sequelize.TEXT,
     allowNull: true,
   },
+  stock_status: {
+    type: DataTypes.ENUM('in_stock', 'low_stock', 'out_of_stock'),
+    allowNull: false,
+    defaultValue: 'out_of_stock'
+  },
   updated_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,

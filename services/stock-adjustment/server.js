@@ -123,6 +123,27 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
         throw new Error(`Cannot decrease more than available quantity for item_id: ${item_id}`);
       }
 
+       // 🔍 Fetch min_stock_level from ItemMaster
+      const itemMaster = await ItemMaster.findOne({
+        where: { id: item_id },
+        transaction,
+        attributes: ['min_stock_level']
+      });
+
+      if (!itemMaster) {
+        throw new Error(`ItemMaster not found for item_id: ${item_id}`);
+      }
+
+      const minStock = parseFloat(itemMaster.min_stock_level || 0);
+      let stock_status = 'in_stock';
+      if (new_quantity === 0) {
+        stock_status = 'out_of_stock';
+      } else if (new_quantity <= minStock) {
+        stock_status = 'low_stock';
+      }
+
+      // ✅ Create Stock Adjustment Item
+      
       const adjustment_item = await StockAdjustmentItem.create(
         {
           adjustment_id: adjustment.id,
@@ -143,7 +164,10 @@ v1Router.post("/stock-adjustments", authenticateJWT, async (req, res) => {
       adjustmentItemsCreated.push(adjustment_item);
  
       await existingInventory.update(
-        { quantity_available: new_quantity },
+        { 
+          quantity_available: new_quantity,
+          stock_status
+         },
         { transaction }
       );
     }
