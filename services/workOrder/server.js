@@ -1238,7 +1238,6 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-
 v1Router.get(
   "/work-order/download/excel",
   authenticateJWT,
