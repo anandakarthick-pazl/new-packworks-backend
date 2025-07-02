@@ -995,7 +995,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     const whereConditions = ['g.company_id = ?', 'g.status = ?'];
     const queryParams = [company_id, 'active'];
 
-    if (vendor_id) { whereConditions.push('g.supplier_id = ?'); queryParams.push(vendor_id); }
+    if (vendor_id) { whereConditions.push('po.supplier_id = ?'); queryParams.push(vendor_id); }
     if (po_id) { whereConditions.push('g.po_id = ?'); queryParams.push(po_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'g.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
