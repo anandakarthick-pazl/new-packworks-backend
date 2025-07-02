@@ -20,6 +20,7 @@ const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
 const Inventory = db.Inventory;
 const AllocationHistory = db.AllocationHistory;
+const stockAdjustment = db.stockAdjustment;
 const User = db.User;
 
 
@@ -2740,7 +2741,131 @@ v1Router.patch("/production-group/batch/temporary-status", authenticateJWT, asyn
   }
 });
 
+v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
+  const transaction = await db.sequelize.transaction();
+  
+  try {
+    const allocationData = req.body;
+    
+    // Validate request body
+    if (!Array.isArray(allocationData) || allocationData.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({ 
+        message: "Request body must be a non-empty array" 
+      });
+    }
 
+    // Validate each item in the array
+    for (let i = 0; i < allocationData.length; i++) {
+      const item = allocationData[i];
+      if (!item.group_id || !item.inventory_id || !item.balance_allocate) {
+        await transaction.rollback();
+        return res.status(400).json({ 
+          message: `Invalid data at index ${i}. Required fields: group_id, inventory_id, balance_allocate` 
+        });
+      }
+    }
+
+    const results = [];
+    
+    // Process each allocation item
+    for (let i = 0; i < allocationData.length; i++) {
+      const { group_id, inventory_id, balance_allocate } = allocationData[i];
+      
+      try {
+        // Step 1: Find the existing inventory record
+        const existingInventory = await db.Inventory.findOne({
+          where: { id: inventory_id },
+          transaction
+        });
+
+        if (!existingInventory) {
+          await transaction.rollback();
+          return res.status(404).json({ 
+            message: `Inventory with id ${inventory_id} not found at index ${i}` 
+          });
+        }
+
+        // Step 2: Create new inventory entry with updated quantity_available
+        const inventoryData = existingInventory.get({ plain: true });
+        delete inventoryData.id; // Remove the primary key to create new record
+        delete inventoryData.created_at; // Let database set new timestamp
+        delete inventoryData.updated_at; // Let database set new timestamp
+        
+        // Update quantity_available with balance_allocate value
+        inventoryData.quantity_available = 0;
+        inventoryData.quantity_blocked = balance_allocate;
+        inventoryData.company_id = req.user.company_id; // Ensure correct company
+
+        const newInventory = await db.Inventory.create(inventoryData, { transaction });
+        
+        // Step 3: Create new stock adjustment entry
+        const stockAdjustmentData = {
+          inventory_id: newInventory.id,
+          company_id: req.user.company_id,
+          remarks: 'customer forced to proceed allocations',
+          created_by: req.user.id,
+          updated_by: req.user.id
+          // All other values will be null as requested
+        };
+
+        const newStockAdjustment = await stockAdjustment.create(stockAdjustmentData, { transaction });
+
+        // Step 4: Create allocation history entry
+        const allocationHistoryData = {
+          company_id: req.user.company_id,
+          inventory_id: newInventory.id,
+          group_id: group_id,
+          allocated_qty: balance_allocate,
+          status: 'active',
+          created_by: req.user.id,
+          updated_by: req.user.id
+        };
+
+        const newAllocationHistory = await db.AllocationHistory.create(allocationHistoryData, { transaction });
+
+        // Store result for this iteration
+        results.push({
+          index: i,
+          original_inventory_id: inventory_id,
+          new_inventory_id: newInventory.id,
+          stock_adjustment_id: newStockAdjustment.id,
+          allocation_history_id: newAllocationHistory.id,
+          group_id: group_id,
+          allocated_qty: balance_allocate,
+          status: 'success'
+        });
+
+        logger.info(`Successfully processed allocation at index ${i} for inventory ${inventory_id}`);
+
+      } catch (itemError) {
+        logger.error(`Error processing allocation at index ${i}:`, itemError);
+        await transaction.rollback();
+        return res.status(500).json({ 
+          message: `Error processing allocation at index ${i}`,
+          error: itemError.message 
+        });
+      }
+    }
+
+    // Commit all operations if everything succeeded
+    await transaction.commit();
+
+    res.status(201).json({
+      message: "Inventory allocation completed successfully",
+      total_processed: results.length,
+      results: results
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    logger.error("Error in inventory allocation:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message 
+    });
+  }
+});
 
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {

@@ -43,7 +43,7 @@ const AllocationHistory = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-    allocated_Qty: {
+    allocated_qty: {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
