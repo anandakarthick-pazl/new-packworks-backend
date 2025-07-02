@@ -1124,7 +1124,7 @@ v1Router.get("/debit-notes", authenticateJWT, async (req, res) => {
     if (vendor_id) { whereConditions.push('dn.supplier_id = ?'); queryParams.push(vendor_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'dn.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['dn.debit_note_generate_id', 'c.display_name', 'dn.reference', 'dn.reason', 'dn.status']);
+    const searchFilter = buildSearchFilter(search, ['dn.debit_note_generate_id', 'c.display_name']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -1186,7 +1186,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
     if (adjustment_type) { whereConditions.push('sa.adjustment_type = ?'); queryParams.push(adjustment_type); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'sa.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['sa.stock_adjustment_generate_id', 'sa.adjustment_type', 'sa.reference', 'sa.reason', 'sa.status']);
+    const searchFilter = buildSearchFilter(search, ['sa.stock_adjustment_generate_id']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
