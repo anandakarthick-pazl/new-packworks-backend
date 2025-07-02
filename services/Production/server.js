@@ -1362,7 +1362,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         groupData.group_value = groupValue || [];
 
         // Calculate balance_Qty = group_Qty - allocated_Qty
-        groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+        groupData.balance_qty = (groupData.group_Qty || 0) - (groupData.allocated_qty || 0);
 
         // Fetch allocation history for this group
         try {
@@ -1602,7 +1602,7 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
         groupData.group_value = groupValue || [];
 
         // Calculate balance_Qty = group_Qty - allocated_Qty
-        groupData.balance_Qty =
+        groupData.balance_qty =
           (groupData.group_Qty || 0) - (groupData.allocated_qty || 0);
 
         // Fetch allocation history for this group
