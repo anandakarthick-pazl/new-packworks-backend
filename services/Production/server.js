@@ -1291,22 +1291,38 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     }
 
     // Add search functionality for production_group_generate_id and group_name
-    if (search && search.trim() !== "") {
-      const searchTerm = search.trim();
-      whereClause[Op.or] = [
-        {
-          production_group_generate_id: {
-            [Op.iLike]: `%${searchTerm}%`
-          }
-        },
-        {
-          group_name: {
-            [Op.iLike]: `%${searchTerm}%`
-          }
-        }
-      ];
-    }
+    // if (search && search.trim() !== "") {
+    //   const searchTerm = search.trim();
+    //   whereClause[Op.or] = [
+    //     {
+    //       production_group_generate_id: {
+    //         [Op.iLike]: `%${searchTerm}%`
+    //       }
+    //     },
+    //     {
+    //       group_name: {
+    //         [Op.iLike]: `%${searchTerm}%`
+    //       }
+    //     }
+    //   ];
+    // }
 
+    // Add search functionality for production_group_generate_id and group_name
+if (search && search.trim() !== "") {
+  const searchTerm = search.trim();
+  whereClause[Op.or] = [
+    sequelize.where(
+      sequelize.fn('LOWER', sequelize.col('production_group_generate_id')),
+      Op.like,
+      `%${searchTerm.toLowerCase()}%`
+    ),
+    sequelize.where(
+      sequelize.fn('LOWER', sequelize.col('group_name')),
+      Op.like,
+      `%${searchTerm.toLowerCase()}%`
+    )
+  ];
+}
     // Get total count for pagination
     const totalCount = await ProductionGroup.count({
       where: whereClause
