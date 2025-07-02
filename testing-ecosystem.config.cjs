@@ -227,7 +227,7 @@ module.exports = {
     },
     
     {
-      name: "category - dev",
+      name: "category-dev",
       script: "./services/category/server.js",
       env: {
         PORT: process.env.PORT_CATEGORY,
@@ -235,7 +235,7 @@ module.exports = {
     },
     
     {
-      name: "subCategory - dev",
+      name: "subCategory-dev",
       script: "./services/sub-category/server.js",
       env: {
         PORT: process.env.PORT_SUB_CATEGORY,
@@ -243,7 +243,7 @@ module.exports = {
     },
     
     {
-      name: "credit-note - dev",
+      name: "credit-note-dev",
       script: "./services/credit-note/server.js",
       env: {
         PORT: process.env.PORT_CREDIT_NOTE,
@@ -251,7 +251,7 @@ module.exports = {
     },
     
     {
-      name: "debit-note - dev",
+      name: "debit-note-dev",
       script: "./services/debit-note/server.js",
       env: {
         PORT: process.env.PORT_DEBIT_NOTE,
@@ -259,7 +259,7 @@ module.exports = {
     },
     
     {
-      name: "dashboard - dev",
+      name: "dashboard-dev",
       script: "./services/dashboard/server.js",
       env: {
         PORT: process.env.PORT_DASHBOARD,
@@ -267,7 +267,7 @@ module.exports = {
     },
     
      {
-      name: "salesOrderReturn - dev",
+      name: "salesOrderReturn-dev",
       script: "./services/salesOrderReturn/server.js",
       env: {
         PORT: process.env.PORT_SALESORDERRETURN,
@@ -275,7 +275,7 @@ module.exports = {
     },
     
     {
-      name: "report - dev",
+      name: "report-dev",
       script: "./services/report/server.js",
       env: {
         PORT: process.env.PORT_REPORT,
@@ -283,7 +283,7 @@ module.exports = {
     },
     
     {
-      name: "production-schedule - dev",
+      name: "production-schedule-dev",
       script: "./services/productionSchedule/server.js",
       env: {
         PORT: process.env.PORT_PRODUCTION_SCHEDULE,
@@ -291,7 +291,7 @@ module.exports = {
     },
     
     {
-      name: "data-transfer - dev",
+      name: "data-transfer-dev",
       script: "./services/data-transfer/server.js",
       env: {
         PORT: process.env.PORT_DATA_TRANSFER,
