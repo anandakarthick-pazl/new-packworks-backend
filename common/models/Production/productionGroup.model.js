@@ -11,6 +11,10 @@ const ProductionGroup = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    production_group_generate_id: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+    },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -40,6 +44,15 @@ const ProductionGroup = sequelize.define(
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
+    },
+    group_status: {
+      type: DataTypes.ENUM("Pending", "Progress", "Completed", "Cancelled"),
+      defaultValue: "Pending",
+    },
+    temporary_status: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,

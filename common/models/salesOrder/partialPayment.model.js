@@ -32,6 +32,11 @@ const PartialPayment = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },
+    credit_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0,
+    },
     remarks: {
       type: DataTypes.STRING(255),
       allowNull: true,

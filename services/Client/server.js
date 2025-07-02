@@ -931,6 +931,44 @@ v1Router.get("/clients/add/wallet-balance/:id", authenticateJWT, async (req, res
   }
 });
 
+//get client by client_ui_id
+v1Router.get("/clients/get/display-name", authenticateJWT, async (req, res) => {
+  try {
+    const { entity_type } = req.query;
+    
+    const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
+
+    // Add entity_type filter if provided
+    if (entity_type) {
+      whereClause.entity_type = entity_type;
+    }
+
+    const clients = await Client.findAll({
+      attributes: ["client_id", "display_name"],
+      where: whereClause,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: clients,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch clients",
+    });
+  }
+});
+
+ 
+
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({

@@ -1464,6 +1464,35 @@ v1Router.patch("/sale-order/:id/status", authenticateJWT, async (req, res) => {
   }
 });
 
+
+//get sales order generate id
+v1Router.get("/sale-order/get/generate-id", authenticateJWT, async (req, res) => {
+  try {
+     const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
+
+    const seles = await SalesOrder.findAll({
+      attributes: ["id", "sales_generate_id"],
+      where: whereClause,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: seles,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch seles orders",
+    });
+  }
+});
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({
