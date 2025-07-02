@@ -41,6 +41,10 @@ const ProductionGroup = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+      balance_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
@@ -50,9 +54,9 @@ const ProductionGroup = sequelize.define(
       defaultValue: "Pending",
     },
     temporary_status: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    defaultValue: 0,
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
