@@ -65,7 +65,7 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           group_name: groupDetails.group_name,
           group_value: groupDetails.group_value || null,
           group_Qty: groupDetails.group_Qty || null,
-          allocated_Qty: groupDetails.allocated_Qty || null,
+          allocated_qty: groupDetails.allocated_qty || null,
           status: groupDetails.status || "active",
           created_by: req.user.id,
           updated_by: req.user.id,
@@ -356,7 +356,7 @@ v1Router.patch("/production-group/final-status", authenticateJWT, async (req, re
         "group_value",
         "group_Qty",
         "group_status",
-        "allocated_Qty",
+        "allocated_qty",
         "group_status",
         "created_at",
         "updated_at",
@@ -518,7 +518,7 @@ v1Router.put("/production-group", authenticateJWT, async (req, res) => {
             group_value: groupDetails.group_value || null,
             group_Qty: groupDetails.group_Qty || null,
             group_status: groupDetails.group_status || existingGroup.group_status,
-            allocated_Qty: groupDetails.allocated_Qty || null,
+            allocated_qty: groupDetails.allocated_qty || null,
             status: groupDetails.status || existingGroup.status,
             updated_by: req.user.id,
             temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : existingGroup.temporary_status,
@@ -1330,7 +1330,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
         "group_value",
         "group_Qty",
         "group_status",
-        "allocated_Qty",
+        "allocated_qty",
         "status",
         "created_at",
         "updated_at",
@@ -1570,7 +1570,7 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
         "group_value",
         "group_Qty",
         "group_status",
-        "allocated_Qty",
+        "allocated_qty",
         "status",
         "created_at",
         "updated_at",
@@ -1603,7 +1603,7 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
 
         // Calculate balance_Qty = group_Qty - allocated_Qty
         groupData.balance_Qty =
-          (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+          (groupData.group_Qty || 0) - (groupData.allocated_qty || 0);
 
         // Fetch allocation history for this group
         try {
@@ -1814,7 +1814,7 @@ v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
         "group_value",
         "group_Qty",
         "group_status",
-        "allocated_Qty",
+        "allocated_qty",
         "status",
         "created_at",
         "updated_at",
@@ -1851,7 +1851,7 @@ v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
     groupData.group_value = groupValue || [];
 
     // Calculate balance_Qty = group_Qty - allocated_Qty
-    groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_Qty || 0);
+    groupData.balance_Qty = (groupData.group_Qty || 0) - (groupData.allocated_qty || 0);
 
     // Fetch allocation history for this group
     try {
@@ -2096,7 +2096,7 @@ v1Router.patch(
           const newInventoryQuantity = currentAvailable - quantityToAllocate;
 
           const currentAllocatedQty =
-            parseFloat(productionGroup.allocated_Qty) || 0;
+            parseFloat(productionGroup.allocated_qty) || 0;
           const newAllocatedQty = currentAllocatedQty + quantityToAllocate;
 
           // Calculate new blocked quantity - ensure proper number conversion
@@ -2120,7 +2120,7 @@ v1Router.patch(
           // Update production group allocated_Qty
           await ProductionGroup.update(
             {
-              allocated_Qty: newAllocatedQty,
+              allocated_qty: newAllocatedQty,
               updated_by: req.user.id,
             },
             {
@@ -2135,7 +2135,7 @@ v1Router.patch(
               company_id: req.user.company_id,
               inventory_id: inventory_id,
               group_id: production_group_id,
-              allocated_Qty: quantityToAllocate, // Use the parsed number
+              allocated_qty: quantityToAllocate, // Use the parsed number
               status: "active",
               created_by: req.user.id,
               updated_by: req.user.id,
@@ -2317,7 +2317,7 @@ v1Router.patch(
           }
 
           // Check if sufficient quantity is allocated to deallocate
-          const currentAllocatedQty = productionGroup.allocated_Qty || 0;
+          const currentAllocatedQty = productionGroup.allocated_qty || 0;
           if (currentAllocatedQty < quantity_to_deallocate) {
             errors.push(
               `Deallocation at index ${i}: Insufficient allocated quantity. Currently allocated: ${currentAllocatedQty}, Requested to deallocate: ${quantity_to_deallocate}`
@@ -2381,7 +2381,7 @@ v1Router.patch(
           // Update production group allocated_Qty (subtract the deallocated quantity)
           const [productionGroupUpdateCount] = await ProductionGroup.update(
             {
-              allocated_Qty: newAllocatedQty,
+              allocated_qty: newAllocatedQty,
               updated_by: req.user.id,
               updated_at: new Date(),
             },
@@ -2407,7 +2407,7 @@ v1Router.patch(
               company_id: req.user.company_id,
               inventory_id: inventory_id,
               group_id: production_group_id,
-              allocated_Qty: -deallocateQty, // Negative to indicate deallocation
+              allocated_qty: -deallocateQty, // Negative to indicate deallocation
               status: "inactive", // Use inactive status to indicate deallocation
               created_by: req.user.id,
               updated_by: req.user.id,
@@ -2504,7 +2504,7 @@ v1Router.get(
           "group_name",
           "group_Qty",
           "group_status",
-          "allocated_Qty",
+          "allocated_qty",
           "status",
           "created_at",
           "updated_at",
@@ -2544,12 +2544,12 @@ v1Router.get(
             remaining_to_allocate: Math.max(
               0,
               (productionGroup.group_Qty || 0) -
-                (productionGroup.allocated_Qty || 0)
+                (productionGroup.allocated_qty || 0)
             ),
             allocation_percentage:
               productionGroup.group_Qty > 0
                 ? Math.round(
-                    ((productionGroup.allocated_Qty || 0) /
+                    ((productionGroup.allocated_qty || 0) /
                       productionGroup.group_Qty) *
                       100
                   )
@@ -2634,7 +2634,7 @@ v1Router.get(
 
       allocationHistory.forEach(record => {
         const groupId = record.group_id;
-        const allocatedQty = parseFloat(record.allocated_Qty) || 0;
+        const allocatedQty = parseFloat(record.allocated_qty) || 0;
         
         if (!groupedAllocations[groupId]) {
           groupedAllocations[groupId] = {
