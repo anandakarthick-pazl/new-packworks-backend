@@ -552,7 +552,8 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
       limit = "10",
       // categoryId = "1",  
        categoryId,  
-      subCategoryId
+      subCategoryId,
+      stock_status
     } = req.query;
 
     const pageNumber = parseInt(page) || 1;
@@ -643,6 +644,10 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
 
     if (subCategoryId) {
       andConditions.push({ sub_category: subCategoryId });
+    }
+
+    if (stock_status) {
+      andConditions.push({ stock_status: stock_status });
     }
 
     // ✅ Final where condition
@@ -839,9 +844,10 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
     const {
       search = "",
       page = "1",
-      limit = "10",
+      limit = "50",
       categoryId,  
-      subCategoryId
+      subCategoryId,
+      stock_status
     } = req.query;
 
     const pageNumber = parseInt(page) || 1;
@@ -926,6 +932,10 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
     if (subCategoryId) {
       andConditions.push({ sub_category: subCategoryId });
+    }
+
+    if (stock_status) {
+      andConditions.push({ stock_status: stock_status });
     }
 
     // ✅ Final where condition
@@ -1041,6 +1051,7 @@ const itemMasterInventory = await Inventory.findAll({
     'location',
     'rate',
     'status',
+    'stock_status',
     'sales_return_id',
     'created_at',
     'updated_at'

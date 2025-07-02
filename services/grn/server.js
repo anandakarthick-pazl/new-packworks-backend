@@ -204,6 +204,18 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         grn_item_status: grnStatus
       }, { transaction });
 
+
+      // Determine stock status
+        const acceptedQty = parseFloat(accepted_quantity);
+        const minStock = parseFloat(itemMaster.min_stock_level || 0);
+
+        let stock_status = 'in_stock';
+        if (acceptedQty === 0) {
+          stock_status = 'out_of_stock';
+        } else if (acceptedQty <= minStock) {
+          stock_status = 'low_stock';
+        }
+
       const newInventory = await Inventory.create({
         inventory_generate_id: inventory_generate_id,
         company_id: req.user.company_id,
@@ -223,6 +235,7 @@ v1Router.post("/grn", authenticateJWT, async (req, res) => {
         batch_no,
         location,
         status: 'active',
+        stock_status,
         created_by: req.user.id,
         updated_by: req.user.id
       }, { transaction });

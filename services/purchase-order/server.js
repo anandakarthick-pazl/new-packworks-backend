@@ -1604,16 +1604,44 @@ v1Router.post("/purchase-order/return/gst/po", authenticateJWT, async (req, res)
         });
       }
 
+
+      // 1. Fetch ItemMaster to get min_stock_level
+      const itemMaster = await ItemMaster.findOne({
+        where: {
+          id: inventory.item_id,
+          company_id: req.user.company_id
+        },
+        attributes: ['min_stock_level']
+      });
+
+      if (!itemMaster) {
+        return res.status(404).json({
+          success: false,
+          message: `ItemMaster not found for item ${inventory.item_id}`
+        });
+      }
+
       // 2. Compute total_amount
       const quantity = parseFloat(inventory.quantity_available || 0);
       const rate = parseFloat(inventory.rate || 0);
       const total_amount = quantity * rate;
 
+      // 3. Determine stock_status
+      const minStock = parseFloat(itemMaster.min_stock_level || 0);
+
+      let stock_status = 'in_stock';
+      if (quantity === 0) {
+        stock_status = 'out_of_stock';
+      } else if (quantity <= minStock) {
+        stock_status = 'low_stock';
+      }
+
       ///
       await Inventory.update(
         {
           po_return_id: poReturn.id,
-          total_amount: total_amount
+          total_amount: total_amount,
+          stock_status:stock_status
         },
         {
           where: {
