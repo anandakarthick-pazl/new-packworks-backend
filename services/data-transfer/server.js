@@ -227,15 +227,94 @@ v1Router.post("/upload", authenticateJWT, upload.single('file'), async (req, res
 });
 
 /**
- * Step 2: Map columns and start processing (temporarily disabled)
+ * Step 2: Map columns and start processing
  */
 v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => {
   try {
-    res.status(503).json({
-      success: false,
-      message: "Column mapping feature is temporarily disabled. Please run the database migration first.",
-      hint: "Execute the SQL commands in add_column_mapping.sql file or run: npm run migrate"
+    const { transfer_id } = req.params;
+    const { column_mapping } = req.body;
+    
+    // Validate input
+    if (!column_mapping || typeof column_mapping !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: "Column mapping is required and must be an object"
+      });
+    }
+
+    // Find the data transfer record
+    const dataTransfer = await DataTransfer.findOne({
+      where: {
+        id: transfer_id,
+        company_id: req.user.company_id,
+        status: 'uploaded' // Only allow mapping for uploaded files
+      }
     });
+
+    if (!dataTransfer) {
+      return res.status(404).json({
+        success: false,
+        message: "Data transfer not found or already processed"
+      });
+    }
+
+    // Validate that at least one mapping exists
+    const mappedFields = Object.values(column_mapping).filter(field => field && field !== '');
+    if (mappedFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one column must be mapped"
+      });
+    }
+
+    // Get module fields to validate mapping
+    const moduleFields = getModuleFields(dataTransfer.module_name);
+    const requiredFields = moduleFields.filter(f => f.required).map(f => f.key);
+    const validFieldKeys = moduleFields.map(f => f.key);
+
+    // Validate that all mapped fields are valid for the module
+    const invalidFields = mappedFields.filter(field => !validFieldKeys.includes(field));
+    if (invalidFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid field mappings",
+        invalid_fields: invalidFields,
+        valid_fields: validFieldKeys
+      });
+    }
+
+    // Check if required fields are mapped
+    const mappedFieldKeys = Object.values(column_mapping).filter(f => f);
+    const missingRequired = requiredFields.filter(field => !mappedFieldKeys.includes(field));
+    
+    if (missingRequired.length > 0) {
+      logger.warn(`Missing required fields for transfer ${transfer_id}: ${missingRequired.join(', ')}`);
+      // We'll allow processing to continue but log the warning
+    }
+
+    // Update the data transfer record with column mapping
+    await dataTransfer.update({
+      column_mapping: JSON.stringify(column_mapping),
+      status: 'queued'
+    });
+
+    // Start processing in the background
+    processDataTransferWithMapping(transfer_id, column_mapping).catch(error => {
+      logger.error(`Background processing failed for transfer ${transfer_id}:`, error);
+    });
+
+    res.json({
+      success: true,
+      data: {
+        transfer_id: dataTransfer.id,
+        status: 'queued',
+        message: "Column mapping saved. Processing started.",
+        column_mapping: column_mapping,
+        missing_required_fields: missingRequired.length > 0 ? missingRequired : undefined
+      },
+      message: "Column mapping successful. Data transfer is now being processed."
+    });
+
   } catch (error) {
     logger.error('Error mapping columns:', error);
     res.status(500).json({
@@ -296,7 +375,7 @@ v1Router.get("/preview/:transfer_id", authenticateJWT, async (req, res) => {
 });
 
 /**
- * Get data transfer status (temporary without column_mapping)
+ * Get data transfer status
  */
 v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
   try {
@@ -329,8 +408,8 @@ v1Router.get("/status/:transfer_id", authenticateJWT, async (req, res) => {
         started_at: dataTransfer.started_at,
         completed_at: dataTransfer.completed_at,
         error_log: dataTransfer.error_log,
-        email_sent: dataTransfer.email_sent
-        // column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
+        email_sent: dataTransfer.email_sent,
+        column_mapping: dataTransfer.column_mapping ? JSON.parse(dataTransfer.column_mapping) : null
       },
       message: "Data transfer status retrieved successfully"
     });
