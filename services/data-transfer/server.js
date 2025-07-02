@@ -295,7 +295,7 @@ v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => 
     // Update the data transfer record with column mapping
     await dataTransfer.update({
       column_mapping: JSON.stringify(column_mapping),
-      status: 'queued'
+      status: 'pending'
     });
 
     // Start processing in the background
