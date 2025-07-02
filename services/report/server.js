@@ -312,7 +312,7 @@ v1Router.get("/sales-orders", authenticateJWT, async (req, res) => {
 
     // Search filter
     const searchFilter = buildSearchFilter(search, [
-      'so.sales_generate_id', 'so.estimated', 'ssd.sku_name', 'c.display_name', 'c.email'
+      'so.sales_generate_id', 'so.estimated', 'ssd.sku', 'c.display_name', 'c.email'
     ]);
     whereConditions.push(...searchFilter.conditions);
     queryParams.push(...searchFilter.params);
@@ -924,7 +924,7 @@ const getStockStatus = (item) => {
 v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, client_id,invoice, search, export: isExport } = req.query;
+    const { fromDate, toDate, client_id, invoice, search, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['sr.company_id = ?'];
@@ -934,7 +934,7 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
     if (invoice) { whereConditions.push('so.sales_generate_id = ?'); queryParams.push(invoice); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'sr.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['sr.return_generate_id', 'sr.reason','sr.notes']);
+    const searchFilter = buildSearchFilter(search, ['sr.return_generate_id', 'sr.reason', 'sr.notes']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -989,16 +989,17 @@ v1Router.get("/sales-returns", authenticateJWT, async (req, res) => {
 v1Router.get("/grn", authenticateJWT, async (req, res) => {
   try {
     const { company_id } = req.user;
-    const { fromDate, toDate, vendor_id, search, export: isExport } = req.query;
+    const { fromDate, toDate, vendor_id, po_id, search, export: isExport } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
 
     const whereConditions = ['g.company_id = ?', 'g.status = ?'];
     const queryParams = [company_id, 'active'];
 
-    // if (vendor_id) { whereConditions.push('g.vendor_id = ?'); queryParams.push(vendor_id); }
+    if (vendor_id) { whereConditions.push('po.supplier_id = ?'); queryParams.push(vendor_id); }
+    if (po_id) { whereConditions.push('g.po_id = ?'); queryParams.push(po_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'g.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['g.grn_number', 'g.vendor_name', 'g.status']);
+    const searchFilter = buildSearchFilter(search, ['g.grn_generate_id', 'po.supplier_name', 'g.status']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -1014,9 +1015,9 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const grns = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(grns, 'GRN Report', [
-        { header: 'GRN Number', key: 'grn_number', width: 20 },
+        { header: 'GRN Number', key: 'grn_generate_id', width: 20 },
         { header: 'PO Number', key: 'po_number', width: 20 },
-        { header: 'Vendor Name', key: 'vendor_name', width: 20 },
+        { header: 'Vendor Name', key: 'supplier_name', width: 20 },
         { header: 'GRN Date', key: 'grn_date_formatted', width: 15 },
         { header: 'Received Qty', key: 'received_qty', width: 15 },
         { header: 'Total Amount', key: 'total_amount', width: 15 },
@@ -1033,7 +1034,7 @@ v1Router.get("/grn", authenticateJWT, async (req, res) => {
     const grns = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = grns.map(grn => ({
-      grn_number: grn.grn_number,
+      grn_generate_id: grn.grn_generate_id,
       grn_date: grn.grn_date_formatted,
       received_qty: grn.received_qty,
       total_amount: grn.total_amount,
@@ -1061,7 +1062,7 @@ v1Router.get("/credit-notes", authenticateJWT, async (req, res) => {
     if (client_id) { whereConditions.push('cn.client_id = ?'); queryParams.push(client_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'cn.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['cn.credit_note_number', 'cn.reference', 'cn.reason', 'cn.status']);
+    const searchFilter = buildSearchFilter(search, ['cn.credit_generate_id', 'cn.credit_reference_id']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -1076,7 +1077,7 @@ v1Router.get("/credit-notes", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const creditNotes = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(creditNotes, 'Credit Notes Report', [
-        { header: 'Credit Note Number', key: 'credit_note_number', width: 20 },
+        { header: 'Credit Note Number', key: 'credit_generate_id', width: 20 },
         { header: 'Client Name', key: 'client_name', width: 20 },
         { header: 'Credit Note Date', key: 'credit_note_date_formatted', width: 15 },
         { header: 'Reference', key: 'reference', width: 20 },
@@ -1095,7 +1096,7 @@ v1Router.get("/credit-notes", authenticateJWT, async (req, res) => {
     const creditNotes = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = creditNotes.map(note => ({
-      credit_note_number: note.credit_note_number,
+      credit_note_number: note.credit_generate_id,
       credit_note_date: note.credit_note_date_formatted,
       credit_amount: note.credit_amount,
       reason: note.reason,
@@ -1123,7 +1124,7 @@ v1Router.get("/debit-notes", authenticateJWT, async (req, res) => {
     if (vendor_id) { whereConditions.push('dn.supplier_id = ?'); queryParams.push(vendor_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'dn.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['dn.debit_note_number', 'dn.vendor_name', 'dn.reference', 'dn.reason', 'dn.status']);
+    const searchFilter = buildSearchFilter(search, ['dn.debit_note_generate_id', 'c.display_name']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -1138,8 +1139,8 @@ v1Router.get("/debit-notes", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const debitNotes = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(debitNotes, 'Debit Notes Report', [
-        { header: 'Debit Note Number', key: 'debit_note_number', width: 20 },
-        { header: 'Vendor Name', key: 'vendor_name', width: 20 },
+        { header: 'Debit Note Number', key: 'debit_note_generate_id', width: 20 },
+        { header: 'Vendor Name', key: 'vendor_display_name', width: 20 },
         { header: 'Debit Note Date', key: 'debit_note_date_formatted', width: 15 },
         { header: 'Reference', key: 'reference', width: 20 },
         { header: 'Debit Amount', key: 'debit_amount', width: 15 },
@@ -1157,7 +1158,7 @@ v1Router.get("/debit-notes", authenticateJWT, async (req, res) => {
     const debitNotes = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = debitNotes.map(note => ({
-      debit_note_number: note.debit_note_number,
+      debit_note_generate_id: note.debit_note_generate_id,
       debit_note_date: note.debit_note_date_formatted,
       debit_amount: note.debit_amount,
       reason: note.reason,
@@ -1185,7 +1186,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
     if (adjustment_type) { whereConditions.push('sa.adjustment_type = ?'); queryParams.push(adjustment_type); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'sa.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['sa.adjustment_id', 'sa.adjustment_type', 'sa.reference', 'sa.reason', 'sa.status']);
+    const searchFilter = buildSearchFilter(search, ['sa.stock_adjustment_generate_id']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
@@ -1200,7 +1201,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
     if (isExport === 'excel') {
       const stockAdjustments = await sequelize.query(baseQuery, { replacements: queryParams, type: QueryTypes.SELECT });
       const workbook = await createExcelWorkbook(stockAdjustments, 'Stock Adjustments Report', [
-        { header: 'Adjustment ID', key: 'adjustment_id', width: 20 },
+        { header: 'Adjustment ID', key: 'stock_adjustment_generate_id', width: 20 },
         { header: 'Adjustment Date', key: 'adjustment_date_formatted', width: 15 },
         { header: 'Adjustment Type', key: 'adjustment_type', width: 15 },
         { header: 'Reference', key: 'reference', width: 20 },
@@ -1219,7 +1220,7 @@ v1Router.get("/stock-adjustments", authenticateJWT, async (req, res) => {
     const stockAdjustments = await sequelize.query(`${baseQuery} LIMIT ? OFFSET ?`, { replacements: [...queryParams, limit, offset], type: QueryTypes.SELECT });
 
     const htmlData = stockAdjustments.map(adj => ({
-      adjustment_id: adj.adjustment_id,
+      stock_adjustment_generate_id: adj.stock_adjustment_generate_id,
       adjustment_date: adj.adjustment_date_formatted,
       adjustment_type: adj.adjustment_type,
       reason: adj.reason,
