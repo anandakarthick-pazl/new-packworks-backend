@@ -37,7 +37,7 @@ const ProductionGroup = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-    allocated_Qty: {
+    allocated_qty: {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
