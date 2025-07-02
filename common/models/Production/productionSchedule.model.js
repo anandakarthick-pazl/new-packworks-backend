@@ -26,6 +26,10 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   machine_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -43,12 +47,12 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
     allowNull: false,
   },
   start_time: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
+    type: DataTypes.DATE,
+    allowNull: false
   },
   end_time: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
+    type: DataTypes.DATE,
+    allowNull: false
   },
   production_status: {
     type: DataTypes.ENUM("Scheduled", "In Progress", "Completed"),
