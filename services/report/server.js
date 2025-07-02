@@ -1062,7 +1062,7 @@ v1Router.get("/credit-notes", authenticateJWT, async (req, res) => {
     if (client_id) { whereConditions.push('cn.client_id = ?'); queryParams.push(client_id); }
     const dateFilter = buildDateFilter(fromDate, toDate, 'cn.created_at');
     whereConditions.push(...dateFilter.conditions); queryParams.push(...dateFilter.params);
-    const searchFilter = buildSearchFilter(search, ['cn.credit_generate_id', 'cn.reference', 'cn.reason', 'cn.status']);
+    const searchFilter = buildSearchFilter(search, ['cn.credit_generate_id', 'cn.credit_reference_id']);
     whereConditions.push(...searchFilter.conditions); queryParams.push(...searchFilter.params);
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
