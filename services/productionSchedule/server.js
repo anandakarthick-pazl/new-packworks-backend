@@ -777,6 +777,8 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
 
 
 // get group view 
+
+
 v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
   try {
     const groupId = req.params.id;
@@ -805,7 +807,7 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
       });
     }
 
-    // Step 1: Parse group_value safely
+    // Parse group_value safely
     let parsedGroupValue = [];
     try {
       parsedGroupValue = group.group_value ? JSON.parse(group.group_value) : [];
@@ -813,10 +815,10 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
       console.error("Invalid group_value JSON:", group.group_value);
     }
 
-    // Step 2: Extract unique work_order_ids
+    // Extract unique work_order_ids
     const workOrderIds = [...new Set(parsedGroupValue.map(item => item.work_order_id).filter(Boolean))];
 
-    // Step 3: Fetch all work orders
+    // Fetch all work orders
     const workOrders = await WorkOrder.findAll({
       where: {
         id: workOrderIds,
@@ -825,37 +827,70 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
       raw: true,
     });
 
-    // Step 4: Build map and parse each work_order_sku_values
+    // Build workOrderMap for easy lookup
     const workOrderMap = {};
     for (const order of workOrders) {
-      let parsedSkuValues = [];
+      let parsedSkus = [];
       try {
-        parsedSkuValues = order.work_order_sku_values
+        parsedSkus = order.work_order_sku_values
           ? JSON.parse(order.work_order_sku_values)
           : [];
       } catch (err) {
-        console.error("Invalid work_order_sku_values JSON for work order:", order.id);
+        console.error("Invalid work_order_sku_values JSON for order:", order.id);
       }
 
       workOrderMap[order.id] = {
         ...order,
-        work_order_sku_values: parsedSkuValues,
+        work_order_sku_values: parsedSkus,
       };
     }
 
-    // Step 5: Merge group_value items with full work_order details
-    const enrichedGroupValue = parsedGroupValue.map(item => ({
-      ...item,
-      work_order: workOrderMap[item.work_order_id] || null
-    }));
+    // Construct enriched layers
+    const enrichedLayers = parsedGroupValue.map(item => {
+      const workOrder = workOrderMap[item.work_order_id];
+      if (!workOrder) return null;
 
-    // Final Response
+      const layerDetail = workOrder.work_order_sku_values.find(l => l.layer_id === item.layer_id);
+      return {
+        ...layerDetail,
+        work_order_id: item.work_order_id,
+        work_generate_id: workOrder.work_generate_id,
+        sku_name: workOrder.sku_name,
+        priority: workOrder.priority,
+        edd: workOrder.edd,
+        stage: workOrder.stage
+      };
+    }).filter(Boolean);
+
+    // Fetch latest group history for this group
+    const productionScheduleHistory = await ProductionSchedule.findOne({
+      where: {
+        group_id: groupId,
+        company_id: companyId,
+        status: "active"
+      },
+      order: [["id", "DESC"]],
+      attributes: [
+        "group_total_quantity",
+        "group_manufactured_quantity",
+        "group_balanced_quantity",
+        "production_status"
+      ],
+      raw: true
+    });
+
+    // Send final response
     return res.status(200).json({
       success: true,
       data: {
-        ...group,
-        group_value: enrichedGroupValue,
-      },
+        id: group.id,
+        production_group_generate_id: group.production_group_generate_id,
+        group_name: group.group_name,
+        group_status: group.group_status,
+        group_Qty: group.group_Qty,
+        layers: enrichedLayers,
+        group_history: productionScheduleHistory || null
+      }
     });
 
   } catch (err) {
@@ -867,6 +902,8 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
 
 
 
@@ -889,6 +926,9 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     }
 
     const employeeId = employee.id;
+
+    console.log("Updating group quantity for groupId:", groupId, "by employeeId:", employeeId);
+    
 
     if (!used_quantity || isNaN(used_quantity) || used_quantity <= 0) {
       return res.status(400).json({
