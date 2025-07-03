@@ -28,7 +28,7 @@ app.use(logRequestResponse)
 // 🔹 Create a Company (POST)
 
 
-v1Router.post("/companies", validateCompany, async (req, res) => {
+v1Router.post("/companies",validateCompany, async (req, res) => {
     const transaction = await sequelize.transaction(); // Start a transaction
 
     try {
@@ -37,6 +37,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
         console.log("🔵 companyAccountDetails:", companyAccountDetails);
         console.log("🔵 companyData:", companyData);
         console.log("🔵 package_name:", package_name);
+        console.log("companyData:", companyData.package_type);
 
         // 🔹 Step 1: Find package ID by package name
         let packageId = null;
@@ -65,7 +66,7 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
 
         // 🔹 Step 2: Call Stored Procedure (Insert Company & Users)
         await sequelize.query(
-            `CALL ProcedureInsertCompanyAndUsers(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCompanyId);`,
+            `CALL ProcedureInsertCompanyAndUsers(?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?, @newCompanyId);`,
             {
                 replacements: [
                     companyData.name,
@@ -80,7 +81,11 @@ v1Router.post("/companies", validateCompany, async (req, res) => {
                     companyAccountDetails[0].accountName, // Assuming at least one account
                     companyAccountDetails[0].accountEmail,
                     await bcrypt.hash(companyData.password || '123456', 10), // defaultPassword
-                    packageId // package_id
+                    packageId,
+                    companyData.package_start_date,
+                    companyData.package_end_date,                    
+                    companyData.package_type
+
                 ],
                 type: sequelize.QueryTypes.RAW,
                 transaction
