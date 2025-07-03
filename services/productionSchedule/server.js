@@ -172,18 +172,6 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
       "production_schedule"
     );
 
-    const schedule = await ProductionSchedule.create({
-      ...restData,
-      employee_id: employee.id,
-      user_id: employee.user_id,
-      company_id: req.user.company_id,
-      created_by: req.user.id,
-      production_schedule_generate_id,
-      group_id,
-      start_time: parsedStartTime,
-      end_time: parsedEndTime,
-      machine_id
-    });
 
     // ✅ Fetch group details
     const group = await ProductionGroup.findOne({
@@ -200,6 +188,23 @@ v1Router.post("/create", authenticateJWT, async (req, res) => {
 
     // ✅ Calculate total_quantity based on parsedGroupValue (example: count)
     const total_quantity = group.group_Qty;
+
+    const schedule = await ProductionSchedule.create({
+      ...restData,
+      employee_id: employee.id,
+      user_id: employee.user_id,
+      company_id: req.user.company_id,
+      created_by: req.user.id,
+      production_schedule_generate_id,
+      group_id,
+      start_time: parsedStartTime,
+      end_time: parsedEndTime,
+      machine_id,
+      group_total_quantity: total_quantity,
+      group_balanced_quantity: total_quantity
+    });
+
+    
 
     // ✅ Create GroupHistory record
     const history = await GroupHistory.create({
@@ -503,94 +508,114 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
 // Get employee production group schedule
 v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;    
+    const userId = req.user.id;
     const companyId = req.user.company_id;
-    const { group_status } = req.query;
+    const { group_status, search } = req.query;
 
-    // Step 1: Find employee
+    // Find employee
     const employee = await Employee.findOne({
-      where: {
-        user_id: userId,
-        company_id: companyId,
-      },
-      attributes: ['id', 'user_id', 'company_id'],
+      where: { user_id: userId, company_id: companyId },
+      attributes: ['id'],
     });
 
     if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
+      return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    // Step 2: Get production schedules
+    // Fetch employee's production schedules
     const schedules = await ProductionSchedule.findAll({
-      where: {
-        employee_id: employee.id,
-        company_id: companyId,
-      },
+      where: { employee_id: employee.id, company_id: companyId },
       order: [['start_time', 'ASC']],
     });
 
     if (!schedules.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No upcoming production schedule found",
-      });
+      return res.status(404).json({ success: false, message: "No production schedules found" });
     }
 
-    // Step 3: Get unique group IDs
     const groupIds = [...new Set(schedules.map(s => s.group_id))];
 
-    // Step 4: Build where clause for ProductionGroup
-    const groupWhereClause = {
+    // Dynamic group where clause
+    let groupWhereClause = {
       company_id: companyId,
       id: groupIds,
     };
 
-    // Optional filter by group_status
-    if (group_status) {
-      const statusArray = group_status.split(',').map(s => s.trim());
-      groupWhereClause.group_status = statusArray.length > 1
-        ? { [Op.in]: statusArray }
-        : statusArray[0];
+    // 🔍 Add search condition for group fields
+    if (search) {
+      groupWhereClause[Op.or] = [
+        { production_group_generate_id: { [Op.like]: `%${search}%` } },
+        { group_name: { [Op.like]: `%${search}%` } },
+        { group_status: { [Op.like]: `%${search}%` } }
+      ];
     }
 
-    // Step 5: Fetch filtered groups
+    // ✅ Optional: filter by latest GroupHistory.group_status
+    if (group_status) {
+      const statusArray = group_status.split(',').map(s => s.trim());
+
+      const latestHistories = await GroupHistory.findAll({
+        where: {
+          group_id: { [Op.in]: groupIds },
+          company_id: companyId,
+          employee_id: employee.id,
+          status: "active",
+        },
+        attributes: [[sequelize.fn("MAX", sequelize.col("id")), "id"]],
+        group: ["group_id"]
+      });
+
+      const latestHistoryIds = latestHistories.map(h => h.id);
+
+      const histories = await GroupHistory.findAll({
+        where: {
+          id: { [Op.in]: latestHistoryIds },
+          group_status: statusArray.length > 1 ? { [Op.in]: statusArray } : statusArray[0],
+        },
+        attributes: ["group_id"],
+        raw: true,
+      });
+
+      const filteredGroupIds = histories.map(h => h.group_id);
+      groupWhereClause.id = filteredGroupIds.length ? filteredGroupIds : [-1]; // avoid empty IN clause
+    }
+
+    // Fetch ProductionGroups with filters
     const groupsRaw = await ProductionGroup.findAll({
       where: groupWhereClause,
       raw: true,
     });
 
-    // Step 6: Parse group_value JSON
     const groups = groupsRaw.map(group => {
       let parsedValue = [];
       try {
         parsedValue = group.group_value ? JSON.parse(group.group_value) : [];
-      } catch (error) {
+      } catch (err) {
         console.error("Invalid group_value JSON:", group.group_value);
       }
+
       return {
         ...group,
         group_value: parsedValue,
       };
     });
 
-    // Step 7: Respond
     return res.status(200).json({
       success: true,
       groups,
     });
 
   } catch (err) {
-    console.error("Error fetching production group schedule:", err);
+    console.error("Error:", err);
     return res.status(500).json({
       success: false,
-      message: "Server error while fetching production schedule",
+      message: "Server error while fetching group schedule",
       error: err.message,
     });
   }
 });
+
+
+
 
 
 
@@ -682,9 +707,18 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
         }
 
         if (search) {
-          workOrderFilter.work_generate_id = {
-            [Op.like]: `%${search}%`
-          };
+          workOrderFilter[Op.or] = [
+            {
+              work_generate_id: {
+                [Op.like]: `%${search}%`
+              }
+            },
+            {
+              priority: {
+                [Op.like]: `%${search}%`
+              }
+            }
+          ];
         }
 
     // const workOrders = await WorkOrder.findAll({
@@ -855,9 +889,6 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     }
 
     const employeeId = employee.id;
-    console.log("Employee ID:", employeeId);
-    console.log("Updating group quantity for groupId:", groupId, "by userId:", userId);
-    
 
     if (!used_quantity || isNaN(used_quantity) || used_quantity <= 0) {
       return res.status(400).json({
@@ -905,12 +936,38 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     groupHistory.total_quantity = originalBalance;
     groupHistory.balanced_quantity = newBalance;
     groupHistory.updated_by = req.user.id;
+    groupHistory.group_status = newBalance === 0 ? 'completed' : 'in_progress';
+
     await groupHistory.save();
+
+    
+    
+    
+    // ✅ Update ProductionSchedule for the group and employee
+    const schedules = await ProductionSchedule.findAll({
+      where: {
+        group_id: groupId,
+        employee_id: employeeId,
+        company_id: req.user.company_id,
+        status: "active"
+      }
+    });
+
+    for (const schedule of schedules) {
+      schedule.group_manufactured_quantity = usedQty;
+      schedule.group_balanced_quantity = newBalance;
+      if (newBalance === 0) {
+        schedule.production_status = 'completed';
+      }
+      await schedule.save();
+    }
+
 
     // If balance becomes 0, mark group as Completed
     if (newBalance === 0) {
       await ProductionGroup.update(
-        { group_status: "Completed" },
+        // { group_status: "Completed" },
+        { production_completed: "Completed" },
         {
           where: {
             id: groupId,
