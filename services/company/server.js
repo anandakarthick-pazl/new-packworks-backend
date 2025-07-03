@@ -84,8 +84,7 @@ v1Router.post("/companies",validateCompany, async (req, res) => {
                     packageId,
                     companyData.package_start_date,
                     companyData.package_end_date,                    
-                    companyData.package_type,
-                    companyData.package_name
+                    companyData.package_type
 
                 ],
                 type: sequelize.QueryTypes.RAW,
