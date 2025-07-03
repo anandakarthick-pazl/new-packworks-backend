@@ -70,6 +70,9 @@ v1Router.post("/production-group", authenticateJWT, async (req, res) => {
           created_by: req.user.id,
           updated_by: req.user.id,
           temporary_status: typeof groupDetails.temporary_status !== 'undefined' ? groupDetails.temporary_status : 0,
+          manufactured_qty: groupDetails.manufactured_qty || 0,
+          balance_manufacture_qty: groupDetails.group_Qty || 0,
+          balance_qty:groupDetails.group_Qty || null
         });
 
         // Process group_value array to update work_order status
@@ -1335,6 +1338,9 @@ if (search && search.trim() !== "") {
         "created_by",
         "updated_by",
         "temporary_status",
+        "manufactured_qty",
+        "balance_manufacture_qty",
+        "balance_qty",
       ],
     });
 
@@ -1575,6 +1581,9 @@ v1Router.post("/production-group/multiple", authenticateJWT, async (req, res) =>
         "created_by",
         "updated_by",
         "temporary_status",
+        "manufactured_qty",
+        "balance_manufacture_qty",
+        "balance_qty",
       ],
     });
 
@@ -1819,6 +1828,9 @@ v1Router.get("/production-group/:id", authenticateJWT, async (req, res) => {
         "created_by",
         "updated_by",
         "temporary_status",
+        "manufactured_qty",
+        "balance_manufacture_qty",  
+        "balance_qty",
       ],
     });
 
