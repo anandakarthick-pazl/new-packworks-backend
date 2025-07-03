@@ -49,6 +49,10 @@ const GroupHistory = sequelize.define(
       type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
     },
+    group_status: {
+      type: DataTypes.ENUM('in_progress', 'completed'),
+      defaultValue: 'in_progress',
+    },
     employee_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false
