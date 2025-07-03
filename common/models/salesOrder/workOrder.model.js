@@ -128,6 +128,8 @@ const WorkOrder = sequelize.define(
         "Pending",
         "Raw Material Allocation",
         "Production Planned",
+        "Board Stage",
+        "Finish Stage",
         "Completed",
         "Invoiced"
       ),
