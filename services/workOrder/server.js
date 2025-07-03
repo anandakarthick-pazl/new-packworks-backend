@@ -1166,62 +1166,72 @@ v1Router.get("/work-order/:id", authenticateJWT, async (req, res) => {
         const productionGroups = await ProductionGroup.findAll({
           where: {
             company_id: req.user.company_id,
-            status: 'active', // Only get active groups
+            status: "active", // Only get active groups
             [Op.or]: [
               // For MySQL with JSON_SEARCH function
-              Sequelize.literal(`JSON_SEARCH(group_value, 'one', '${id}', NULL, '$[*].work_order_id') IS NOT NULL`),
+              Sequelize.literal(
+                `JSON_SEARCH(group_value, 'one', '${id}', NULL, '$[*].work_order_id') IS NOT NULL`
+              ),
               // Fallback: simple string search
               {
                 group_value: {
-                  [Op.like]: `%"work_order_id":${id}%`
-                }
-              }
-            ]
+                  [Op.like]: `%"work_order_id":${id}%`,
+                },
+              },
+            ],
           },
           attributes: [
-            'id',
-            'production_group_generate_id',
-            'group_name',
-            'group_value',
-            'group_Qty',
-            'allocated_qty',
-            'balance_qty',
-            'group_status',
-            'created_at',
-            'updated_at'
-          ]
+            "id",
+            "production_group_generate_id",
+            "group_name",
+            "group_value",
+            "group_Qty",
+            "allocated_qty",
+            "balance_qty",
+            "group_status",
+            "created_at",
+            "updated_at",
+          ],
         });
 
         // Parse group_value JSON and filter to only include relevant entries
-        const relevantGroups = productionGroups.map(group => {
-          const groupData = group.get({ plain: true });
-          
-          // Parse group_value if it's a string
-          let groupValue = groupData.group_value;
-          if (typeof groupValue === 'string') {
-            try {
-              groupValue = JSON.parse(groupValue);
-            } catch (error) {
-              logger.warn(`Failed to parse group_value for production group ${groupData.id}:`, error);
-              groupValue = [];
+        const relevantGroups = productionGroups
+          .map((group) => {
+            const groupData = group.get({ plain: true });
+
+            // Parse group_value if it's a string
+            let groupValue = groupData.group_value;
+            if (typeof groupValue === "string") {
+              try {
+                groupValue = JSON.parse(groupValue);
+              } catch (error) {
+                logger.warn(
+                  `Failed to parse group_value for production group ${groupData.id}:`,
+                  error
+                );
+                groupValue = [];
+              }
             }
-          }
-          
-          // Filter to only include entries with matching work_order_id
-          const relevantEntries = Array.isArray(groupValue) 
-            ? groupValue.filter(entry => entry.work_order_id == id)
-            : [];
-          
-          return {
-            ...groupData,
-            group_value: relevantEntries, // Only include relevant entries
-            work_order_entries_count: relevantEntries.length
-          };
-        }).filter(group => group.work_order_entries_count > 0); // Only include groups that have relevant entries
+
+            // Filter to only include entries with matching work_order_id
+            const relevantEntries = Array.isArray(groupValue)
+              ? groupValue.filter((entry) => entry.work_order_id == id)
+              : [];
+
+            return {
+              ...groupData,
+              group_value: relevantEntries, // Only include relevant entries
+              work_order_entries_count: relevantEntries.length,
+            };
+          })
+          .filter((group) => group.work_order_entries_count > 0); // Only include groups that have relevant entries
 
         result.production_groups = relevantGroups;
       } catch (error) {
-        logger.error(`Error fetching production groups for work order ${id}:`, error);
+        logger.error(
+          `Error fetching production groups for work order ${id}:`,
+          error
+        );
         result.production_groups = [];
       }
     } else {
@@ -1635,6 +1645,8 @@ v1Router.patch(
         "Pending",
         "Raw Material Allocation",
         "Production Planned",
+        "Board Stage",
+        "Finish Stage",
         "Completed",
         "Invoiced",
       ];
