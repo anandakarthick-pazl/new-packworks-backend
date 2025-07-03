@@ -295,7 +295,7 @@ v1Router.post("/map-columns/:transfer_id", authenticateJWT, async (req, res) => 
     // Update the data transfer record with column mapping
     await dataTransfer.update({
       column_mapping: JSON.stringify(column_mapping),
-      status: 'queued'
+      status: 'pending'
     });
 
     // Start processing in the background
@@ -1020,6 +1020,11 @@ async function processModuleRecordWithMapping(moduleName, row, columnMapping, co
  * Process field value based on type
  */
 function processFieldValue(value, fieldName) {
+  // Handle null or undefined values
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
   const stringValue = value.toString().trim();
   
   // Date fields
@@ -1038,12 +1043,51 @@ function processFieldValue(value, fieldName) {
     return isNaN(num) ? null : num;
   }
   
-  // Boolean fields
-  if (fieldName.includes('status') && (stringValue.toLowerCase() === 'true' || stringValue.toLowerCase() === 'false')) {
-    return stringValue.toLowerCase() === 'true';
+  // Status field - keep as string and truncate if needed
+  // Most status fields in database are VARCHAR(20) or VARCHAR(50)
+  if (fieldName === 'status') {
+    // Truncate to 20 characters to be safe (adjust based on your DB schema)
+    return stringValue.substring(0, 20);
   }
   
-  return stringValue;
+  // Text fields that might have length limits
+  if (fieldName === 'employment_type' || fieldName === 'marital_status' || 
+      fieldName === 'priority' || fieldName === 'unit' || fieldName === 'category') {
+    // These fields typically have shorter limits
+    return stringValue.substring(0, 50);
+  }
+  
+  // Email field - basic validation and truncation
+  if (fieldName === 'email') {
+    // Basic email validation and truncate to reasonable length
+    return stringValue.substring(0, 100);
+  }
+  
+  // Phone field - remove special characters and limit length
+  if (fieldName === 'phone') {
+    // Keep only digits, +, -, (, ), and spaces
+    const cleanPhone = stringValue.replace(/[^0-9+\-() ]/g, '');
+    return cleanPhone.substring(0, 20);
+  }
+  
+  // Code fields - usually have specific formats
+  if (fieldName.includes('_code') || fieldName.includes('_number')) {
+    return stringValue.substring(0, 50);
+  }
+  
+  // Name fields - reasonable length limit
+  if (fieldName.includes('_name') || fieldName === 'name') {
+    return stringValue.substring(0, 100);
+  }
+  
+  // Description and address fields - longer text
+  if (fieldName === 'description' || fieldName === 'address' || fieldName === 'skills') {
+    // These are typically TEXT fields, but let's limit to reasonable length
+    return stringValue.substring(0, 500);
+  }
+  
+  // Default: return as string with reasonable length limit
+  return stringValue.substring(0, 255);
 }
 
 /**
@@ -1128,9 +1172,43 @@ async function processInventoryRecordMapped(mappedData) {
 }
 
 async function processSkuRecordMapped(mappedData) {
-  if (!mappedData.status) {
+  // Validate and set default status if not provided or invalid
+  const validStatuses = ['active', 'inactive', 'draft', 'archived'];
+  
+  if (!mappedData.status || mappedData.status === '') {
     mappedData.status = 'active';
+  } else {
+    // Normalize status value
+    const normalizedStatus = mappedData.status.toString().toLowerCase().trim();
+    
+    // Check if it's a valid status
+    if (validStatuses.includes(normalizedStatus)) {
+      mappedData.status = normalizedStatus;
+    } else {
+      // If status is not in valid list, default to 'active'
+      // You could also throw an error here if you want strict validation
+      logger.warn(`Invalid status '${mappedData.status}' for SKU, defaulting to 'active'`);
+      mappedData.status = 'active';
+    }
   }
+  
+  // Ensure status doesn't exceed database column length (typically VARCHAR(20))
+  mappedData.status = mappedData.status.substring(0, 20);
+  
+  // Additional validation for other SKU fields
+  if (mappedData.sku_name) {
+    mappedData.sku_name = mappedData.sku_name.substring(0, 100);
+  }
+  
+  if (mappedData.sku_code) {
+    mappedData.sku_code = mappedData.sku_code.substring(0, 50);
+  }
+  
+  if (mappedData.description) {
+    mappedData.description = mappedData.description.substring(0, 500);
+  }
+  
+  // Create the SKU record
   return await Sku.create(mappedData);
 }
 
