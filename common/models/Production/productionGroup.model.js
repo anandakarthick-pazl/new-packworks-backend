@@ -50,7 +50,7 @@ const ProductionGroup = sequelize.define(
       defaultValue: "active",
     },
     group_status: {
-      type: DataTypes.ENUM("Pending", "Progress", "Completed", "Cancelled"),
+      type: DataTypes.ENUM("pending", "allocation_completed", "production_completed", "cancelled"),
       defaultValue: "Pending",
     },
     temporary_status: {

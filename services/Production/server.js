@@ -1289,24 +1289,6 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     if (temporary_status) {
       whereClause.temporary_status = parseInt(temporary_status, 10);
     }
-
-    // Add search functionality for production_group_generate_id and group_name
-    // if (search && search.trim() !== "") {
-    //   const searchTerm = search.trim();
-    //   whereClause[Op.or] = [
-    //     {
-    //       production_group_generate_id: {
-    //         [Op.iLike]: `%${searchTerm}%`
-    //       }
-    //     },
-    //     {
-    //       group_name: {
-    //         [Op.iLike]: `%${searchTerm}%`
-    //       }
-    //     }
-    //   ];
-    // }
-
     // Add search functionality for production_group_generate_id and group_name
 if (search && search.trim() !== "") {
   const searchTerm = search.trim();
