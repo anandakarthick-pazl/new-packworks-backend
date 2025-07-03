@@ -73,21 +73,13 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
-  group_total_quantity: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 0,
-  },
+ 
   group_manufactured_quantity: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     defaultValue: 0,
   },
-  group_balanced_quantity: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 0,
-  },
+ 
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
@@ -116,5 +108,7 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
 ProductionSchedule.belongsTo(Company, { foreignKey: "company_id" });
 ProductionSchedule.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ProductionSchedule.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+
 
 export default ProductionSchedule;

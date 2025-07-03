@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import ProductionSchedule from "./productionSchedule.model.js";
 
 const GroupHistory = sequelize.define(
   "GroupHistory",
@@ -21,19 +22,16 @@ const GroupHistory = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
-    group_id: {
+   production_schedule_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false
-    },
-    total_quantity: {
-      type: DataTypes.DECIMAL(10, 2),
-      defaultValue: 0
+      allowNull: true,
+      references: {
+        model: 'production_schedule',
+        key: 'id'
+      },
+      onDelete: 'CASCADE'
     },
     used_quantity: {
-      type: DataTypes.DECIMAL(10, 2),
-      defaultValue: 0
-    },
-    balanced_quantity: {
       type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0
     },
@@ -48,10 +46,6 @@ const GroupHistory = sequelize.define(
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
-    },
-    group_status: {
-      type: DataTypes.ENUM('in_progress', 'completed'),
-      defaultValue: 'in_progress',
     },
     employee_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -99,5 +93,10 @@ GroupHistory.belongsTo(Company, { foreignKey: "company_id" });
 
 GroupHistory.belongsTo(User, {foreignKey: "created_by", as: "creator"});
 GroupHistory.belongsTo(User, { foreignKey: "updated_by", as: "updater"});
+
+GroupHistory.belongsTo(ProductionSchedule, {
+      foreignKey: 'production_schedule_id',
+      as: 'production_schedule'
+    });
 
 export default GroupHistory;
