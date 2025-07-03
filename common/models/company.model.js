@@ -73,6 +73,18 @@ const Company = sequelize.define(
       type: DataTypes.ENUM("monthly", "annual"),
       defaultValue: "monthly",
     },
+   package_start_date: {
+  type: DataTypes.DATEONLY,
+  allowNull: false, // or true if optional
+},
+package_end_date: {
+  type: DataTypes.DATEONLY,
+  allowNull: false, // or true if optional
+},
+package_name: {
+      type: DataTypes.STRING(191),
+      allowNull: false,
+    },
     timezone: {
       type: DataTypes.STRING(191),
       defaultValue: "Asia/Kolkata",
