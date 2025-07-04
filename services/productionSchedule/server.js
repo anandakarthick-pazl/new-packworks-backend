@@ -304,6 +304,7 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
     const employee = await Employee.findOne({
       where: {
         user_id: userId,
+        user_source: 'both', 
         company_id: companyId,
       },
       attributes: ['id'],
@@ -597,7 +598,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
 
     // Find the employee
     const employee = await Employee.findOne({
-      where: { user_id: userId, company_id: companyId },
+      where: { user_id: userId, company_id: companyId, user_source: 'both' },
       attributes: ['id'],
     });
 
@@ -922,6 +923,7 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     const employee = await Employee.findOne({
       where: {
         company_id: companyId,
+        user_source: 'both',
         user_id: userId,
       },
       attributes: ["id", "company_id"],

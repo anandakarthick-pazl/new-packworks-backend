@@ -99,6 +99,11 @@ const Employee = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    user_source: {
+      type: Sequelize.ENUM('web', 'mobile', 'both'),
+      allowNull: false,
+      defaultValue: 'both',
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
