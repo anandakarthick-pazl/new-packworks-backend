@@ -1273,6 +1273,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     const { 
       include_work_orders = "false", 
       temporary_status,
+      group_status,
       page = 1,
       limit = 10,
       search = ""
@@ -1291,6 +1292,9 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     // Add temporary_status filter if provided
     if (temporary_status) {
       whereClause.temporary_status = parseInt(temporary_status, 10);
+    }
+      if (group_status) {
+      whereClause.group_status = group_status;
     }
     // Add search functionality for production_group_generate_id and group_name
 if (search && search.trim() !== "") {
