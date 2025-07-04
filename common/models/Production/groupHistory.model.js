@@ -31,8 +31,9 @@ const GroupHistory = sequelize.define(
       },
       onDelete: 'CASCADE'
     },
-    used_quantity: {
-      type: DataTypes.DECIMAL(10, 2),
+    group_manufactured_quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
       defaultValue: 0
     },
     start_time: {

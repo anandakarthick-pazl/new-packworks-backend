@@ -15,6 +15,9 @@ const ProductionSchedule = db.ProductionSchedule;
 const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
 const GroupHistory = db.GroupHistory; // Assuming you have a GroupHistory model
+const AllocationHistory = db.AllocationHistory; // Assuming you have an AllocationHistory model
+const ItemMaster = db.ItemMaster; // Assuming you have an ItemMaster model
+const Inventory = db.Inventory; // Assuming you have an Inventory model
 // const SKU = db.Sku; // Assuming you have a SKU model
 
 
@@ -199,12 +202,6 @@ v1Router.get("/get-all", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-
-
-
-
-
 //get by id
 v1Router.get("/get-by-id/:id", authenticateJWT, async (req, res) => {
   try {
@@ -294,8 +291,6 @@ v1Router.delete("/delete/:id", authenticateJWT, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-
 
 //mobile
 //Get employee work order 
@@ -450,8 +445,6 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
   }
 });
 
-
-
 // Get employee production group schedule
 // v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
 //   try {
@@ -459,7 +452,7 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
 //     const companyId = req.user.company_id;
 //     const { group_status, search } = req.query;
 
-//     // Find employee
+//     // Find the employee
 //     const employee = await Employee.findOne({
 //       where: { user_id: userId, company_id: companyId },
 //       attributes: ['id'],
@@ -469,7 +462,7 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
 //       return res.status(404).json({ success: false, message: "Employee not found" });
 //     }
 
-//     // Fetch employee's production schedules
+//     // Get production schedules for the employee
 //     const schedules = await ProductionSchedule.findAll({
 //       where: { employee_id: employee.id, company_id: companyId },
 //       order: [['start_time', 'ASC']],
@@ -479,15 +472,16 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
 //       return res.status(404).json({ success: false, message: "No production schedules found" });
 //     }
 
+//     // Extract unique group IDs from schedules
 //     const groupIds = [...new Set(schedules.map(s => s.group_id))];
 
-//     // Dynamic group where clause
+//     // Build where clause for ProductionGroup
 //     let groupWhereClause = {
 //       company_id: companyId,
 //       id: groupIds,
 //     };
 
-//     // 🔍 Add search condition for group fields
+//     // Apply search filter
 //     if (search) {
 //       groupWhereClause[Op.or] = [
 //         { production_group_generate_id: { [Op.like]: `%${search}%` } },
@@ -496,59 +490,93 @@ v1Router.get("/employee/work-order-schedule", authenticateJWT, async (req, res) 
 //       ];
 //     }
 
-//     // ✅ Optional: filter by latest GroupHistory.group_status
+//     // Apply group_status filter
 //     if (group_status) {
-//       const statusArray = group_status.split(',').map(s => s.trim());
-
-//       const latestHistories = await GroupHistory.findAll({
-//         where: {
-//           group_id: { [Op.in]: groupIds },
-//           company_id: companyId,
-//           employee_id: employee.id,
-//           status: "active",
-//         },
-//         attributes: [[sequelize.fn("MAX", sequelize.col("id")), "id"]],
-//         group: ["group_id"]
-//       });
-
-//       const latestHistoryIds = latestHistories.map(h => h.id);
-
-//       const histories = await GroupHistory.findAll({
-//         where: {
-//           id: { [Op.in]: latestHistoryIds },
-//           group_status: statusArray.length > 1 ? { [Op.in]: statusArray } : statusArray[0],
-//         },
-//         attributes: ["group_id"],
-//         raw: true,
-//       });
-
-//       const filteredGroupIds = histories.map(h => h.group_id);
-//       groupWhereClause.id = filteredGroupIds.length ? filteredGroupIds : [-1]; // avoid empty IN clause
+//       const statusArray = group_status.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      
+//       if (statusArray.length > 0) {
+//         groupWhereClause.group_status = statusArray.length > 1
+//           ? { [Op.in]: statusArray }
+//           : statusArray[0];
+//       }
 //     }
 
-//     // Fetch ProductionGroups with filters
+//     // Fetch production groups with filters applied
 //     const groupsRaw = await ProductionGroup.findAll({
 //       where: groupWhereClause,
 //       raw: true,
 //     });
 
-//     const groups = groupsRaw.map(group => {
-//       let parsedValue = [];
+//     // Process each group to include work order details
+//     const result = await Promise.all(groupsRaw.map(async (group) => {
+//       let parsedGroupValue = [];
 //       try {
-//         parsedValue = group.group_value ? JSON.parse(group.group_value) : [];
+//         parsedGroupValue = group.group_value ? JSON.parse(group.group_value) : [];
 //       } catch (err) {
 //         console.error("Invalid group_value JSON:", group.group_value);
 //       }
 
+//       // Extract work order IDs from group value
+//       const workOrderIds = [...new Set(parsedGroupValue.map(item => item.work_order_id).filter(Boolean))];
+
+//       // Fetch work orders
+//       const workOrders = await WorkOrder.findAll({
+//         where: {
+//           id: workOrderIds,
+//           company_id: companyId,
+//         },
+//         raw: true,
+//       });
+
+//       // Create work order map with parsed SKU values
+//       const workOrderMap = {};
+//       for (const order of workOrders) {
+//         try {
+//           const parsedSku = order.work_order_sku_values ? JSON.parse(order.work_order_sku_values) : [];
+//           workOrderMap[order.id] = {
+//             ...order,
+//             work_order_sku_values: parsedSku,
+//           };
+//         } catch (e) {
+//           console.error("Invalid work_order_sku_values JSON:", order.work_order_sku_values);
+//           workOrderMap[order.id] = {
+//             ...order,
+//             work_order_sku_values: [],
+//           };
+//         }
+//       }
+
+//       // Build layers with work order details
+//       const layers = parsedGroupValue.map((item) => {
+//         const wo = workOrderMap[item.work_order_id];
+//         const layerDetail = wo?.work_order_sku_values?.find(l => l.layer_id === item.layer_id);
+
+//         return {
+//           ...(layerDetail || {}),
+//           work_order_id: item.work_order_id,
+//           work_generate_id: wo?.work_generate_id,
+//           sku_name: wo?.sku_name,
+//           priority: wo?.priority,
+//           edd: wo?.edd,
+//           stage: wo?.stage,
+//         };
+//       });
+
 //       return {
-//         ...group,
-//         group_value: parsedValue,
+//         id: group.id,
+//         production_group_generate_id: group.production_group_generate_id,
+//         group_name: group.group_name,
+//         group_status: group.group_status,
+//         group_Qty: group.group_Qty,
+//         manufactured_qty: group.manufactured_qty || 0,
+//         balance_manufacture_qty: group.balance_manufacture_qty || 0,
+//         layers: layers,
 //       };
-//     });
+//     }));
 
 //     return res.status(200).json({
 //       success: true,
-//       groups,
+//       data: result.length === 1 ? result[0] : result,
 //     });
 
 //   } catch (err) {
@@ -567,6 +595,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
     const companyId = req.user.company_id;
     const { group_status, search } = req.query;
 
+    // Find the employee
     const employee = await Employee.findOne({
       where: { user_id: userId, company_id: companyId },
       attributes: ['id'],
@@ -576,6 +605,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
+    // Get production schedules for the employee
     const schedules = await ProductionSchedule.findAll({
       where: { employee_id: employee.id, company_id: companyId },
       order: [['start_time', 'ASC']],
@@ -585,13 +615,16 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
       return res.status(404).json({ success: false, message: "No production schedules found" });
     }
 
+    // Extract unique group IDs from schedules
     const groupIds = [...new Set(schedules.map(s => s.group_id))];
 
+    // Build where clause for ProductionGroup
     let groupWhereClause = {
       company_id: companyId,
       id: groupIds,
     };
 
+    // Apply search filter
     if (search) {
       groupWhereClause[Op.or] = [
         { production_group_generate_id: { [Op.like]: `%${search}%` } },
@@ -600,15 +633,23 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
       ];
     }
 
+    // Apply group_status filter
     if (group_status) {
-      groupWhereClause.group_status = group_status;
+      const statusArray = group_status.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      if (statusArray.length > 0) {
+        groupWhereClause.group_status = statusArray.length > 1
+          ? { [Op.in]: statusArray }
+          : statusArray[0];
+      }
     }
 
+    // Fetch production groups
     const groupsRaw = await ProductionGroup.findAll({
       where: groupWhereClause,
       raw: true,
     });
 
+    // Process each group
     const result = await Promise.all(groupsRaw.map(async (group) => {
       let parsedGroupValue = [];
       try {
@@ -617,8 +658,10 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
         console.error("Invalid group_value JSON:", group.group_value);
       }
 
+      // Extract work order IDs
       const workOrderIds = [...new Set(parsedGroupValue.map(item => item.work_order_id).filter(Boolean))];
 
+      // Fetch work orders
       const workOrders = await WorkOrder.findAll({
         where: {
           id: workOrderIds,
@@ -636,6 +679,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
             work_order_sku_values: parsedSku,
           };
         } catch (e) {
+          console.error("Invalid work_order_sku_values JSON:", order.work_order_sku_values);
           workOrderMap[order.id] = {
             ...order,
             work_order_sku_values: [],
@@ -643,6 +687,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
         }
       }
 
+      // Build layers with work order details
       const layers = parsedGroupValue.map((item) => {
         const wo = workOrderMap[item.work_order_id];
         const layerDetail = wo?.work_order_sku_values?.find(l => l.layer_id === item.layer_id);
@@ -658,6 +703,57 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
         };
       });
 
+      // ✅ Fetch AllocationHistory for this group
+      const allocations = await AllocationHistory.findAll({
+        where: {
+          group_id: group.id,
+          company_id: companyId,
+        },
+        attributes: ['inventory_id'],
+        raw: true,
+      });
+
+      // ✅ Get unique inventory IDs
+      const uniqueInventoryIds = [...new Set(allocations.map(a => a.inventory_id))];
+
+      // ✅ Fetch Inventory
+      const inventories = await Inventory.findAll({
+        where: {
+          id: uniqueInventoryIds,
+          company_id: companyId,
+        },
+        attributes: ['id', 'item_id', 'inventory_generate_id', 'qr_code_url'],
+        raw: true,
+      });
+
+      // ✅ Get item IDs from inventories
+      const itemIds = inventories.map(i => i.item_id);
+
+      // ✅ Fetch Items
+      const items = await ItemMaster.findAll({
+        where: {
+          id: itemIds,
+          company_id: companyId,
+        },
+        attributes: ['id', 'item_name'],
+        raw: true,
+      });
+
+      // ✅ Maps for quick access
+      const inventoryMap = Object.fromEntries(inventories.map(inv => [inv.id, inv]));
+      const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
+
+      // ✅ Build unique inventory details
+      const inventoryDetails = uniqueInventoryIds.map(inventoryId => {
+        const inv = inventoryMap[inventoryId];
+        const item = itemMap[inv?.item_id];
+        return {
+          inventory_generate_id: inv?.inventory_generate_id ?? null,
+          qr_code_url: inv?.qr_code_url ?? null,
+          item_name: item?.item_name ?? null,
+        };
+      });
+
       return {
         id: group.id,
         production_group_generate_id: group.production_group_generate_id,
@@ -667,6 +763,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
         manufactured_qty: group.manufactured_qty || 0,
         balance_manufacture_qty: group.balance_manufacture_qty || 0,
         layers: layers,
+        inventories: inventoryDetails, // ✅ final clean list
       };
     }));
 
@@ -687,133 +784,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
 
 
 
-
-
-
-
 // get group view 
-// v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
-//   try {
-//     const groupId = req.params.id;
-//     const companyId = req.user.company_id;
-
-//     if (!groupId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Group ID is required",
-//       });
-//     }
-
-//     // Fetch the group
-//     const group = await ProductionGroup.findOne({
-//       where: {
-//         id: groupId,
-//         company_id: companyId,
-//       },
-//       raw: true,
-//     });
-
-//     if (!group) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Production group not found",
-//       });
-//     }
-
-//     // Parse group_value safely
-//     let parsedGroupValue = [];
-//     try {
-//       parsedGroupValue = group.group_value ? JSON.parse(group.group_value) : [];
-//     } catch (err) {
-//       console.error("Invalid group_value JSON:", group.group_value);
-//     }
-
-//     // Extract unique work_order_ids
-//     const workOrderIds = [...new Set(parsedGroupValue.map(item => item.work_order_id).filter(Boolean))];
-
-//     // Fetch all work orders
-//     const workOrders = await WorkOrder.findAll({
-//       where: {
-//         id: workOrderIds,
-//         company_id: companyId
-//       },
-//       raw: true,
-//     });
-
-//     // Build workOrderMap for easy lookup
-//     const workOrderMap = {};
-//     for (const order of workOrders) {
-//       let parsedSkus = [];
-//       try {
-//         parsedSkus = order.work_order_sku_values
-//           ? JSON.parse(order.work_order_sku_values)
-//           : [];
-//       } catch (err) {
-//         console.error("Invalid work_order_sku_values JSON for order:", order.id);
-//       }
-
-//       workOrderMap[order.id] = {
-//         ...order,
-//         work_order_sku_values: parsedSkus,
-//       };
-//     }
-
-//     // Construct enriched layers
-//     const enrichedLayers = parsedGroupValue.map(item => {
-//       const workOrder = workOrderMap[item.work_order_id];
-//       if (!workOrder) return null;
-
-//       const layerDetail = workOrder.work_order_sku_values.find(l => l.layer_id === item.layer_id);
-//       return {
-//         ...layerDetail,
-//         work_order_id: item.work_order_id,
-//         work_generate_id: workOrder.work_generate_id,
-//         sku_name: workOrder.sku_name,
-//         priority: workOrder.priority,
-//         edd: workOrder.edd,
-//         stage: workOrder.stage
-//       };
-//     }).filter(Boolean);
-
-//     // Fetch latest group history for this group
-//     const productionScheduleHistory = await ProductionSchedule.findOne({
-//       where: {
-//         group_id: groupId,
-//         company_id: companyId,
-//         status: "active"
-//       },
-//       order: [["id", "DESC"]],
-//       attributes: [
-        
-//         "production_status"
-//       ],
-//       raw: true
-//     });
-
-//     // Send final response
-//     return res.status(200).json({
-//       success: true,
-//       data: {
-//         id: group.id,
-//         production_group_generate_id: group.production_group_generate_id,
-//         group_name: group.group_name,
-//         group_status: group.group_status,
-//         group_Qty: group.group_Qty,
-//         layers: enrichedLayers,
-//         group_history: productionScheduleHistory || null
-//       }
-//     });
-
-//   } catch (err) {
-//     console.error("Error fetching production group by ID:", err);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error while fetching production group",
-//       error: err.message,
-//     });
-//   }
-// });
-
 v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
   try {
     const groupId = req.params.id;
@@ -938,133 +909,153 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-
-
-
-
-
 //update group quantity
-v1Router.patch("/group/update_quantity/:groupId", authenticateJWT, async (req, res) => {
+v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const groupId = req.params.groupId;
     const { manufactured_quantity } = req.body;
     const userId = req.user.id;
+    const companyId = req.user.company_id;
+
+    // Get employee
     const employee = await Employee.findOne({
       where: {
-        company_id: req.user.company_id,
+        company_id: companyId,
         user_id: userId,
       },
       attributes: ["id", "company_id"],
+      transaction: t
     });
-
     if (!employee) {
+      await t.rollback();
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
-
     const employeeId = employee.id;
 
-    console.log("Updating group quantity for groupId:", groupId, "by employeeId:", employeeId);
-    
-
-    if (!manufactured_quantity || isNaN(manufactured_quantity) || manufactured_quantity <= 0) {
+    // Validate manufactured quantity
+    const usedQty = parseFloat(manufactured_quantity);
+    if (!usedQty || isNaN(usedQty) || usedQty <= 0) {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: "Used quantity must be a valid number greater than 0"
       });
     }
 
-    // Fetch the latest active group history by group_id and company
-    const groupHistory = await GroupHistory.findOne({
+    // Fetch ProductionGroup
+    const productionGroup = await ProductionGroup.findOne({
       where: {
-        group_id: groupId,
-        company_id: req.user.company_id,
-        employee_id: employeeId,
+        id: groupId,
+        company_id: companyId,
         status: "active"
       },
-      order: [['id', 'DESC']] // Get latest record
+      transaction: t
     });
-
-    if (!groupHistory) {
+    if (!productionGroup) {
+      await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "Group history not found for this group ID"
+        message: "Production Group not found for this group ID"
       });
     }
-
-
-    console.log("Original groupHistory:", groupHistory);
-    
-
-    const originalBalance = parseFloat(groupHistory.balanced_quantity || 0);
-    const usedQty = parseFloat(manufactured_quantity);
-
+    const groupQty = parseFloat(productionGroup.group_Qty || 0);
+    const originalBalance = parseFloat(productionGroup.balance_manufacture_qty || 0);
+    const originalManufactured = parseFloat(productionGroup.manufactured_qty || 0);
+    const newManufacturedTotal = originalManufactured + usedQty;
     if (usedQty > originalBalance) {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: "Used quantity cannot be greater than current balanced quantity"
       });
     }
+    if (newManufacturedTotal > groupQty) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Total manufactured quantity cannot exceed group quantity"
+      });
+    }
+    const newBalance = groupQty - newManufacturedTotal;
 
-    const newBalance = originalBalance - usedQty;
-
-    // Update the history record
-    groupHistory.manufactured_quantity = usedQty;
-    groupHistory.total_quantity = originalBalance;
-    groupHistory.balanced_quantity = newBalance;
-    groupHistory.updated_by = req.user.id;
-    groupHistory.group_status = newBalance === 0 ? 'completed' : 'in_progress';
-
-    await groupHistory.save();
-
-    
-    
-    
-    // ✅ Update ProductionSchedule for the group and employee
+    // Find all active production schedules for this group and employee
     const schedules = await ProductionSchedule.findAll({
       where: {
         group_id: groupId,
         employee_id: employeeId,
-        company_id: req.user.company_id,
+        company_id: companyId,
         status: "active"
-      }
+      },
+      transaction: t
     });
+    if (!schedules.length) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "No active production schedule found for this group and employee"
+      });
+    }
+    // Use the latest schedule for history
+    const activeSchedule = schedules[0];
 
+    // Create new GroupHistory entry
+    const groupHistory = await GroupHistory.create({
+      company_id: companyId,
+      production_schedule_id: activeSchedule.id,
+      group_manufactured_quantity: usedQty,
+      start_time: new Date(),
+      end_time: new Date(),
+      employee_id: employeeId,
+      machine_id: activeSchedule.machine_id,
+      created_by: userId,
+      updated_by: userId
+    }, { transaction: t });
+
+    // Update ProductionGroup
+    await ProductionGroup.update(
+      {
+        manufactured_qty: newManufacturedTotal,
+        balance_manufacture_qty: newBalance,
+        ...(newBalance === 0 ? { production_completed: "Completed" } : {})
+      },
+      {
+        where: {
+          id: groupId,
+          company_id: companyId
+        },
+        transaction: t
+      }
+    );
+
+    // Update all active ProductionSchedule records for this group/employee
     for (const schedule of schedules) {
-      schedule.group_manufactured_quantity = usedQty;
+      schedule.group_manufactured_quantity = (parseFloat(schedule.group_manufactured_quantity || 0) + usedQty);
       schedule.group_balanced_quantity = newBalance;
       if (newBalance === 0) {
         schedule.production_status = 'completed';
+      } else {
+        schedule.production_status = 'in_progress';
       }
-      await schedule.save();
+      await schedule.save({ transaction: t });
     }
 
-
-    // If balance becomes 0, mark group as Completed
-    if (newBalance === 0) {
-      await ProductionGroup.update(
-        // { group_status: "Completed" },
-        { production_completed: "Completed" },
-        {
-          where: {
-            id: groupId,
-            company_id: req.user.company_id
-          }
-        }
-      );
-    }
-
+    await t.commit();
     return res.status(200).json({
       success: true,
-      message: "Group history updated successfully",
+      message: "Group quantity updated and history entry created successfully",
       data: {
         group_id: groupId,
-        total_quantity: groupHistory.total_quantity,
-        manufactured_quantity: groupHistory.manufactured_quantity,
-        balanced_quantity: groupHistory.balanced_quantity
+        group_history_id: groupHistory.id,
+        manufactured_quantity: usedQty,
+        total_manufactured: newManufacturedTotal,
+        total_quantity: groupQty,
+        balanced_quantity: newBalance,
+        production_schedule_id: activeSchedule.id
       }
     });
-
   } catch (err) {
+    if (t.finished !== 'commit') await t.rollback();
     console.error("Error updating group quantity:", err);
     return res.status(500).json({
       success: false,
@@ -1073,7 +1064,6 @@ v1Router.patch("/group/update_quantity/:groupId", authenticateJWT, async (req, r
     });
   }
 });
-
 
 
 
