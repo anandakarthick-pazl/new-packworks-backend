@@ -104,6 +104,10 @@ const Employee = sequelize.define(
       allowNull: false,
       defaultValue: 'both',
     },
+    about_me:{
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
