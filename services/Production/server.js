@@ -1273,6 +1273,7 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     const { 
       include_work_orders = "false", 
       temporary_status,
+      group_status,
       page = 1,
       limit = 10,
       search = ""
@@ -1291,6 +1292,9 @@ v1Router.get("/production-group", authenticateJWT, async (req, res) => {
     // Add temporary_status filter if provided
     if (temporary_status) {
       whereClause.temporary_status = parseInt(temporary_status, 10);
+    }
+      if (group_status) {
+      whereClause.group_status = group_status;
     }
     // Add search functionality for production_group_generate_id and group_name
 if (search && search.trim() !== "") {
@@ -2930,6 +2934,200 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
   }
 });
 
+
+//  update manufacturing group status
+v1Router.patch("/production-group/:id/status", authenticateJWT, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { group_status } = req.body;
+
+    // Validate ID
+    if (!Number.isInteger(parseInt(id)) || parseInt(id) <= 0) {
+      return res.status(400).json({
+        message: "Invalid ID - must be a positive integer",
+      });
+    }
+
+    // Validate that group_status is provided
+    if (!group_status) {
+      return res.status(400).json({
+        message: "group_status is required",
+      });
+    }
+
+    // Validate group_status value against ENUM
+    const validStatuses = ["pending", "allocation_completed", "production_completed", "cancelled"];
+    if (!validStatuses.includes(group_status)) {
+      return res.status(400).json({
+        message: `Invalid group_status. Must be one of: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    // Check if group exists and belongs to the user's company
+    const existingGroup = await ProductionGroup.findOne({
+      where: {
+        id: parseInt(id),
+        company_id: req.user.company_id,
+      },
+    });
+
+    if (!existingGroup) {
+      return res.status(404).json({
+        message: "Production group not found or doesn't belong to your company",
+      });
+    }
+
+    // Update the group status
+    await ProductionGroup.update(
+      {
+        group_status: group_status,
+        updated_by: req.user.id,
+        updated_at: new Date(),
+      },
+      {
+        where: {
+          id: parseInt(id),
+          company_id: req.user.company_id,
+        },
+      }
+    );
+
+    // Get updated group with group_value
+    const updatedGroup = await ProductionGroup.findOne({
+      where: {
+        id: parseInt(id),
+        company_id: req.user.company_id,
+      },
+    });
+
+    // Update work orders based on group_value
+    if (updatedGroup.group_value) {
+      // Parse group_value if it's a string
+      let groupValueArray;
+      try {
+        groupValueArray = typeof updatedGroup.group_value === 'string' 
+          ? JSON.parse(updatedGroup.group_value) 
+          : updatedGroup.group_value;
+      } catch (error) {
+        console.error("Error parsing group_value JSON:", error);
+        groupValueArray = null;
+      }
+
+      if (groupValueArray && Array.isArray(groupValueArray)) {
+      // Extract unique work_order_ids from group_value
+      const workOrderIds = [...new Set(groupValueArray.map(item => parseInt(item.work_order_id)))];
+      
+      if (workOrderIds.length > 0) {
+        console.log("Work Order IDs to update:", workOrderIds);
+        console.log("Group value array:", groupValueArray);
+
+        // Get all relevant work orders
+        const workOrders = await WorkOrder.findAll({
+          where: {
+            id: workOrderIds,
+            company_id: req.user.company_id,
+          },
+          attributes: ['id', 'work_order_sku_values'],
+        });
+
+        console.log("Found work orders:", workOrders.length);
+
+        // Update each work order
+        for (const workOrder of workOrders) {
+          console.log(`\n=== Processing work order ${workOrder.id} ===`);
+          console.log("Raw work_order_sku_values:", workOrder.work_order_sku_values);
+          console.log("Type of work_order_sku_values:", typeof workOrder.work_order_sku_values);
+          console.log("Is array?", Array.isArray(workOrder.work_order_sku_values));
+
+          // Parse work_order_sku_values if it's a string
+          let skuValuesArray;
+          try {
+            skuValuesArray = typeof workOrder.work_order_sku_values === 'string' 
+              ? JSON.parse(workOrder.work_order_sku_values) 
+              : workOrder.work_order_sku_values;
+          } catch (error) {
+            console.error("Error parsing work_order_sku_values JSON:", error);
+            skuValuesArray = null;
+          }
+
+          console.log("Parsed sku values array:", skuValuesArray);
+          console.log("Is parsed array?", Array.isArray(skuValuesArray));
+
+          if (skuValuesArray && Array.isArray(skuValuesArray)) {
+            console.log("Original sku values:", JSON.stringify(skuValuesArray, null, 2));
+
+            // Get layer_ids for this specific work_order from group_value
+            const layerIdsForThisWorkOrder = groupValueArray
+              .filter(item => parseInt(item.work_order_id) === workOrder.id)
+              .map(item => parseInt(item.layer_id));
+
+            console.log(`Layer IDs to update for work order ${workOrder.id}:`, layerIdsForThisWorkOrder);
+
+            // Update production_status for matching layer_ids
+            const updatedSkuValues = skuValuesArray.map(layer => {
+              // Convert both to integers for comparison
+              const layerIdInt = parseInt(layer.layer_id);
+              const shouldUpdate = layerIdsForThisWorkOrder.includes(layerIdInt);
+              
+              console.log(`Layer ${layerIdInt}: should update? ${shouldUpdate}`);
+              
+              if (shouldUpdate) {
+                console.log(`Updating layer ${layerIdInt} production_status from "${layer.production_status}" to "${group_status}"`);
+                return {
+                  ...layer,
+                  production_status: group_status
+                };
+              }
+              return layer;
+            });
+
+            console.log("Updated sku values:", JSON.stringify(updatedSkuValues, null, 2));
+
+            // Update the work order with modified sku values
+            await WorkOrder.update(
+              {
+                work_order_sku_values: updatedSkuValues,
+                updated_by: req.user.id,
+                updated_at: new Date(),
+              },
+              {
+                where: {
+                  id: workOrder.id,
+                  company_id: req.user.company_id,
+                },
+              }
+            );
+
+            console.log(`✅ Successfully updated work order ${workOrder.id}`);
+            logger.info(`Updated work order ${workOrder.id} production_status for layers ${layerIdsForThisWorkOrder.join(', ')} to ${group_status}`);
+          } else {
+            console.log(`❌ work_order_sku_values is not a valid array for work order ${workOrder.id}`);
+          }
+        }
+      }
+    }
+    }
+
+    // Log the update operation
+    logger.info(`User ${req.user.id} updated production group ${id} status to ${group_status}`, {
+      group_id: parseInt(id),
+      new_status: group_status,
+      company_id: req.user.company_id,
+    });
+
+    res.status(200).json({
+      message: "Production group status and related work orders updated successfully",
+      data: updatedGroup,
+    });
+
+  } catch (error) {
+    logger.error("Error updating production group status:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 
 
 // ✅ Health Check Endpoint
