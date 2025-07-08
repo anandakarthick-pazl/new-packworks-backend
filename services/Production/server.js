@@ -3019,11 +3019,12 @@ v1Router.post("/inventory-allocation", authenticateJWT, async (req, res) => {
         inventoryData.company_id = req.user.company_id; // Ensure correct company
 
         const newInventory = await db.Inventory.create(inventoryData, { transaction });
-        
+        const stock_adjustment_generate_id = await generateId(req.user.company_id, stockAdjustment, "stock_adjustment");
         // Step 3: Create new stock adjustment entry
         const stockAdjustmentData = {
           inventory_id: newInventory.id,
           company_id: req.user.company_id,
+          stock_adjustment_generate_id:stock_adjustment_generate_id ,
           remarks: 'customer forced to proceed allocations',
           created_by: req.user.id,
           updated_by: req.user.id
