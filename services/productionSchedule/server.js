@@ -770,7 +770,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: result.length === 1 ? result[0] : result,
+      data: result,
     });
 
   } catch (err) {
@@ -782,8 +782,6 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-
 
 // get group view 
 v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
@@ -1218,12 +1216,6 @@ v1Router.patch("/group/update_quantity/:groupId", authenticateJWT, async (req, r
     });
   }
 });
-
-
-
-
-
-
 
 app.use("/api/production-schedule", v1Router);
 const PORT = process.env.PORT_PRODUCTION_SCHEDULE;
