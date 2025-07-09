@@ -1,6 +1,6 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
-
+import Package from "./package.model.js"; 
 const Company = sequelize.define(
   "Company",
   {
@@ -157,5 +157,8 @@ package_end_date: {
     timestamps: false,
   }
 );
-
+Company.belongsTo(Package, {
+  foreignKey: "package_id",
+  as: "package" // ✅ match the 'as' name used in your include
+});
 export default Company;

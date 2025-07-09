@@ -982,7 +982,6 @@ v1Router.post("/work-order", authenticateJWT, async (req, res) => {
 //   }
 // });
 
-
 v1Router.get("/work-order", authenticateJWT, async (req, res) => {
   try {
     const {
@@ -1266,7 +1265,9 @@ v1Router.get("/work-order", authenticateJWT, async (req, res) => {
 
                 // Filter to only include entries with matching work_order_id
                 const relevantEntries = Array.isArray(groupValue)
-                  ? groupValue.filter((entry) => entry.work_order_id == parsedWorkOrder.id)
+                  ? groupValue.filter(
+                      (entry) => entry.work_order_id == parsedWorkOrder.id
+                    )
                   : [];
 
                 return {
@@ -1856,7 +1857,36 @@ v1Router.put("/work-order/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-// DELETE work order (soft delete)
+// v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
+//   const { id } = req.params;
+//   const { updated_by } = req.user.id;
+
+//   try {
+//     // Find the work order
+//     const workOrder = await WorkOrder.findByPk(id);
+
+//     if (!workOrder) {
+//       return res.status(404).json({ message: "Work order not found" });
+//     }
+
+//     // Soft delete - update status to inactive
+//     await workOrder.update({
+//       status: "inactive",
+//       updated_by: updated_by,
+//       updated_at: sequelize.literal("CURRENT_TIMESTAMP"),
+//     });
+
+//     res.json({
+//       message: "Work Order successfully marked as inactive",
+//       data: workOrder.get({ plain: true }),
+//     });
+//   } catch (error) {
+//     logger.error("Error soft deleting work order:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { updated_by } = req.user.id;
@@ -1867,6 +1897,24 @@ v1Router.delete("/work-order/:id", authenticateJWT, async (req, res) => {
 
     if (!workOrder) {
       return res.status(404).json({ message: "Work order not found" });
+    }
+
+    // Check if work order ID exists in production group table
+    const productionGroups = await sequelize.query(
+      `SELECT id FROM production_group
+   WHERE JSON_CONTAINS(group_value, JSON_OBJECT('work_order_id', :workOrderId))`,
+      {
+        replacements: { workOrderId: parseInt(id) },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (productionGroups.length > 0) {
+      return res.status(400).json({
+        message:
+          "Cannot delete work order. It is currently being used in production groups.",
+        productionGroupsCount: productionGroups.length,
+      });
     }
 
     // Soft delete - update status to inactive

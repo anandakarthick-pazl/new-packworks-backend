@@ -770,7 +770,7 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: result.length === 1 ? result[0] : result,
+      data: result,
     });
 
   } catch (err) {
@@ -782,8 +782,6 @@ v1Router.get("/employee/group-schedule", authenticateJWT, async (req, res) => {
     });
   }
 });
-
-
 
 // get group view 
 v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
@@ -911,7 +909,163 @@ v1Router.get("/group/:id", authenticateJWT, async (req, res) => {
 });
 
 //update group quantity
-v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, res) => {
+// v1Router.patch("/group/update_quantity/:groupId", authenticateJWT, async (req, res) => {
+//   const t = await sequelize.transaction();
+//   try {
+//     const groupId = req.params.groupId;
+//     const { manufactured_quantity } = req.body;
+//     const userId = req.user.id;
+//     const companyId = req.user.company_id;
+
+//     // Get employee
+//     const employee = await Employee.findOne({
+//       where: {
+//         company_id: companyId,
+//         user_source: 'both',
+//         user_id: userId,
+//       },
+//       attributes: ["id", "company_id"],
+//       transaction: t
+//     });
+//     if (!employee) {
+//       await t.rollback();
+//       return res.status(404).json({ success: false, message: "Employee not found" });
+//     }
+//     const employeeId = employee.id;
+
+//     // Validate manufactured quantity
+//     const usedQty = parseFloat(manufactured_quantity);
+//     if (!usedQty || isNaN(usedQty) || usedQty <= 0) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Used quantity must be a valid number greater than 0"
+//       });
+//     }
+
+//     // Fetch ProductionGroup
+//     const productionGroup = await ProductionGroup.findOne({
+//       where: {
+//         id: groupId,
+//         company_id: companyId,
+//         status: "active"
+//       },
+//       transaction: t
+//     });
+//     if (!productionGroup) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Production Group not found for this group ID"
+//       });
+//     }
+//     const groupQty = parseFloat(productionGroup.group_Qty || 0);
+//     const originalBalance = parseFloat(productionGroup.balance_manufacture_qty || 0);
+//     const originalManufactured = parseFloat(productionGroup.manufactured_qty || 0);
+//     const newManufacturedTotal = originalManufactured + usedQty;
+//     if (usedQty > originalBalance) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Used quantity cannot be greater than current balanced quantity"
+//       });
+//     }
+//     if (newManufacturedTotal > groupQty) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Total manufactured quantity cannot exceed group quantity"
+//       });
+//     }
+//     const newBalance = groupQty - newManufacturedTotal;
+
+//     // Find all active production schedules for this group and employee
+//     const schedules = await ProductionSchedule.findAll({
+//       where: {
+//         group_id: groupId,
+//         employee_id: employeeId,
+//         company_id: companyId,
+//         status: "active"
+//       },
+//       transaction: t
+//     });
+//     if (!schedules.length) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "No active production schedule found for this group and employee"
+//       });
+//     }
+//     // Use the latest schedule for history
+//     const activeSchedule = schedules[0];
+
+//     // Create new GroupHistory entry
+//     const groupHistory = await GroupHistory.create({
+//       company_id: companyId,
+//       production_schedule_id: activeSchedule.id,
+//       group_manufactured_quantity: usedQty,
+//       start_time: new Date(),
+//       end_time: new Date(),
+//       employee_id: employeeId,
+//       machine_id: activeSchedule.machine_id,
+//       created_by: userId,
+//       updated_by: userId
+//     }, { transaction: t });
+
+//     // Update ProductionGroup
+//     await ProductionGroup.update(
+//       {
+//         manufactured_qty: newManufacturedTotal,
+//         balance_manufacture_qty: newBalance,
+//         ...(newBalance === 0 ? { production_completed: "Completed" } : {})
+//       },
+//       {
+//         where: {
+//           id: groupId,
+//           company_id: companyId
+//         },
+//         transaction: t
+//       }
+//     );
+
+//     // Update all active ProductionSchedule records for this group/employee
+//     for (const schedule of schedules) {
+//       schedule.group_manufactured_quantity = (parseFloat(schedule.group_manufactured_quantity || 0) + usedQty);
+//       schedule.group_balanced_quantity = newBalance;
+//       if (newBalance === 0) {
+//         schedule.production_status = 'completed';
+//       } else {
+//         schedule.production_status = 'in_progress';
+//       }
+//       await schedule.save({ transaction: t });
+//     }
+
+//     await t.commit();
+//     return res.status(200).json({
+//       success: true,
+//       message: "Group quantity updated and history entry created successfully",
+//       data: {
+//         group_id: groupId,
+//         group_history_id: groupHistory.id,
+//         manufactured_quantity: usedQty,
+//         total_manufactured: newManufacturedTotal,
+//         total_quantity: groupQty,
+//         balanced_quantity: newBalance,
+//         production_schedule_id: activeSchedule.id
+//       }
+//     });
+//   } catch (err) {
+//     if (t.finished !== 'commit') await t.rollback();
+//     console.error("Error updating group quantity:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while updating group quantity",
+//       error: err.message
+//     });
+//   }
+// });
+
+v1Router.patch("/group/update_quantity/:groupId", authenticateJWT, async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const groupId = req.params.groupId;
@@ -979,7 +1133,7 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
         message: "Total manufactured quantity cannot exceed group quantity"
       });
     }
-    const newBalance = groupQty - newManufacturedTotal;
+    const newBalance = originalBalance - usedQty;
 
     // Find all active production schedules for this group and employee
     const schedules = await ProductionSchedule.findAll({
@@ -1031,14 +1185,10 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     );
 
     // Update all active ProductionSchedule records for this group/employee
+    // Only update manufactured quantities, not status
     for (const schedule of schedules) {
       schedule.group_manufactured_quantity = (parseFloat(schedule.group_manufactured_quantity || 0) + usedQty);
       schedule.group_balanced_quantity = newBalance;
-      if (newBalance === 0) {
-        schedule.production_status = 'completed';
-      } else {
-        schedule.production_status = 'in_progress';
-      }
       await schedule.save({ transaction: t });
     }
 
@@ -1066,14 +1216,6 @@ v1Router.post("/group/update_quantity/:groupId", authenticateJWT, async (req, re
     });
   }
 });
-
-
-
-
-
-
-
-
 
 app.use("/api/production-schedule", v1Router);
 const PORT = process.env.PORT_PRODUCTION_SCHEDULE;

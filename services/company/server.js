@@ -22,6 +22,8 @@ app.use(cors());
 const v1Router = Router();
 const RABBITMQ_URL = process.env.RABBITMQ_URL; // Update if needed
 const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
+const Package = db.Package;
+
 // ✅ Secure all API routes with JWT middleware
 // app.use(authenticateStaticToken);
 app.use(logRequestResponse)
@@ -66,7 +68,7 @@ v1Router.post("/companies",validateCompany, async (req, res) => {
 
         // 🔹 Step 2: Call Stored Procedure (Insert Company & Users)
         await sequelize.query(
-            `CALL ProcedureInsertCompanyAndUsers(?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?, @newCompanyId);`,
+            `CALL ProcedureInsertCompanyAndUsers(?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCompanyId);`,
             {
                 replacements: [
                     companyData.name,
@@ -184,33 +186,40 @@ v1Router.post("/companies",validateCompany, async (req, res) => {
 
 
 v1Router.get("/companies", async (req, res) => {
-    try {
-        const companies = await Company.findAll();
-        return res.status(200).json({
-            status: true,
-            message: 'company fetched successfully',
-            data: companies,
-        });
-    } catch (error) {
-        const stackLines = error.stack.split('\n');
-        const callerLine = stackLines[1]; // The line where the error occurred
-        const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
-        let fileName = '';
-        let lineNumber = '';
+  try {
+    const companies = await Company.findAll({
+      include: [{
+        model: Package,
+        as: 'package',
+        attributes: ['id', 'name'] // fetch id and name of package
+      }]
+    });
 
-        if (match) {
-            fileName = match[1];
-            lineNumber = match[2];
-        }
+    return res.status(200).json({
+      status: true,
+      message: 'company fetched successfully',
+      data: companies,
+    });
+  } catch (error) {
+    const stackLines = error.stack.split('\n');
+    const callerLine = stackLines[1];
+    const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
+    let fileName = '';
+    let lineNumber = '';
 
-        return res.status(500).json({
-            status: false,
-            message: error.message,
-            file: fileName,
-            line: lineNumber,
-            data: [],
-        });
+    if (match) {
+      fileName = match[1];
+      lineNumber = match[2];
     }
+
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+      file: fileName,
+      line: lineNumber,
+      data: [],
+    });
+  }
 });
 
 // 🔹 Get a Single Company by ID (GET)
