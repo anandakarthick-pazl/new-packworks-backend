@@ -500,6 +500,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
       ...sku.toJSON(),
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
       part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+      tags: sku.tags ? JSON.parse(sku.tags) : null,
     };
 
     res.status(200).json(formattedSku);
