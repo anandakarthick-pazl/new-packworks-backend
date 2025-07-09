@@ -18,6 +18,7 @@ const GroupHistory = db.GroupHistory; // Assuming you have a GroupHistory model
 const AllocationHistory = db.AllocationHistory; // Assuming you have an AllocationHistory model
 const ItemMaster = db.ItemMaster; // Assuming you have an ItemMaster model
 const Inventory = db.Inventory; // Assuming you have an Inventory model
+const Machine = db.Machine; // Assuming you have a Machine model
 // const SKU = db.Sku; // Assuming you have a SKU model
 
 
@@ -27,6 +28,138 @@ app.use(json());
 app.use(cors());
 const v1Router = Router();
 
+
+//get group_history
+v1Router.get('/group/history/:group_id', async (req, res) => {
+  try {
+    const { group_id } = req.params;
+
+    // 1. Get the production schedule
+    const productionSchedule = await ProductionSchedule.findOne({
+      where: {
+        group_id: group_id,
+        status: 'active'
+      },
+      attributes: [
+        'id',
+        'production_schedule_generate_id',
+        'employee_id',
+        'machine_id',
+        'group_id'
+      ]
+    });
+
+    if (!productionSchedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Production schedule not found or inactive'
+      });
+    }
+
+    // 2. Get ALL group history records for this schedule
+    const groupHistories = await sequelize.query(`
+      SELECT 
+        id,
+        start_time, 
+        end_time, 
+        group_manufactured_quantity, 
+        employee_id, 
+        machine_id
+      FROM group_history
+      WHERE production_schedule_id = :scheduleId
+      AND status = 'active'
+      ORDER BY created_at DESC
+    `, {
+      replacements: { scheduleId: productionSchedule.id },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // 3. Enrich each history with employee and machine details
+    const enrichedHistories = await Promise.all(groupHistories.map(async (history) => {
+      // Fetch employee
+      const employee = await Employee.findOne({
+        where: { id: history.employee_id },
+        attributes: ['id', 'slack_username']
+      });
+
+      // Fetch machine
+      const machine = await Machine.findOne({
+        where: { id: history.machine_id },
+        attributes: ['id', 'machine_name']
+      });
+
+      return {
+        id: history.id,
+        start_time: history.start_time,
+        end_time: history.end_time,
+        group_manufactured_quantity: history.group_manufactured_quantity,
+        employee: employee ? {
+          id: employee.id,
+          name: employee.slack_username
+        } : null,
+        machine: machine ? {
+          id: machine.id,
+          name: machine.machine_name
+        } : null
+      };
+    }));
+
+    // 4. Get production group
+    const productionGroup = await ProductionGroup.findOne({
+      where: {
+        id: group_id,
+        status: 'active'
+      },
+      attributes: [
+        'id',
+        'production_group_generate_id',
+        'group_name',
+        'group_Qty',
+        'balance_manufacture_qty',
+        'group_status'
+      ]
+    });
+
+    if (!productionGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Production group not found or inactive'
+      });
+    }
+
+    // 5. Respond
+    return res.json({
+      success: true,
+      data: {
+        production_group: {
+          id: productionGroup.id,
+          group_Qty: productionGroup.group_Qty,
+          generate_id: productionGroup.production_group_generate_id,
+          balance_manufacture_qty: productionGroup.balance_manufacture_qty,
+          group_name: productionGroup.group_name,
+          group_status: productionGroup.group_status
+           
+        },
+        production_histories: enrichedHistories
+      }
+    });
+
+  } catch (error) {
+    console.error("Error fetching group history:", error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
+});
+
+
+
+
+
+
+//create
 v1Router.post("/create", authenticateJWT, async (req, res) => {
   try {
     const { employee_id, start_time, end_time, group_id, machine_id, ...restData } = req.body;
