@@ -201,19 +201,46 @@ v1Router.get("/billing/get", authenticateJWT, async (req, res) => {
       limit: limitNum,
       offset: offset,
       order: [["updated_at", "DESC"]],
+      attributes: [
+        'id', 'invoice_id', 'company', 'package', 'payment_date', 
+        'next_payment_date', 'transaction_id', 'amount', 'payment_gateway',
+        'payment_status', 'status', 'created_at', 'updated_at'
+      ],
       include: [
         {
           model: User,
           as: "creator",
-          attributes: ["id", "email"]
+          attributes: ["id", "email", "name"]
         }
       ]
     });
 
     const totalPages = Math.ceil(count / limitNum);
 
+    // Format response with transaction_id clearly visible
+    const formattedBills = rows.map(bill => ({
+      id: bill.id,
+      invoice_id: bill.invoice_id,
+      company: bill.company,
+      package: bill.package,
+      amount: parseFloat(bill.amount || 0),
+      payment_status: bill.payment_status,
+      transaction_id: bill.transaction_id, // ← Will be populated after payment
+      payment_gateway: bill.payment_gateway,
+      payment_date: bill.payment_date,
+      next_payment_date: bill.next_payment_date,
+      status: bill.status,
+      created_at: bill.created_at,
+      updated_at: bill.updated_at,
+      creator: bill.creator,
+      // Helper fields
+      has_transaction: !!bill.transaction_id,
+      is_paid: bill.payment_status === 'paid',
+      formatted_amount: `₹${parseFloat(bill.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+    }));
+
     res.json({
-      bills: rows,
+      bills: formattedBills,
       pagination: {
         total: count,
         page: pageNum,
@@ -240,16 +267,21 @@ v1Router.get("/billing/get/:id", authenticateJWT, async (req, res) => {
 
     const bill = await CompanyPaymentBill.findOne({
       where: { id: id },
+      attributes: [
+        'id', 'invoice_id', 'company', 'package', 'payment_date', 
+        'next_payment_date', 'transaction_id', 'amount', 'payment_gateway',
+        'payment_status', 'status', 'created_at', 'updated_at'
+      ],
       include: [
         {
           model: User,
           as: "creator",
-          attributes: ["id", "email"]
+          attributes: ["id", "email","name"]
         },
         {
           model: User,
           as: "updater",
-          attributes: ["id", "email"]
+          attributes: ["id", "email", "name"]
         }
       ]
     });
@@ -261,8 +293,32 @@ v1Router.get("/billing/get/:id", authenticateJWT, async (req, res) => {
       });
     }
 
+    // Format response with transaction_id clearly visible
+    const formattedBill = {
+      id: bill.id,
+      invoice_id: bill.invoice_id,
+      company: bill.company,
+      package: bill.package,
+      amount: parseFloat(bill.amount || 0),
+      payment_status: bill.payment_status,
+      transaction_id: bill.transaction_id, // ← Will be populated after payment
+      payment_gateway: bill.payment_gateway,
+      payment_date: bill.payment_date,
+      next_payment_date: bill.next_payment_date,
+      status: bill.status,
+      created_at: bill.created_at,
+      updated_at: bill.updated_at,
+      creator: bill.creator,
+      updater: bill.updater,
+      // Helper fields
+      has_transaction: !!bill.transaction_id,
+      is_paid: bill.payment_status === 'paid',
+      is_overdue: bill.next_payment_date ? new Date(bill.next_payment_date) < new Date() && bill.payment_status !== 'paid' : false,
+      formatted_amount: `₹${parseFloat(bill.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+    };
+
     res.json({
-      data: bill,
+      data: formattedBill,
       success: true
     });
 
@@ -948,7 +1004,7 @@ v1Router.get("/billing/payment/status/:billId", authenticateJWT, async (req, res
         {
           model: User,
           as: "creator",
-          attributes: ["id", "email", "first_name", "last_name"]
+          attributes: ["id", "email","name"]
         }
       ]
     });
@@ -1036,6 +1092,7 @@ v1Router.get("/billing/get/invoice/generate-id", authenticateJWT, async (req, re
 
 
 
+// companies api
 
 v1Router.post("/",validateCompany, async (req, res) => {
     const transaction = await sequelize.transaction(); // Start a transaction

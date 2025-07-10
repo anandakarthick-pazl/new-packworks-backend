@@ -32,6 +32,7 @@ const v1Router = Router();
 const Client = db.Client;
 const Address = db.ClientAddress;
 const User = db.User;
+const States = db.States; // Import States model
 
 // 🔹 Create a Client (POST)
 v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
@@ -209,7 +210,6 @@ v1Router.get("/clients", authenticateJWT, async (req, res) => {
 v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
   try {
     const clientId = req.params.id;
-
     // Validate client ID
     if (!clientId) {
       return res.status(400).json({
@@ -217,7 +217,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         message: "Client ID is required",
       });
     }
-
     const client = await Client.findOne({
       where: {
         client_id: clientId, // Use client_id instead of primary key
@@ -227,6 +226,13 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         {
           model: Address,
           as: "addresses",
+          include: [
+            {
+              model: States, // Use States (not State) to match your model
+              as: "state_info", // This matches your association alias
+              attributes: ["id", "states"], // Get state id and states name
+            },
+          ],
         },
         {
           model: User,
@@ -243,7 +249,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         exclude: ["password", "sensitive_data"], // Exclude sensitive fields if any
       },
     });
-
     // Check if client exists
     if (!client) {
       return res.status(404).json({
@@ -251,10 +256,8 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         message: "Client not found or you do not have access to this client",
       });
     }
-
     // Convert to plain object
     const clientData = client.toJSON();
-
     // Parse 'documents' if it's a string
     if (typeof clientData.documents === "string") {
       try {
@@ -263,18 +266,22 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         clientData.documents = []; // fallback if invalid JSON
       }
     }
-
     // Build and return response
     const response = {
       status: true,
       data: {
         ...clientData,
-        addresses: clientData.addresses || [],
+        addresses: clientData.addresses ? clientData.addresses.map(address => {
+          const { state_info, ...addressWithoutStateInfo } = address;
+          return {
+            ...addressWithoutStateInfo,
+            state_name: state_info ? state_info.states : null
+          };
+        }) : [],
         creator: clientData.creator || null,
         updater: clientData.updater || null,
       },
     };
-
     return res.status(200).json(response);
   } catch (error) {
     logger.error("Client Fetch by ID Error:", {
@@ -282,7 +289,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
       errorMessage: error.message,
       errorStack: error.stack,
     });
-
     if (error.name === "SequelizeValidationError") {
       return res.status(400).json({
         status: false,
@@ -290,7 +296,6 @@ v1Router.get("/clients/:id", authenticateJWT, async (req, res) => {
         errors: error.errors.map((e) => e.message),
       });
     }
-
     return res.status(500).json({
       status: false,
       message: "Internal Server Error",
