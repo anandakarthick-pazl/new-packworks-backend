@@ -5,18 +5,20 @@ import dotenv from "dotenv";
 import logger from "../../common/helper/logger.js";
 import { Op } from "sequelize";
 import sequelize from "../../common/database/database.js";
-import redisClient, { clearClientCache } from "../../common/helper/redis.js";
-import {
-  publishToQueue,
-  rabbitChannel,
-  closeRabbitMQConnection,
-} from "../../common/helper/rabbitmq.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import User from "../../common/models/user.model.js";
-import Company from "../../common/models/company.model.js";
-import Role from "../../common/models/designation.model.js";
-import GlobalInvoices from "../../common/models/globalInvoice.model.js";
 import "../../common/models/association.js";
+
+// Add these imports to your existing companies service file
+import Razorpay from 'razorpay';
+import twilio from 'twilio';
+import { sendEmail } from '../../common/helper/emailService.js';
+import { PaymentLinkTemplate } from '../../common/services/email/templates/paymentLink.js';
+import crypto from 'crypto';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import CompanyPaymentBill from '../../common/models/companyPaymentBill.model.js';
+
 dotenv.config();
 
 const app = express();
@@ -28,67 +30,6 @@ const v1Router = Router();
 
 import { QueryTypes } from "sequelize";
 
-/**
- * @swagger
- * /billing:
- *   get:
- *     summary: Get paginated list of billing records
- *     tags:
- *       - Billing
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of records per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Optional search keyword (currently unused)
- *       - in: query
- *         name: includeInactive
- *         schema:
- *           type: boolean
- *           default: false
- *         description: Include inactive billing records (currently unused)
- *       - in: query
- *         name: entity_type
- *         schema:
- *           type: string
- *         description: Optional filter for entity type (currently unused)
- *     responses:
- *       200:
- *         description: Billing fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/BillingRecord'
- *                 totalPages:
- *                   type: integer
- *                 currentPage:
- *                   type: integer
- *                 totalRecords:
- *                   type: integer
- *       500:
- *         description: Server error while fetching billing
- */
 
 // 🔹 Get All billing (GET) with Addresses - Only active billing
 v1Router.get("/billing",authenticateJWT, async (req, res) => {
@@ -196,22 +137,17 @@ app.get("/health", (req, res) => {
   res.json({
     status: "Service is running",
     timestamp: new Date(),
-    redis: redisClient.status === "ready" ? "connected" : "disconnected",
-    rabbitmq: rabbitChannel ? "connected" : "disconnected",
   });
 });
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down...");
-  await redisClient.quit();
-  await closeRabbitMQConnection();
   process.exit(0);
 });
 
 // Use Version 1 Router
 app.use("/api", v1Router);
-// await db.sequelize.sync();
 const PORT = 3017;
 app.listen(process.env.PORT_BILLING,'0.0.0.0', () => {
   console.log(`billing Service running on port ${process.env.PORT_BILLING}`);

@@ -68,6 +68,7 @@ import ProductionSchedule from "./Production/productionSchedule.model.js";
 
 // Import associations
 import "./association.js";
+import CompanyPaymentBill from "./admin/companyPaymentBill.model.js";
 const db = {
   sequelize,
   User,
@@ -134,9 +135,8 @@ const db = {
   PurchaseOrderPayment,
   DataTransfer,
   ProductionSchedule,
-  GroupHistory
-
-
+  GroupHistory,
+  CompanyPaymentBill,
 };
 
 export default db;
