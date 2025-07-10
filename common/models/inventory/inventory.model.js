@@ -6,7 +6,8 @@ import GRNItem from "../grn/grn_item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import Sub_categories from "../category/sub_category.model.js";
-
+import Categories from "../category/category.model.js";
+import Sku from "../skuModel/sku.model.js";
 const Inventory = sequelize.define("Inventory", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -29,12 +30,18 @@ const Inventory = sequelize.define("Inventory", {
   item_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    // references: {
-    //   model: ItemMaster,
-    //   key: "id",
-    // },
-    // onUpdate: "CASCADE",
-    // onDelete: "CASCADE",
+  },
+  sku_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  sku_generate_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
+  },
+  sales_return_id:{
+    type: DataTypes.STRING(200),
+    allowNull: true,
   },
   item_code: {
     type: DataTypes.STRING(50),
@@ -141,6 +148,15 @@ const Inventory = sequelize.define("Inventory", {
     onUpdate: "CASCADE",
     onDelete: "SET NULL",
   },
+  qr_code_url: {
+    type: Sequelize.TEXT,
+    allowNull: true,
+  },
+  stock_status: {
+    type: DataTypes.ENUM('in_stock', 'low_stock', 'out_of_stock'),
+    allowNull: false,
+    defaultValue: 'out_of_stock'
+  },
   updated_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
@@ -169,7 +185,11 @@ Inventory.belongsTo(Company, { foreignKey: "company_id" });
 Inventory.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Inventory.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
+Inventory.belongsTo(Categories, {foreignKey: 'category', as: 'category_info' });
 Inventory.belongsTo(Sub_categories, {foreignKey: 'sub_category', as: 'sub_category_info' });
 Inventory.belongsTo(ItemMaster, { as: 'item_info', foreignKey: 'item_id' });
-
+Inventory.belongsTo(Sku, {
+  foreignKey: 'item_id',         // or the correct foreign key that links to SKU
+  as: 'sku_info'
+});
 export default Inventory;

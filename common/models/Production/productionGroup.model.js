@@ -11,6 +11,10 @@ const ProductionGroup = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    production_group_generate_id: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+    },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -33,13 +37,31 @@ const ProductionGroup = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-    allocated_Qty: {
+    allocated_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    balance_qty: {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
+    },
+    group_status: {
+      type: DataTypes.ENUM(
+        "pending",
+        "allocation_completed",
+        "production_completed",
+        "cancelled"
+      ),
+      defaultValue: "Pending",
+    },
+    temporary_status: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -66,6 +88,15 @@ const ProductionGroup = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+    },
+    manufactured_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    balance_manufacture_qty: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
   },
   {

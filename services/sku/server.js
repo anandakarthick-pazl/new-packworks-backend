@@ -500,6 +500,7 @@ v1Router.get("/sku-details/:id", authenticateJWT, async (req, res) => {
       ...sku.toJSON(),
       sku_values: sku.sku_values ? JSON.parse(sku.sku_values) : null,
       part_value: sku.part_value ? JSON.parse(sku.part_value) : null,
+      tags: sku.tags ? JSON.parse(sku.tags) : null,
     };
 
     res.status(200).json(formattedSku);
@@ -1766,6 +1767,36 @@ v1Router.delete(
     }
   }
 );
+
+//get sku generate id
+v1Router.get("/sku-details/get/generate-id", authenticateJWT, async (req, res) => {
+  try {
+     const whereClause = {
+      company_id: req.user.company_id,
+      status: "active",
+    };
+
+    const sku = await Sku.findAll({
+      attributes: ["id", "sku_ui_id"],
+      where: whereClause,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: sku,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch Sku Details",
+    });
+  }
+});
+
+
+
 // ✅ Health Check Endpoint
 app.get("/health", (req, res) => {
   res.json({

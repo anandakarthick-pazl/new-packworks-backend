@@ -20,6 +20,11 @@ export const validateCompany = async (req, res, next) => {
             logo: Joi.string().uri().optional(),
             package_name: Joi.string().min(3).max(100).optional(),
             password: Joi.string().min(3).max(100).optional(),
+            package_id: Joi.number().integer().positive().optional(),
+             package_type: Joi.string().valid("monthly", "annual").default("monthly"),
+             package_start_date: Joi.date().required(),
+             package_end_date: Joi.date().required(),
+
 
             companyAccountDetails: Joi.array().items(
                 Joi.object({

@@ -1489,6 +1489,121 @@ v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
   }
 });
 
+
+
+
+
+v1Router.post( "/employee/login",authenticateStaticToken,validateLogin,async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      // 🔹 Check if required fields exist
+      if (!email || !password) {
+        return res.status(400).json({
+          status: false,
+          message: "Missing email or password",
+          data: [],
+        });
+      }
+
+      // 🔹 Find user by email
+      const user = await User.findOne({ where: { email } });
+
+      if (!user) {
+        return res.status(400).json({
+          status: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      // 🔹 Check if user is an employee
+      const getId = user.id;
+      const employee = await Employee.findOne({ where: { user_id: getId } });
+      
+      if (!employee) {
+        return res.status(403).json({
+          status: false,
+          message: "Access denied. Employee account required.",
+        });
+      }
+
+      const userAuth = await UserAuth.findOne({
+        where: { id: user.user_auth_id },
+      });
+
+      // 🔹 Compare passwords
+      const isMatch = await bcrypt.compare(password, userAuth.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          status: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      // 🔹 Fetch company_state_id from Company table
+      const company = await Company.findOne({
+        where: { id: user.company_id },
+        attributes: ["company_state_id"],
+      });
+
+      // 🔹 Generate JWT Token (unchanged)
+      const JWT_SECRET = process.env.JWT_SECRET;
+
+      const token = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email, 
+          company_id: user.company_id,
+          employee_id: employee.id, // Add employee ID to token
+          employee_code: employee.employee_id // Add employee code if needed
+        },
+        JWT_SECRET
+        // { expiresIn: "1h" }
+      );
+
+      console.log("Generated Token Payload:", {
+        id: user.id,
+        email: user.email,
+        company_id: user.company_id,
+        employee_id: employee.id,
+      });
+
+      // 🔹 Update last login time
+      await User.update({ last_login: new Date() }, { where: { id: user.id } });
+
+      // Return response with employee data included
+      // return res.status(200).json({
+      //   status: true,
+      //   message: "Login successful",
+      //   token,
+      //   user,
+      //   employee, // Include employee details
+      //   company_state_id: company ? company.company_state_id : null,
+      // });
+
+return res.status(200).json({
+  ...employee.toJSON(),
+  company_state_id: company ? company.company_state_id : null,
+  status: true,
+  message: "Login successful",
+  token,
+  user,
+});
+
+    } catch (error) {
+      console.error("❌ Error:", error.message);
+      res.status(500).json({
+        status: false,
+        message: error.message,
+        file: error.stack.split("\n")[1]?.trim(),
+        data: [],
+      });
+    }
+  }
+);
+
+
+
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", (req, res) => {
   res.json({ status: "Service is running", timestamp: new Date() });

@@ -1,9 +1,41 @@
+# Environment files
 .env
+
+# Logs
 logs/
+*.log
+
+# Dependency directories
 node_modules/
+
+# Build output
+dist/
+build/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Docker-related
 docker-compose.yml
-Dokerfile
-qrcodes/
+Dockerfile
+
+# PM2 ecosystem configs
 ecosystem.config.cjs
-dummy.js
 dev-ecosystem.config.cjs
+
+# QR code output
+qrcodes/
+
+# Public files (only if you want to ignore them — optional)
+public/
+
+# Temporary or dummy files
+dummy.js
+
+# QR code output inside public folder
+/public/inventory_qrcodes/
+
+package.json
+package-lock.json
+

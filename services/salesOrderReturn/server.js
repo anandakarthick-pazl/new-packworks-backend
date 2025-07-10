@@ -34,6 +34,7 @@ app.get("/health", (req, res) => {
 });
 const WorkOrderInvoice = db.WorkOrderInvoice;
 const Inventory = db.Inventory;
+const Sku = db.Sku;
 
 
 // Sales Return Creation Endpoint
@@ -180,48 +181,79 @@ v1Router.post("/sales-return", authenticateJWT, async (req, res) => {
 
     }
 
-    
-    
-    // 5. Always create a new Inventory row for each return item
-       let inventoryData = null;
-console.log("Return Items Data", returnItemsData);
-
+    // 5. Create Inventory Records
+    const inventoryData = [];
     for (const item of returnItemsData) {
-      const inventory_generate_id = await generateId(companyId, Inventory, 'inventory');
-      const rate = item.unit_price || 0;
-      const quantity_available = item.return_qty;
-      const tax_amount = item.tax_amount || 0;
+      try {
+        const inventory_generate_id = await generateId(req.user.company_id, Inventory, "inventory");
+        const rate = item.unit_price || 0;
+        const quantity_available = item.return_qty;
+        const tax_amount = item.tax_amount || 0;
+        const total_amount = quantity_available * rate;
+        const total_amount_inventory = total_amount + tax_amount;
 
-      const total_amount = quantity_available * rate;
-      const total_amount_inventory = total_amount + tax_amount;
+        // Parse sku_details if it's a string
+        const skuDetails = typeof item.sku_details === 'string'
+          ? JSON.parse(item.sku_details)
+          : item.sku_details;
 
-      const skuDetails = typeof item.sku_details === 'string'
-                          ? JSON.parse(item.sku_details)
-                          : item.sku_details;
+        // Fetch work order invoice
+        const workOrderInvoice = await WorkOrderInvoice.findOne({
+          where: { sale_id: sales_order_id, company_id: companyId },
+          attributes: ["work_id", "invoice_number"],
+        });
 
-      const workOrderInvoice = await WorkOrderInvoice.findOne({
-        where: { sale_id: sales_order_id, company_id: companyId },
-        attributes: ["work_id","invoice_number"],
-      });
-console.log("Sales Return ID:", salesReturnHeader.id);
+        // Fetch SKU data
+        let skuData = null;
+        if (skuDetails?.sku_id) {
+          skuData = await Sku.findOne({
+            where: { id: skuDetails.sku_id, company_id: companyId },
+            attributes: ["sku_ui_id"],
+          });
+        }
 
-       inventoryData = await Inventory.create({
-        inventory_generate_id,
-        company_id: companyId,
-        item_id: skuDetails?.sku_id || 0,
-        work_order_id: workOrderInvoice.work_id || null,
-        quantity_available,
-        rate,
-        total_amount: total_amount_inventory,
-        status: "active",
-        category: 2,
-        created_by: userId,
-        created_at: new Date(),
-        sales_return_id : salesReturnHeader.id,
-      }, { transaction });
+        // 🔒 CHECK: Avoid duplicate insert
+        const existingInventory = await Inventory.findOne({
+          where: {
+            company_id: companyId,
+            sales_return_id: salesReturnHeader.id,
+            sku_id: skuDetails?.sku_id || 0,
+          },
+          transaction
+        });
+
+        if (existingInventory) {
+          console.log("⚠️ Inventory already exists for this return & SKU. Skipping...");
+          continue; // Skip this item to prevent duplicate
+        }
+
+        console.log("Creating inventory for salesReturnHeader.id:", salesReturnHeader.id);
+        console.log("Inventory Generate ID:", inventory_generate_id);
+
+        const inventory = await Inventory.create({
+          inventory_generate_id,
+          company_id: companyId,
+          item_id: 0,
+          sku_id: skuDetails?.sku_id || 0,
+          sku_generate_id: skuData?.sku_ui_id || null,
+          work_order_id: workOrderInvoice?.work_id || null,
+          quantity_available,
+          rate,
+          total_amount: total_amount_inventory,
+          status: "active",
+          category: 2,
+          created_by: userId,
+          created_at: new Date(),
+          sales_return_id: salesReturnHeader.id,
+        }, { transaction });
+
+        console.log("Inventory created:", inventoryData.id, "for salesReturnHeader.id:", salesReturnHeader.id);
+    inventoryData.push(inventory);
+      } catch (err) {
+        console.error("Error creating inventory for item:", item, err);
+        throw err; // This will cause the transaction to rollback and error to propagate
+      }
     }
-  
-
 
 
     // Commit transaction

@@ -109,6 +109,11 @@ const WorkOrder = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    priority: {
+      type: DataTypes.ENUM("High", "Medium", "Low"),
+      allowNull: false,
+      defaultValue: "low",
+    },
     production: {
       type: DataTypes.ENUM(
         "created",
@@ -118,16 +123,13 @@ const WorkOrder = sequelize.define(
       allowNull: true,
       defaultValue: "created",
     },
-    priority: {
-      type: DataTypes.ENUM("High", "Medium", "Low"),
-      allowNull: false,
-      defaultValue: "low",
-    },
     progress: {
       type: DataTypes.ENUM(
         "Pending",
         "Raw Material Allocation",
         "Production Planned",
+        "Board Stage",
+        "Finish Stage",
         "Completed",
         "Invoiced"
       ),
@@ -162,6 +164,11 @@ const WorkOrder = sequelize.define(
     select_plant: {
       type: DataTypes.STRING(100),
       allowNull: true,
+    },
+    temporary_status: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),

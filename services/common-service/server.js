@@ -17,6 +17,7 @@ import { PasswordResetSuccessTemplate } from "../../common/services/email/templa
 import { ContactFormCustomerTemplate } from "../../common/services/email/templates/contactFormCustomer.js";
 import { ContactFormAdminTemplate } from "../../common/services/email/templates/contactFormAdmin.js";
 import { Sequelize } from "sequelize";
+import UserAuth from "../../common/models/userAuth.model.js";
 dotenv.config();
 
 const app = express();
@@ -1329,12 +1330,15 @@ v1Router.post("/reset-password", async (req, res) => {
         message: "User not found"
       });
     }
-
+    const userauth = await UserAuth.findOne({
+      where: { id: user.user_auth_id },
+      transaction
+    });
     // Hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update user password
-    await user.update({
+    await userauth.update({
       password: hashedPassword,
       updated_at: new Date()
     }, { transaction });

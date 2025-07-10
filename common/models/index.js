@@ -60,8 +60,14 @@ import WalletHistory from "./walletHistory.model.js";
 import PartialPayment from "./salesOrder/partialPayment.model.js";
 import SalesReturn  from "./sales_return/sales_return.model.js";
 import SalesReturnItem  from "./sales_return/sales_return_item.model.js";
-import PurchaseOrderPayment from "./po/PurchaseOrderPayment.model.js";
+import PurchaseOrderPayment from "./po/purchase_order_payment.model.js";
+import DataTransfer from "./dataTransfer.model.js";
+import GroupHistory from "./Production/groupHistory.model.js";
 
+import ProductionSchedule from "./Production/productionSchedule.model.js";
+
+// Import associations
+import "./association.js";
 const db = {
   sequelize,
   User,
@@ -125,7 +131,10 @@ const db = {
   PartialPayment,
   SalesReturnItem,
   SalesReturn,
-  PurchaseOrderPayment
+  PurchaseOrderPayment,
+  DataTransfer,
+  ProductionSchedule,
+  GroupHistory
 
 
 };

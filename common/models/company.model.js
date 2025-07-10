@@ -1,6 +1,6 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
-
+import Package from "./package.model.js"; 
 const Company = sequelize.define(
   "Company",
   {
@@ -73,6 +73,15 @@ const Company = sequelize.define(
       type: DataTypes.ENUM("monthly", "annual"),
       defaultValue: "monthly",
     },
+   package_start_date: {
+  type: DataTypes.DATEONLY,
+  allowNull: false, // or true if optional
+},
+package_end_date: {
+  type: DataTypes.DATEONLY,
+  allowNull: false, // or true if optional
+},
+
     timezone: {
       type: DataTypes.STRING(191),
       defaultValue: "Asia/Kolkata",
@@ -148,5 +157,8 @@ const Company = sequelize.define(
     timestamps: false,
   }
 );
-
+Company.belongsTo(Package, {
+  foreignKey: "package_id",
+  as: "package" // ✅ match the 'as' name used in your include
+});
 export default Company;
