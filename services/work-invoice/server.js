@@ -139,27 +139,6 @@ const PartialPayment = db.PartialPayment;
 //       .json({ message: "Internal Server Error", error: error.message });
 //   }
 // });
-/**
- * POST create new work order invoice
- * 
- * Features:
- * - Creates a new work order invoice in the database
- * - Automatically sends email with PDF attachment if client_email is provided
- * - Automatically sends WhatsApp notification if client_phone is provided
- * - Uses beautiful email template with invoice details and SKU information
- * - Uses professional WhatsApp message format with invoice links
- * - Returns detailed notification status in the response
- * 
- * Request Body:
- * - All standard invoice fields (client_name, client_email, client_phone, etc.)
- * - client_email: If provided, sends email with PDF attachment
- * - client_phone: If provided, sends WhatsApp notification
- * 
- * Response:
- * - Standard invoice creation response
- * - notifications.email: Email sending status and details
- * - notifications.whatsapp: WhatsApp sending status and details
- */
 v1Router.post("/create", authenticateJWT, async (req, res) => {
   const invoiceDetails = req.body;
 
@@ -1844,87 +1823,6 @@ v1Router.get("/activate/:id", async (req, res) => {
     });
   }
 });
-
-// POST create new partial payment
-// v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
-//   const {
-//     work_order_invoice_id,
-//     payment_type,
-//     reference_number,
-//     amount,
-//     remarks,
-//     status
-//   } = req.body;
-
-//   if (!work_order_invoice_id || !payment_type || !amount) {
-//     return res.status(400).json({ message: "Missing required fields" });
-//   }
-
-//   try {
-//     // Fetch total invoice amount
-//     const invoice = await WorkOrderInvoice.findOne({
-//       where: { id: work_order_invoice_id },
-//       attributes: ["total_amount"]
-//     });
-
-//     if (!invoice) {
-//       return res.status(404).json({ message: "Invoice not found" });
-//     }
-
-//     const totalInvoiceAmount = parseFloat(invoice.total_amount);
-
-//     // Get total paid amount so far
-//     const paid = await PartialPayment.findOne({
-//       where: { work_order_invoice_id },
-//       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total_paid"]],
-//       raw: true
-//     });
-
-//     const totalPaid = parseFloat(paid.total_paid) || 0;
-//     const newTotalPaid = totalPaid + parseFloat(amount);
-
-//     if (newTotalPaid > totalInvoiceAmount) {
-//       return res.status(400).json({ message: "Trying to overpay the invoice" });
-//     }
-
-//     // Determine updated payment status
-//     let paymentStatus = "partial";
-//     if (newTotalPaid === totalInvoiceAmount) {
-//       paymentStatus = "paid";
-//     }
-
-//     // Create new partial payment
-//     const newPartialPayment = await PartialPayment.create({
-//       work_order_invoice_id,
-//       payment_type,
-//       reference_number: reference_number || null,
-//       amount,
-//       remarks: remarks || null,
-//       status: status || "completed",
-//       created_at: new Date(),
-//       updated_at: new Date(),
-//     });
-
-//     // Update invoice with new received amount and payment status
-//     await WorkOrderInvoice.update(
-//       {
-//         received_amount: sequelize.literal(`received_amount + ${amount}`),
-//         updated_at: new Date(),
-//         payment_status: paymentStatus
-//       },
-//       { where: { id: work_order_invoice_id } }
-//     );
-
-//     return res.status(201).json({
-//       message: "Partial payment created successfully",
-//       data: newPartialPayment
-//     });
-
-//   } catch (error) {
-//     logger.error("Error creating partial payment:", error);
-//     return res.status(500).json({ message: "Internal Server Error", error: error.message });
-//   }
-// });
 
 v1Router.post("/partial-payment/create", authenticateJWT, async (req, res) => {
   const {
