@@ -42,7 +42,7 @@ const Address = sequelize.define(
       allowNull: false,
     },
     state: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(100),
       allowNull: true,
     },
     pinCode: {
