@@ -1240,7 +1240,6 @@ v1Router.get(
 
 // company apis
 
-
 // v1Router.post("/",validateCompany, async (req, res) => {
 //     const transaction = await sequelize.transaction(); // Start a transaction
 
@@ -1394,7 +1393,6 @@ v1Router.get(
 //         });
 //     }
 // });
-
 
 v1Router.post("/", validateCompany, async (req, res) => {
   const transaction = await sequelize.transaction(); // Start a transaction
@@ -1860,7 +1858,6 @@ v1Router.delete("/:id", async (req, res) => {
 
 // packages
 
-// Simple Get All Packages API
 v1Router.get("/packages/master", async (req, res) => {
   try {
     const packages = await Package.findAll({
@@ -1874,10 +1871,23 @@ v1Router.get("/packages/master", async (req, res) => {
       order: [['created_at', 'ASC']], // Order by creation date
     });
 
+    // Parse module_in_package JSON string for each package
+    const formattedPackages = packages.map(pkg => {
+      const packageData = pkg.toJSON();
+      try {
+        // Parse the JSON string to actual array
+        packageData.module_in_package = JSON.parse(packageData.module_in_package);
+      } catch (error) {
+        // If parsing fails, keep as string or set to empty array
+        packageData.module_in_package = [];
+      }
+      return packageData;
+    });
+
     return res.status(200).json({
       status: true,
       message: "packages fetched successfully",
-      data: packages,
+      data: formattedPackages,
     });
   } catch (error) {
     const stackLines = error.stack.split("\n");
