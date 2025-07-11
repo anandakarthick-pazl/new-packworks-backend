@@ -27,6 +27,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Op } from "sequelize";
+import { BuildStatusListInstance } from "twilio/lib/rest/serverless/v1/service/build/buildStatus.js";
 
 const app = express();
 app.use(json());
@@ -39,6 +40,7 @@ const Package = db.Package;
 const CompanyPaymentBill = db.CompanyPaymentBill;
 const Company = db.Company;
 const OfflineRequest = db.OfflineRequest;
+const GlobalSettings = db.GlobalSettings;
 
 app.use(logRequestResponse);
 
@@ -1912,6 +1914,38 @@ v1Router.get("/packages/master", async (req, res) => {
 
 // offline requests
 
+// checking admin status
+
+v1Router.get("/request-type/get", async (req, res) => {
+  try {
+    // Assuming global_settings has only one row (or you want the first row)
+    const globalSettings = await sequelize.models.GlobalSettings.findOne();
+
+    if (!globalSettings) {
+      return res.status(404).json({
+        message: "Global settings not found",
+      });
+    }
+
+    const { company_need_approval } = globalSettings;
+
+    const requestType = company_need_approval === 1 ? "offline request" : "online request";
+
+    res.status(200).json({
+      message: "Request type retrieved successfully",
+      requestType,
+    });
+  } catch (error) {
+    logger.error("Error fetching request type:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+
+
 v1Router.post("/offline-request", async (req, res) => {
   const offlineRequestDetails = req.body;
 
@@ -1945,7 +1979,6 @@ v1Router.post("/offline-request", async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 // GET all offline requests with pagination and filtering
 v1Router.get("/offline-request/get", async (req, res) => {
   try {

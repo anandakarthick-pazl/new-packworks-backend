@@ -141,9 +141,7 @@ const db = {
   GroupHistory,
   MailConfiguration,
   GlobalSettings,
-  CompanyPaymentBill
-
-
+  CompanyPaymentBill,
   OfflineRequest, 
 };
 
