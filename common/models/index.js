@@ -70,6 +70,7 @@ import GlobalSettings from "./global_settings.model.js";
 
 // Import associations
 import "./association.js";
+import CompanyPaymentBill from "./admin/companyPaymentBill.model.js";
 const db = {
   sequelize,
   User,
@@ -138,7 +139,8 @@ const db = {
   ProductionSchedule,
   GroupHistory,
   MailConfiguration,
-  GlobalSettings
+  GlobalSettings,
+  CompanyPaymentBill
 
 
 };

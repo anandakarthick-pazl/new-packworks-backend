@@ -73,6 +73,10 @@ const Company = sequelize.define(
       type: DataTypes.ENUM("monthly", "annual"),
       defaultValue: "monthly",
     },
+    version:{
+      type: DataTypes.ENUM("trial", "paid"),
+      defaultValue: "trial",
+    },
    package_start_date: {
   type: DataTypes.DATEONLY,
   allowNull: false, // or true if optional
