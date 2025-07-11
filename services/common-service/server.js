@@ -18,6 +18,10 @@ import { ContactFormCustomerTemplate } from "../../common/services/email/templat
 import { ContactFormAdminTemplate } from "../../common/services/email/templates/contactFormAdmin.js";
 import { Sequelize } from "sequelize";
 import UserAuth from "../../common/models/userAuth.model.js";
+import fs from "fs";
+import path from "path";
+
+
 dotenv.config();
 
 const app = express();
@@ -42,6 +46,184 @@ const Package = db.Package;
 const DemoRequest = db.DemoRequest;
 const ContactMessage = db.ContactMessage;
 const PasswordReset = db.PasswordReset;
+const MailConfiguration = db.MailConfiguration;
+const GlobalSettings = db.GlobalSettings;
+
+
+// get system settings 
+v1Router.get("/system-settings", authenticateJWT, async (req, res) => {
+    try {
+      const settings = await GlobalSettings.findAll({
+        attributes: [
+          'date_format',
+          'time_format',
+          'timezone',
+          'currency_id',
+          'locale',
+          'company_need_approval'
+        ]
+      });
+
+      if (!settings) {
+        return res.status(404).json({ message: "System settings not found" });
+      }
+
+      res.status(200).json({
+        message: "System settings retrieved successfully",
+        data: settings
+      });
+    } catch (error) {
+      logger.error("Error retrieving system settings:", error);
+      res.status(500).json({
+        message: "Internal Server Error",
+        error: error.message
+      });
+    }
+  }
+);
+
+
+// global settings 
+v1Router.put("/system-settings", authenticateJWT, async (req, res) => {
+    const {
+        date_format,
+        time_format,
+        timezone,
+        currency_id,
+        locale,
+        company_need_approval
+    } = req.body;
+    try {
+        if (!date_format || !time_format || !timezone || !currency_id || !locale) {
+            return res.status(400).json({
+                message: "Missing required fields: date_format, time_format, timezone, currency_id, and locale are required"
+            });
+        }
+
+        // Verify currency exists
+        const currency = await Currency.findByPk(currency_id);
+        if (!currency) {
+            return res.status(400).json({ message: "Invalid currency_id" });
+        }
+
+        // Get the first settings record (assuming there's only one)
+        const settings = await GlobalSettings.findOne();
+        if (!settings) {
+            return res.status(404).json({ message: "System settings not found" });
+        }
+
+        // Update the settings
+        const updatedSettings = await settings.update({
+            date_format,
+            time_format,
+            timezone,
+            currency_id,
+            locale,
+            company_need_approval: company_need_approval?company_need_approval : 0,
+            updated_by: req.userId
+        });
+
+        res.status(200).json({
+            message: "System settings updated successfully",
+            data: updatedSettings
+        });
+    } catch (error) {
+        logger.error("Error updating system settings:", error);
+        res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+});
+
+
+// update .env 
+const updateEnvValue = (key, value) => {
+  const envPath = path.resolve(".env");
+  let envConfig = fs.readFileSync(envPath, "utf8");
+
+  const keyRegex = new RegExp(`^${key}=.*$`, "m");
+
+  if (envConfig.match(keyRegex)) {
+    envConfig = envConfig.replace(keyRegex, `${key}=${value}`);
+  } else {
+    envConfig += `\n${key}=${value}`;
+  }
+
+  fs.writeFileSync(envPath, envConfig);
+};
+
+// ✅ PUT or CREATE SMTP Settings
+  v1Router.post("/mail-configuration", authenticateJWT, async (req, res) => {
+
+  try {
+    const user = req.user;
+    console.log("userdetails ",req.user);
+    
+    const companyId = req.user?.company_id;
+    console.log("company",companyId);
+    
+    const userId = req.user?.id;
+    if (!companyId) {
+      return res.status(400).json({ error: 'Missing company ID' });
+    }
+
+    const {
+      mail_host,
+      mail_port,
+      mail_username,
+      mail_password,
+      mail_encryption,
+      mail_from_email,
+      mail_from_name,
+    } = req.body;
+
+    const existing = await MailConfiguration.findOne({
+      where: { company_id: companyId },
+    });
+
+    const dataToUpdate = {
+      ...req.body,
+      updated_by: userId,
+      updated_at: new Date(),
+    };
+
+    if (existing) {
+      await existing.update(dataToUpdate);
+    } else {
+      await MailConfiguration.create({
+        ...req.body,
+        company_id: companyId,
+        created_by: userId,
+        updated_by: userId,
+      });
+    }
+
+    // ✅ Write to .env
+    updateEnvValue("SMTP_HOST", mail_host);
+    updateEnvValue("SMTP_PORT", mail_port);
+    updateEnvValue("SMTP_USER", mail_username);
+    updateEnvValue("SMTP_PASS", mail_password);
+    updateEnvValue("SMTP_SECURE", mail_encryption);
+    updateEnvValue("FROM_EMAIL", mail_from_email);
+    updateEnvValue("APP_Name", mail_from_name);
+
+    return res.json({
+      success: true,
+      message: "SMTP settings saved and .env updated.",
+    });
+  } catch (error) {
+    console.error("SMTP Save Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error saving SMTP settings",
+    });
+  }
+});
+
+
+
+
 
 // Middleware to extract user details from token
 const extractUserDetails = (req, res, next) => {

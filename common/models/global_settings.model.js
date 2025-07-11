@@ -277,6 +277,11 @@ const GlobalSettings = sequelize.define(
       allowNull: false,
       defaultValue: "default",
     },
+    company_need_approval: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
     last_updated_by: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
