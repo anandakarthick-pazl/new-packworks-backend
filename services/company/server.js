@@ -27,6 +27,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Op } from "sequelize";
+import { BuildStatusListInstance } from "twilio/lib/rest/serverless/v1/service/build/buildStatus.js";
 
 const app = express();
 app.use(json());
@@ -38,6 +39,8 @@ const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 const Package = db.Package;
 const CompanyPaymentBill = db.CompanyPaymentBill;
 const Company = db.Company;
+const OfflineRequest = db.OfflineRequest;
+const GlobalSettings = db.GlobalSettings;
 
 app.use(logRequestResponse);
 
@@ -1855,9 +1858,7 @@ v1Router.delete("/:id", async (req, res) => {
   }
 });
 
-
 // packages
-
 v1Router.get("/packages/master", async (req, res) => {
   try {
     const packages = await Package.findAll({
@@ -1908,6 +1909,271 @@ v1Router.get("/packages/master", async (req, res) => {
       line: lineNumber,
       data: [],
     });
+  }
+});
+
+// offline requests
+
+// checking admin status
+
+v1Router.get("/request-type/get", async (req, res) => {
+  try {
+    // Assuming global_settings has only one row (or you want the first row)
+    const globalSettings = await sequelize.models.GlobalSettings.findOne();
+
+    if (!globalSettings) {
+      return res.status(404).json({
+        message: "Global settings not found",
+      });
+    }
+
+    const { company_need_approval } = globalSettings;
+
+    const requestType = company_need_approval === 1 ? "offline request" : "online request";
+
+    res.status(200).json({
+      message: "Request type retrieved successfully",
+      requestType,
+    });
+  } catch (error) {
+    logger.error("Error fetching request type:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+
+
+v1Router.post("/offline-request", async (req, res) => {
+  const offlineRequestDetails = req.body;
+
+  try {
+    // Hash password before storing
+    // const hashedPassword = await bcrypt.hash(offlineRequestDetails.password, 10);
+
+    // Create Offline Request
+    const newOfflineRequest = await OfflineRequest.create({
+      company_name: offlineRequestDetails.company_name,
+      full_name: offlineRequestDetails.full_name,
+      email: offlineRequestDetails.email,
+      phone: offlineRequestDetails.phone,
+      password: offlineRequestDetails.password, 
+      approval_status: offlineRequestDetails.approval_status || "pending",
+      status: offlineRequestDetails.status || "active",
+    });
+
+    // Remove password from response
+    const responseData = newOfflineRequest.get({ plain: true });
+    delete responseData.password;
+
+    res.status(201).json({
+      message: "Offline request created successfully",
+      data: responseData,
+    });
+  } catch (error) {
+    logger.error("Error creating offline request:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+// GET all offline requests with pagination and filtering
+v1Router.get("/offline-request/get", async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, status = "active", approval_status } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for filtering
+    const whereClause = {};
+
+    // Status filtering
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    // Approval status filtering
+    if (approval_status && approval_status !== "all") {
+      whereClause.approval_status = approval_status;
+    }
+
+    // Search functionality
+    if (search) {
+      whereClause[Op.or] = [
+        { company_name: { [Op.like]: `%${search}%` } },
+        { full_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { phone: { [Op.like]: `%${search}%` } }
+      ];
+    }
+
+    // Fetch from database with pagination and filters
+    const { count, rows } = await OfflineRequest.findAndCountAll({
+      where: whereClause,
+      limit: limitNum,
+      offset: offset,
+      order: [["updated_at", "DESC"]],
+      attributes: { exclude: ['password'] }, // Exclude password from response
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(count / limitNum);
+
+    res.json({
+      status: true,
+      message: "Offline requests fetched successfully",
+      offlineRequests: rows,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching offline requests:", error);
+    res
+      .status(500)
+      .json({ 
+        status: false,
+        message: "Internal Server Error", 
+        error: error.message 
+      });
+  }
+});
+// GET single offline request by ID
+v1Router.get("/offline-request/get/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const offlineRequest = await OfflineRequest.findOne({
+      where: {
+        id,
+      },
+      attributes: { exclude: ['password'] }, // Exclude password from response
+    });
+
+    if (!offlineRequest) {
+      return res.status(404).json({ 
+        status: false,
+        message: "Offline request not found" 
+      });
+    }
+
+    res.json({
+      status: true,
+      message: "Offline request fetched successfully",
+      data: offlineRequest,
+    });
+  } catch (error) {
+    logger.error("Error fetching offline request:", error);
+    res
+      .status(500)
+      .json({ 
+        status: false,
+        message: "Internal Server Error", 
+        error: error.message 
+      });
+  }
+});
+
+v1Router.delete("/offline-request/delete/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Find the offline request
+    const offlineRequest = await OfflineRequest.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!offlineRequest) {
+      return res.status(404).json({ 
+        status: false,
+        message: "Offline request not found" 
+      });
+    }
+
+    // Remove password from response before deletion
+    const responseData = offlineRequest.get({ plain: true });
+    delete responseData.password;
+
+    // Hard delete - permanently remove from database
+    await offlineRequest.destroy();
+
+    res.json({
+      status: true,
+      message: "Offline request successfully deleted",
+      data: responseData,
+    });
+  } catch (error) {
+    logger.error("Error soft deleting offline request:", error);
+    res
+      .status(500)
+      .json({ 
+        status: false,
+        message: "Internal Server Error", 
+        error: error.message 
+      });
+  }
+});
+
+// PUT update approval status
+v1Router.put("/offline-request/:id/approval", async (req, res) => {
+  const { id } = req.params;
+  const { approval_status } = req.body;
+
+  if (!approval_status || !["pending", "approved", "rejected"].includes(approval_status)) {
+    return res.status(400).json({ 
+      status: false,
+      message: "Invalid approval status. Must be 'pending', 'approved', or 'rejected'." 
+    });
+  }
+
+  try {
+    // Find the offline request
+    const offlineRequest = await OfflineRequest.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!offlineRequest) {
+      return res.status(404).json({ 
+        status: false,
+        message: "Offline request not found" 
+      });
+    }
+
+    // Update approval status
+    await offlineRequest.update({
+      approval_status: approval_status,
+      updated_at: new Date(),
+    });
+
+    // Remove password from response
+    const responseData = offlineRequest.get({ plain: true });
+    delete responseData.password;
+
+    res.json({
+      status: true,
+      message: `Offline request ${approval_status} successfully`,
+      data: responseData,
+    });
+  } catch (error) {
+    logger.error("Error updating approval status:", error);
+    res
+      .status(500)
+      .json({ 
+        status: false,
+        message: "Internal Server Error", 
+        error: error.message 
+      });
   }
 });
 
