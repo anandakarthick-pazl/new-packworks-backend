@@ -21,10 +21,14 @@ export const validateCompany = async (req, res, next) => {
             package_name: Joi.string().min(3).max(100).optional(),
             password: Joi.string().min(3).max(100).optional(),
             package_id: Joi.number().integer().positive().optional(),
-             package_type: Joi.string().valid("monthly", "annual").default("monthly"),
-             package_start_date: Joi.date().required(),
-             package_end_date: Joi.date().required(),
-
+            package_type: Joi.string().valid("monthly", "annual").default("monthly"),
+            
+            // 🔹 CHANGED: Made package dates optional since they're auto-generated
+            package_start_date: Joi.date().optional(),
+            package_end_date: Joi.date().optional(),
+            
+            // 🔹 NEW: Added version field as optional
+            version: Joi.string().valid("trial", "paid").optional(),
 
             companyAccountDetails: Joi.array().items(
                 Joi.object({
