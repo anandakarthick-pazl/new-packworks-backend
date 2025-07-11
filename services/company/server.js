@@ -1857,6 +1857,50 @@ v1Router.delete("/:id", async (req, res) => {
   }
 });
 
+
+// packages
+
+// Simple Get All Packages API
+v1Router.get("/packages/master", async (req, res) => {
+  try {
+    const packages = await Package.findAll({
+      // include: [
+      //   {
+      //     model: Currency,
+      //     as: "currency",
+      //     attributes: ["id", "name", "symbol"], // Include currency details
+      //   },
+      // ],
+      order: [['created_at', 'ASC']], // Order by creation date
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "packages fetched successfully",
+      data: packages,
+    });
+  } catch (error) {
+    const stackLines = error.stack.split("\n");
+    const callerLine = stackLines[1];
+    const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
+    let fileName = "";
+    let lineNumber = "";
+
+    if (match) {
+      fileName = match[1];
+      lineNumber = match[2];
+    }
+
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+      file: fileName,
+      line: lineNumber,
+      data: [],
+    });
+  }
+});
+
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", authenticateStaticToken, (req, res) => {
   res.json({ status: "Service is running", timestamp: new Date() });
