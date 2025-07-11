@@ -1,5 +1,6 @@
 import express, { json, Router } from "express";
 import cors from "cors";
+dotenv.config();
 import db from "../../common/models/index.js";
 import User from "../../common/models/user.model.js";
 import UserAuth from "../../common/models/userAuth.model.js";
@@ -14,7 +15,6 @@ import dotenv from "dotenv";
 import { logRequestResponse } from "../../common/middleware/errorLogger.js";
 import logger from "../../common/helper/logger.js";
 import emailService from "../../common/services/email/emailService.js";
-dotenv.config();
 import bcrypt from "bcryptjs";
 
 // Add these imports to your existing companies service file
@@ -26,6 +26,7 @@ import crypto from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Op } from "sequelize";
 
 const app = express();
 app.use(json());
@@ -38,10 +39,7 @@ const Package = db.Package;
 const CompanyPaymentBill = db.CompanyPaymentBill;
 const Company = db.Company;
 
-// ✅ Secure all API routes with JWT middleware
-// app.use(authenticateStaticToken);
 app.use(logRequestResponse);
-// 🔹 Create a Company (POST)
 
 // For ES6 modules, we need to recreate __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -52,13 +50,11 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
-
 // Initialize Twilio client
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_ID,
   process.env.TWILIO_AUTH_TOKEN
 );
-
 // Utility function to detect if input is email or mobile number
 const detectContactType = (input) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,7 +75,6 @@ const detectContactType = (input) => {
     return { type: "invalid", value: null };
   }
 };
-
 // Generate unique invoice ID for company billing
 const generateCompanyInvoiceId = async () => {
   const prefix = "COMP-INV";
@@ -89,7 +84,6 @@ const generateCompanyInvoiceId = async () => {
     .padStart(3, "0");
   return `${prefix}-${timestamp}-${random}`;
 };
-
 // POST create company payment bill
 v1Router.post("/billing/create", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -158,7 +152,6 @@ v1Router.post("/billing/create", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // GET all company payment bills with pagination and filtering
 v1Router.get("/billing/get", authenticateJWT, async (req, res) => {
   try {
@@ -276,7 +269,6 @@ v1Router.get("/billing/get", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // GET specific company payment bill by ID
 v1Router.get("/billing/get/:id", authenticateJWT, async (req, res) => {
   try {
@@ -363,7 +355,6 @@ v1Router.get("/billing/get/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 // POST send payment link for company billing
 v1Router.post(
   "/billing/send/payment/link",
@@ -614,7 +605,6 @@ v1Router.post(
     }
   }
 );
-
 // GET payment callback URL handler
 v1Router.get("/billing/payment/callback", async (req, res) => {
   try {
@@ -901,7 +891,6 @@ v1Router.get("/billing/payment/callback", async (req, res) => {
     `);
   }
 });
-
 // POST webhook to handle Razorpay payment updates for company billing
 v1Router.post("/billing/payment/webhook", async (req, res) => {
   try {
@@ -971,7 +960,6 @@ v1Router.post("/billing/payment/webhook", async (req, res) => {
       .json({ message: "Webhook processing failed", error: error.message });
   }
 });
-
 // GET payment link status
 v1Router.get(
   "/billing/payment/link/status/:paymentLinkId",
@@ -1122,7 +1110,6 @@ v1Router.post(
     }
   }
 );
-
 // GET payment status for a company bill
 v1Router.get(
   "/billing/payment/status/:billId",
@@ -1213,7 +1200,6 @@ v1Router.get(
     }
   }
 );
-
 // GET all company bill invoice IDs
 v1Router.get(
   "/billing/get/invoice/generate-id",
@@ -1251,7 +1237,9 @@ v1Router.get(
   }
 );
 
-// companies api
+
+// company apis
+
 
 // v1Router.post("/",validateCompany, async (req, res) => {
 //     const transaction = await sequelize.transaction(); // Start a transaction
@@ -1406,6 +1394,7 @@ v1Router.get(
 //         });
 //     }
 // });
+
 
 v1Router.post("/", validateCompany, async (req, res) => {
   const transaction = await sequelize.transaction(); // Start a transaction
@@ -1681,7 +1670,24 @@ v1Router.post("/", validateCompany, async (req, res) => {
 
 v1Router.get("/", async (req, res) => {
   try {
-    const companies = await Company.findAll({
+    // Extract query parameters
+    const { page = 1, limit = 10, search } = req.query;
+    
+    // Parse pagination parameters
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const pageLimit = parseInt(limit);
+    
+    // Build where clause for search
+    const whereClause = {};
+    if (search) {
+      whereClause.company_name = {
+        [Op.like]: `%${search}%` 
+      };
+    }
+
+    // Fetch companies with pagination and search
+    const { count, rows: companies } = await Company.findAndCountAll({
+      where: whereClause,
       include: [
         {
           model: Package,
@@ -1689,12 +1695,29 @@ v1Router.get("/", async (req, res) => {
           attributes: ["id", "name"], // fetch id and name of package
         },
       ],
+      limit: pageLimit,
+      offset: offset,
+      order: [['created_at', 'DESC']], // Optional: order by creation date
     });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(count / pageLimit);
+    const currentPage = parseInt(page);
+    const hasNextPage = currentPage < totalPages;
+    const hasPreviousPage = currentPage > 1;
 
     return res.status(200).json({
       status: true,
-      message: "company fetched successfully",
+      message: "companies fetched successfully",
       data: companies,
+      pagination: {
+        currentPage,
+        totalPages,
+        totalItems: count,
+        itemsPerPage: pageLimit,
+        hasNextPage,
+        hasPreviousPage,
+      },
     });
   } catch (error) {
     const stackLines = error.stack.split("\n");
@@ -1719,23 +1742,32 @@ v1Router.get("/", async (req, res) => {
 });
 v1Router.get("/:id", async (req, res) => {
   try {
-    const company = await Company.findByPk(req.params.id);
+    const company = await Company.findByPk(req.params.id, {
+      include: [
+        {
+          model: Package,
+          as: "package",
+          attributes: ["id", "name"], // fetch id and name of package
+        },
+      ],
+    });
+
     if (!company) {
-      return res.status(400).json({
+      return res.status(404).json({
         status: false,
         message: "Company not found",
-        data: companies,
-      });
-    } else {
-      return res.status(200).json({
-        status: true,
-        message: "company fetched successfully",
-        data: company,
+        data: null,
       });
     }
+
+    return res.status(200).json({
+      status: true,
+      message: "company fetched successfully",
+      data: company,
+    });
   } catch (error) {
     const stackLines = error.stack.split("\n");
-    const callerLine = stackLines[1]; // The line where the error occurred
+    const callerLine = stackLines[1];
     const match = callerLine.match(/\((.*):(\d+):(\d+)\)/);
     let fileName = "";
     let lineNumber = "";
@@ -1755,7 +1787,7 @@ v1Router.get("/:id", async (req, res) => {
   }
 });
 // 🔹 Update a Company (PUT)
-v1Router.put("/:id", validateCompany, async (req, res) => {
+v1Router.put("/:id", async (req, res) => {
   try {
     const company = await Company.findByPk(req.params.id);
     if (!company) {
@@ -1821,55 +1853,6 @@ v1Router.delete("/:id", async (req, res) => {
       file: fileName,
       line: lineNumber,
       data: [],
-    });
-  }
-});
-// 🔹 Test Email Endpoint (for development/testing)
-v1Router.post("/test-email", async (req, res) => {
-  try {
-    const { companyData, userData } = req.body;
-
-    // Default test data if not provided
-    const defaultCompanyData = {
-      name: companyData?.name || "Test Company Ltd",
-      email: companyData?.email || "test@company.com",
-      phone: companyData?.phone || "+1 (555) 123-4567",
-      website: companyData?.website || "https://testcompany.com",
-      address: companyData?.address || "123 Test Street, Test City",
-    };
-
-    const defaultUserData = {
-      name: userData?.name || "John Doe",
-      email: userData?.email || "john@company.com",
-      username: userData?.username || userData?.email || "john@company.com",
-      password: userData?.password || "123456",
-    };
-
-    logger.info("Testing email functionality with data:", {
-      company: defaultCompanyData.name,
-      user: defaultUserData.name,
-    });
-
-    const result = await emailService.sendCompanyRegistrationEmails(
-      defaultCompanyData,
-      defaultUserData
-    );
-
-    return res.status(200).json({
-      status: true,
-      message: "Test emails sent successfully",
-      result: result,
-      data: {
-        companyData: defaultCompanyData,
-        userData: defaultUserData,
-      },
-    });
-  } catch (error) {
-    logger.error("Test email failed:", error);
-    return res.status(500).json({
-      status: false,
-      message: "Failed to send test emails",
-      error: error.message,
     });
   }
 });
