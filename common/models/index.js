@@ -65,6 +65,8 @@ import DataTransfer from "./dataTransfer.model.js";
 import GroupHistory from "./Production/groupHistory.model.js";
 
 import ProductionSchedule from "./Production/productionSchedule.model.js";
+import MailConfiguration from "./commonModel/mailConfiguration.model.js";
+import GlobalSettings from "./global_settings.model.js";
 
 // Import associations
 import "./association.js";
@@ -136,7 +138,11 @@ const db = {
   DataTransfer,
   ProductionSchedule,
   GroupHistory,
-  CompanyPaymentBill,
+  MailConfiguration,
+  GlobalSettings,
+  CompanyPaymentBill
+
+
 };
 
 export default db;
