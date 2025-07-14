@@ -6,7 +6,13 @@ import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
-import moment from "moment-timezone";
+// import moment from "moment-timezone";
+import QRCode from "qrcode";
+import path from "path";
+import fs from "fs";
+import axios from "axios";
+import FormData from "form-data";
+import { fileURLToPath } from "url";
 
 const ItemMaster = db.ItemMaster;
 const Company = db.Company;
@@ -30,6 +36,88 @@ const app = express();
 app.use(json());
 app.use(cors());
 const v1Router = Router();
+
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
+// FIX 1: Ensure the public directory structure is correct
+const publicDir = path.join(__dirname, "../../public");
+const qrCodeDir = path.join(publicDir, "item_qrcodes");
+
+// Ensure directories exist
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+if (!fs.existsSync(qrCodeDir)) {
+  fs.mkdirSync(qrCodeDir, { recursive: true });
+}
+
+// Serve the entire public directory, not just qrcodes
+app.use("/public", express.static(publicDir));
+// Also serve qrcodes directly for backward compatibility
+app.use("/qrcodes", express.static(qrCodeDir));
+
+async function generateQRCode(itemData, token) {
+  try {
+    const { item_generate_id } = itemData;
+
+    if (!item_generate_id) {
+      throw new Error("Missing item_generate_id in itemData");
+    }
+
+
+    const textContent = `Product: ${itemData.item_generate_id}`.trim();
+    const sanitizedId = item_generate_id.replace(/[^a-zA-Z0-9]/g, "_");
+    const timestamp = Date.now();
+    const qrFileName = `product_${sanitizedId}_${timestamp}.png`;
+    const qrFilePath = path.join(qrCodeDir, qrFileName);
+
+
+    await QRCode.toFile(qrFilePath, textContent, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 300,
+    });
+
+    if (!fs.existsSync(qrFilePath)) {
+      throw new Error("QR code file was not created successfully");
+    }
+
+    // Prepare form data for upload
+    const form = new FormData();
+    form.append("file", fs.createReadStream(qrFilePath));
+
+      // const qrCodeUrl =`http://localhost:4024/public/qrcodes/${qrFileName}`;
+      // return qrCodeUrl;
+
+
+    const config = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${process.env.BASE_URL}/file/upload`,
+      headers: {
+        Authorization: `Bearer ${token}`, 
+        ...form.getHeaders(),
+      },
+      data: form,
+    };
+
+    const uploadResponse = await axios.request(config);
+    console.log("Upload response:", uploadResponse);
+    if (uploadResponse.status !== 200 || !uploadResponse.data?.data?.file_url) {
+      throw new Error("Failed to upload QR code image.");
+    }
+    const uploadedImageUrl = uploadResponse.data?.data?.file_url || "";
+    fs.unlinkSync(qrFilePath);
+    return uploadedImageUrl;
+  } catch (error) {
+    console.error("GRN creation error:", error);    
+  }
+}
+
 
 
 
@@ -100,7 +188,6 @@ v1Router.get("/items",authenticateJWT,async (req,res)=>{
 v1Router.post("/items", authenticateJWT, async (req, res) => {
   const transaction = await sequelize.transaction(); 
   try {
-        const indiaTime = moment().tz("Asia/Kolkata").toDate();
 
     const item_generate_id = await generateId(req.user.company_id, ItemMaster, "item");
     const { itemData, ...rest } = req.body; 
@@ -108,7 +195,7 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
     rest.created_by = req.user.id;
     rest.updated_by = req.user.id;
     rest.company_id = req.user.company_id;
-    rest.created_at = indiaTime;
+    // rest.created_at = indiaTime;
 
     // console.log("custom_fields:", typeof rest.custom_fields);    
     // console.log("default_custom_fields:", typeof rest.default_custom_fields);    
@@ -124,6 +211,19 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
 
 
     const item = await ItemMaster.create(rest, { transaction });
+
+    const authHeader = req.headers.authorization;
+      const token = authHeader.split(" ")[1];
+      const qrCodeUrl = await generateQRCode(item, token);
+  
+      // Update work order with QR code URL
+    if (qrCodeUrl) {
+      await item.update({ qr_code_url: qrCodeUrl }, { transaction });
+    } else {
+      throw new Error("QR code URL generation failed");
+    }
+
+
     // await transaction.commit();
 
     // Create Inventory record
@@ -135,6 +235,8 @@ v1Router.post("/items", authenticateJWT, async (req, res) => {
       quantity_available: 0, 
       created_by: req.user.id,
     }, { transaction });
+
+    
 
     await transaction.commit();
 
