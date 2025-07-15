@@ -71,6 +71,7 @@ import GlobalSettings from "./global_settings.model.js";
 import "./association.js";
 import CompanyPaymentBill from "./admin/companyPaymentBill.model.js";
 import OfflineRequest from "./admin/offlineRequest.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 const db = {
   sequelize,
@@ -143,6 +144,7 @@ const db = {
   GlobalSettings,
   CompanyPaymentBill,
   OfflineRequest, 
+  CompanyAddress,
 };
 
 export default db;
