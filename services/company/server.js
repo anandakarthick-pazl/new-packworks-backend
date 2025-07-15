@@ -1534,32 +1534,33 @@ v1Router.post("/", validateCompany, async (req, res) => {
       companyData.package_end_date,
       companyData.package_type,
       companyData.version,
+      companyData.company_state_id,
     ];
     console.table(replacements);
 
     // 🔹 Step 3: Call Stored Procedure (Insert Company & Users)
     // NOTE: You may need to update your stored procedure to accept the version parameter
     await sequelize.query(
-      `CALL ProcedureInsertCompanyAndUsers(?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCompanyId);`,
+      `CALL ProcedureInsertCompanyAndUsers(?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, @newCompanyId);`,
       {
         replacements: [
           companyData.name,
           companyData.email,
           companyData.currency,
           companyData.timezone,
-        //   companyData.language,
           companyData.address,
           companyData.phone,
           companyData.website,
           companyData.logo,
           companyAccountDetails[0].accountName, // Assuming at least one account
-          companyAccountDetails[0].accountEmail,
+          companyAccountDetails[0].accountEmail, // 10
           await bcrypt.hash(companyData.password || "123456", 10), // defaultPassword
           packageId,
           companyData.package_start_date, // Now guaranteed to be set
           companyData.package_end_date, // Now guaranteed to be calculated
           companyData.package_type,
-          companyData.version, // NEW: Add version parameter
+          companyData.version, // 16
+          companyData.company_state_id,
         ],
         type: sequelize.QueryTypes.RAW,
         transaction,
@@ -1741,6 +1742,7 @@ v1Router.get("/", async (req, res) => {
     });
   }
 });
+
 v1Router.get("/:id", async (req, res) => {
   try {
     const company = await Company.findByPk(req.params.id, {
@@ -1749,6 +1751,11 @@ v1Router.get("/:id", async (req, res) => {
           model: Package,
           as: "package",
           attributes: ["id", "name"], // fetch id and name of package
+        },
+        {
+          model: User,
+          as: "users",
+          attributes: ["name", "email"], // fetch name and email of users
         },
       ],
     });
@@ -1787,6 +1794,7 @@ v1Router.get("/:id", async (req, res) => {
     });
   }
 });
+
 // 🔹 Update a Company (PUT)
 v1Router.put("/:id", async (req, res) => {
   try {
