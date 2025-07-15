@@ -4,6 +4,7 @@ import Company from "./company.model.js";
 import User from "./user.model.js";
 import Category from "./category/category.model.js";
 import SubCategory from "./category/sub_category.model.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const ItemMaster = sequelize.define(
   "ItemMaster",
@@ -109,10 +110,16 @@ const ItemMaster = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     deleted_at: {
       type: DataTypes.DATE,

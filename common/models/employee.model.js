@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const Employee = sequelize.define(
   "Employee",
@@ -111,13 +112,16 @@ const Employee = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
-      // defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
-    // ✅ Fix: Remove `ON UPDATE CURRENT_TIMESTAMP`
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
-      // defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     company_address_id: {
       type: DataTypes.BIGINT.UNSIGNED,

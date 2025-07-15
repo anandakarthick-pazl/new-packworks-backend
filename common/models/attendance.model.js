@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const Attendance = sequelize.define('Attendance', {
   id: {
@@ -57,11 +58,16 @@ created_by: {
   created_at: {
     type: DataTypes.DATE,
     allowNull: true,
-
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE,
     allowNull: true,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   
 }, {

@@ -4,6 +4,8 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import Inventory from "../inventory/inventory.model.js";
 import ProductionGroup from "./productionGroup.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const AllocationHistory = sequelize.define(
   "AllocationHistory",
@@ -71,11 +73,17 @@ const AllocationHistory = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
   },
   {

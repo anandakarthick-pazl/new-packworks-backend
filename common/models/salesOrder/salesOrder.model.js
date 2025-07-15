@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 // OrderDetails Model
 const SalesOrder = sequelize.define(
@@ -102,11 +103,17 @@ const SalesOrder = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),

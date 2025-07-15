@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const ContactMessage = sequelize.define('ContactMessage', {
     id: {
@@ -90,11 +91,17 @@ const ContactMessage = sequelize.define('ContactMessage', {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
+        get() {
+            return formatDateTime(this.getDataValue('created_at'));
+        }
     },
     updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
+        get() {
+            return formatDateTime(this.getDataValue('updated_at'));
+        }
     },
 }, {
     tableName: 'contact_messages',

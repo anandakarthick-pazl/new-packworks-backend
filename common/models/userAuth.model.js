@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const UserAuth = sequelize.define('UserAuth', {
     id: {
@@ -67,11 +68,17 @@ const UserAuth = sequelize.define('UserAuth', {
         type: DataTypes.DATE,
         allowNull: true,
         defaultValue: DataTypes.NOW,
+        get() {
+            return formatDateTime(this.getDataValue('created_at'));
+        }
     },
     updated_at: {
         type: DataTypes.DATE,
         allowNull: true,
         defaultValue: DataTypes.NOW,
+        get() {
+            return formatDateTime(this.getDataValue('updated_at'));
+        }
     },
 }, {
     tableName: 'user_auths',
