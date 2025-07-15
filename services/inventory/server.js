@@ -732,7 +732,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         {
           model: ItemMaster,
           as: 'item_info',
-          attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+          attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'qr_code_url', 'status', 'default_custom_fields', 'custom_fields'],
           required: false,
           include: [
             {
@@ -1131,7 +1131,7 @@ const itemMasterInventory = await Inventory.findAll({
       as: 'item_info',
       attributes: [
         'item_generate_id', 'item_name', 'uom', 'net_weight', 'description',
-        'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status',
+        'category', 'sub_category', 'min_stock_level', 'standard_cost','qr_code_url', 'status',
         'default_custom_fields', 'custom_fields'
       ],
       required: false,
