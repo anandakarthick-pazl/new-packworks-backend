@@ -1,5 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import Company from "./company.model.js";
+import { formatDateTime } from "../utils/dateFormatHelper.js";
 
 const CompanyAddress = sequelize.define(
   "CompanyAddress",
@@ -12,6 +14,12 @@ const CompanyAddress = sequelize.define(
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
+      references: {
+        model: Company,
+        key: "id",
+      },
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     },
     country_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -48,19 +56,28 @@ const CompanyAddress = sequelize.define(
     },
     created_at: {
       type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue("created_at"));
+      },
     },
     updated_at: {
       type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+      defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue("updated_at"));
+      },
     },
   },
   {
     tableName: "company_addresses",
-    timestamps: false, // ✅ Disable auto timestamps
+    timestamps: false,
   }
 );
+
+CompanyAddress.belongsTo(Company, {
+  foreignKey: "company_id",
+  as: "company_address",
+});
 
 export default CompanyAddress;
