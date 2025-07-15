@@ -2182,7 +2182,6 @@ v1Router.put("/offline-request/:id/approval", async (req, res) => {
 
 
 // company branch apis
-
 v1Router.get("/branches/get", authenticateJWT, async (req, res) => {
   try {
     const company_id = req.user.company_id; 
@@ -2208,7 +2207,6 @@ v1Router.get("/branches/get", authenticateJWT, async (req, res) => {
     });
   }
 });
-
 v1Router.post("/branches/create", authenticateJWT, async (req, res) => {
   try {
     const company_id = req.user.company_id; // Get company_id from JWT token
@@ -2258,7 +2256,6 @@ v1Router.post("/branches/create", authenticateJWT, async (req, res) => {
     });
   }
 });
-// DELETE API - Soft delete company address
 v1Router.delete("/branches/delete/:id", authenticateJWT, async (req, res) => {
   try {
     const company_id = req.user.company_id; // Get company_id from JWT token
@@ -2324,7 +2321,6 @@ v1Router.delete("/branches/delete/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
-// PUT API for updating company address
 v1Router.put("/branches/update/:id", authenticateJWT, async (req, res) => {
   try {
     const company_id = req.user.company_id; // Get company_id from JWT token
@@ -2392,6 +2388,9 @@ v1Router.put("/branches/update/:id", authenticateJWT, async (req, res) => {
     });
   }
 });
+
+
+
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", authenticateStaticToken, (req, res) => {
   res.json({ status: "Service is running", timestamp: new Date() });
