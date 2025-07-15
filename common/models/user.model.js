@@ -110,6 +110,17 @@ const User = sequelize.define('User', {
     timestamps: false,
 });
 
+Company.hasMany(User, {
+    foreignKey: 'company_id',
+    as: 'users',
+}); 
+
+User.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+
+
 
 
 export default User;

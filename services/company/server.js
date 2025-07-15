@@ -1742,6 +1742,7 @@ v1Router.get("/", async (req, res) => {
     });
   }
 });
+
 v1Router.get("/:id", async (req, res) => {
   try {
     const company = await Company.findByPk(req.params.id, {
@@ -1750,6 +1751,11 @@ v1Router.get("/:id", async (req, res) => {
           model: Package,
           as: "package",
           attributes: ["id", "name"], // fetch id and name of package
+        },
+        {
+          model: User,
+          as: "users",
+          attributes: ["name", "email"], // fetch name and email of users
         },
       ],
     });
@@ -1788,6 +1794,7 @@ v1Router.get("/:id", async (req, res) => {
     });
   }
 });
+
 // 🔹 Update a Company (PUT)
 v1Router.put("/:id", async (req, res) => {
   try {
