@@ -102,6 +102,10 @@ const ItemMaster = sequelize.define(
       type: Sequelize.JSON,
       allowNull: true,
     },
+    qr_code_url: {
+    type: Sequelize.TEXT,
+    allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

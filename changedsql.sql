@@ -1,3 +1,23 @@
+CREATE TABLE `company_payment_bill` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `invoice_id` VARCHAR(50) NULL,
+  `company` VARCHAR(255) NULL,
+  `package` VARCHAR(255) NULL,
+  `payment_date` DATE NULL,
+  `next_payment_date` DATE DEFAULT NULL,
+  `transaction_id` VARCHAR(100) NULL,
+  `amount` DECIMAL(10,2) NULL,
+  `payment_gateway` VARCHAR(100) NULL,
+  `status` ENUM('active', 'inactive') DEFAULT 'active',
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE TABLE `allocation_history` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `company_id` INT UNSIGNED NOT NULL,

@@ -63,11 +63,15 @@ import SalesReturnItem  from "./sales_return/sales_return_item.model.js";
 import PurchaseOrderPayment from "./po/purchase_order_payment.model.js";
 import DataTransfer from "./dataTransfer.model.js";
 import GroupHistory from "./Production/groupHistory.model.js";
-
 import ProductionSchedule from "./Production/productionSchedule.model.js";
+import MailConfiguration from "./commonModel/mailConfiguration.model.js";
+import GlobalSettings from "./global_settings.model.js";
 
 // Import associations
 import "./association.js";
+import CompanyPaymentBill from "./admin/companyPaymentBill.model.js";
+import OfflineRequest from "./admin/offlineRequest.model.js";
+
 const db = {
   sequelize,
   User,
@@ -134,9 +138,11 @@ const db = {
   PurchaseOrderPayment,
   DataTransfer,
   ProductionSchedule,
-  GroupHistory
-
-
+  GroupHistory,
+  MailConfiguration,
+  GlobalSettings,
+  CompanyPaymentBill,
+  OfflineRequest, 
 };
 
 export default db;

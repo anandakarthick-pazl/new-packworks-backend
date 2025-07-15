@@ -646,9 +646,9 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
       andConditions.push({ sub_category: subCategoryId });
     }
 
-    if (stock_status) {
-      andConditions.push({ stock_status: stock_status });
-    }
+    // if (stock_status) {
+    //   andConditions.push({ stock_status: stock_status });
+    // }
 
     // ✅ Final where condition
     const whereCondition = { [Op.and]: andConditions };
@@ -668,7 +668,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         {
           model: Categories,
           as: 'category_info',
-          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.literal('Inventory.quantity_available * Inventory.rate')), 'total_amount']],
           required: false,
           on: Sequelize.where(
             Sequelize.col('Inventory.category'),
@@ -679,7 +679,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         {
           model: Sub_categories,
           as: 'sub_category_info',
-          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.literal('Inventory.quantity_available * Inventory.rate')), 'total_amount']],
           required: false,
           on: Sequelize.where(
             Sequelize.col('Inventory.sub_category'),
@@ -706,7 +706,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
 
 
     // get inventory data
-    const inventory = await Inventory.findAll({
+    let allInventoryData  = await Inventory.findAll({
       attributes: [
         //  'id',
         'item_id',
@@ -732,7 +732,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         {
           model: ItemMaster,
           as: 'item_info',
-          attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status', 'default_custom_fields', 'custom_fields'],
+          attributes: ['item_generate_id', 'item_name', 'uom', 'net_weight', 'description', 'category', 'sub_category', 'min_stock_level', 'standard_cost', 'qr_code_url', 'status', 'default_custom_fields', 'custom_fields'],
           required: false,
           include: [
             {
@@ -761,18 +761,61 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
       offset: offset,
     });
 
+    let filteredInventory = allInventoryData;
+if (stock_status && ['out_of_stock', 'low_stock', 'in_stock'].includes(stock_status)) {
+      filteredInventory = allInventoryData.filter(inv => {
+        const raw = inv.toJSON();
+      
+        if (raw.item_info && raw.item_info.min_stock_level !== undefined) {
+          // ✅ Use correct field name 'total_quantity'
+          const quantity = parseFloat(raw.total_quantity || 0);
+          const minStock = parseFloat(raw.item_info.min_stock_level || 0);
+          
+          let calculatedStatus;
+          if (quantity <= 0) {
+            calculatedStatus = 'out_of_stock';
+          } else if (quantity <= minStock) {
+            calculatedStatus = 'low_stock';
+          } else {
+            calculatedStatus = 'in_stock';
+          }
+          
+          return calculatedStatus === stock_status;
+        }
+        
+        return false;
+      });
+    }
+
+
+
 
     // Get total count of unique item_ids (for pagination)
-    const totalCountResult = await Inventory.findAll({
-      attributes: ['item_id'],
-      where: whereCondition,
-      group: ['item_id']
-    });
-    const totalAmount = await Inventory.findOne({
-      attributes: [[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
-      where: whereCondition,
-      // group: ['item_id']
-    });
+    const totalCount = filteredInventory.length;
+    const paginatedInventory = filteredInventory.slice(offset, offset + limitNumber);
+
+    // Get total amount (from original query without stock filter)
+    // const totalAmount = await Inventory.findOne({
+    //   attributes: [[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+    //   where: whereCondition,
+    // });
+
+    let totalAmount = 0;
+    
+    if (stock_status && ['out_of_stock', 'low_stock', 'in_stock'].includes(stock_status)) {
+      // For stock-filtered queries, calculate from filtered results
+      totalAmount = filteredInventory.reduce((sum, inv) => {
+        const raw = inv.toJSON();
+        return sum + parseFloat(raw.total_amount || 0);
+      }, 0);
+    } else {
+      // For non-stock-filtered queries, use efficient database calculation
+      const totalAmountResult = await Inventory.findOne({
+        attributes: [[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+        where: whereCondition,
+      });
+      totalAmount = totalAmountResult?.total_amount || 0;
+    }
 
 
     // Parse JSON fields for each item in the result
@@ -787,7 +830,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
     //   return raw;
     // });
 
-    const inventoryData = inventory.map(inv => {
+    const inventoryData = paginatedInventory.map(inv => {
       const raw = inv.toJSON();
 
       if (raw.item_info) {
@@ -806,12 +849,29 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
             raw.item_info.custom_fields = {};
           }
         }
+
+
+         // Add calculated stock status to response
+        const quantity = parseFloat(raw.total_quantity || 0);
+        const minStock = parseFloat(raw.item_info.min_stock_level || 0);
+        
+        if (quantity <= 0) {
+          raw.calculated_stock_status = 'out_of_stock';
+        } else if (quantity <= minStock) {
+          raw.calculated_stock_status = 'low_stock';
+        } else {
+          raw.calculated_stock_status = 'in_stock';
+        }
+      
       }
+
+             
+
 
       return raw;
     });
 
-    const totalCount = totalCountResult.length;
+    // const totalCount = totalCountResult.length;
     const totalPages = Math.ceil(totalCount / limitNumber);
 
     return res.status(200).json({
@@ -823,7 +883,7 @@ v1Router.get("/inventory/product", authenticateJWT, async (req, res) => {
         perPage: limitNumber,
         totalCount,
         totalPages,
-        totalAmount: totalAmount.total_amount || 0
+        totalAmount: totalAmount
       },
       totalCount: totalCount
     });
@@ -934,12 +994,11 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
       andConditions.push({ sub_category: subCategoryId });
     }
 
-    if (stock_status) {
-      andConditions.push({ stock_status: stock_status });
-    }
+    // if (stock_status) {
+    //   andConditions.push({ stock_status: stock_status });
+    // }
 
     // ✅ Final where condition
-    const whereCondition = { [Op.and]: andConditions };
 
 
 
@@ -955,7 +1014,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         {
           model: Categories,
           as: 'category_info',
-          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          attributes: ['id', 'category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.literal('Inventory.quantity_available * Inventory.rate')), 'total_amount']],
           required: false,
           on: Sequelize.where(
             Sequelize.col('Inventory.category'),
@@ -966,7 +1025,7 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
         {
           model: Sub_categories,
           as: 'sub_category_info',
-          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_amount']],
+          attributes: ['id', 'sub_category_name',[Sequelize.fn('SUM', Sequelize.col('quantity_available')), 'total_quantity'],[Sequelize.fn('SUM', Sequelize.literal('Inventory.quantity_available * Inventory.rate')), 'total_amount']],
           required: false,
           on: Sequelize.where(
             Sequelize.col('Inventory.sub_category'),
@@ -1041,6 +1100,12 @@ v1Router.get("/inventory", authenticateJWT, async (req, res) => {
 
 let inventory = [];
 
+if (stock_status) {
+      andConditions.push({ stock_status: stock_status });
+}
+
+    const whereCondition = { [Op.and]: andConditions };
+
 const itemMasterInventory = await Inventory.findAll({
   attributes: [
     'id',
@@ -1066,7 +1131,7 @@ const itemMasterInventory = await Inventory.findAll({
       as: 'item_info',
       attributes: [
         'item_generate_id', 'item_name', 'uom', 'net_weight', 'description',
-        'category', 'sub_category', 'min_stock_level', 'standard_cost', 'status',
+        'category', 'sub_category', 'min_stock_level', 'standard_cost','qr_code_url', 'status',
         'default_custom_fields', 'custom_fields'
       ],
       required: false,
@@ -1124,7 +1189,44 @@ const skuInventory = await Inventory.findAll({
 
 
 // Final merged result
-inventory = [...itemMasterInventory, ...skuInventory];
+let allInventory = [...itemMasterInventory, ...skuInventory];
+
+
+
+// Filter by calculated stock status if needed
+    if (stock_status && ['out_of_stock', 'low_stock', 'in_stock'].includes(stock_status)) {
+      allInventory = allInventory.filter(inv => {
+        const raw = inv.toJSON();
+        
+        // For ItemMaster inventory
+        if (raw.item_info && raw.item_info.min_stock_level !== undefined) {
+          const quantity = parseFloat(raw.quantity_available || 0);
+          const minStock = parseFloat(raw.item_info.min_stock_level || 0);
+          
+          let calculatedStatus;
+          if (quantity <= 0) {
+            calculatedStatus = 'out_of_stock';
+          } else if (quantity <= minStock) {
+            calculatedStatus = 'low_stock';
+          } else {
+            calculatedStatus = 'in_stock';
+          }
+          
+          return calculatedStatus === stock_status;
+        }
+        
+        // For SKU inventory (only include for out_of_stock)
+        if (raw.sku_id && stock_status === 'out_of_stock') {
+          return parseFloat(raw.quantity_available || 0) <= 0;
+        }
+        
+        return false;
+      });
+    }
+
+    // Apply pagination to filtered results
+    inventory = allInventory.slice(0, limitNumber);
+
 
 
 
@@ -1695,5 +1797,5 @@ app.use("/api", v1Router);
 // await db.sequelize.sync();
 const PORT = 3025;
 app.listen(process.env.PORT_INVENTORY, '0.0.0.0', () => {
-  console.log(`Item Master Service running on port ${process.env.PORT_INVENTORY}`);
+  console.log(`Inventory Service running on port ${process.env.PORT_INVENTORY}`);
 });
