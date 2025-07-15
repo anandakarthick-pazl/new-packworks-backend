@@ -45,7 +45,6 @@ const tables = [
   'group_history',
   'html_templates',
   'inventory',
-  'inventory_type',
   'invoice_settings',
   'item_master',
   'language_settings',
