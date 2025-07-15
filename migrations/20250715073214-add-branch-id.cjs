@@ -52,7 +52,6 @@ const tables = [
   'machine_process_fields',
   'machine_process_values',
   'machine_route_process',
-  'machineprocess',
   'machines',
   'module_settings',
   'modules',
