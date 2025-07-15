@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const DataTransfer = sequelize.define(
   "DataTransfer",
@@ -117,11 +118,17 @@ const DataTransfer = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
   },
   {

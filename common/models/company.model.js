@@ -1,6 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
-import Package from "./package.model.js"; 
+import Package from "./package.model.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 const Company = sequelize.define(
   "Company",
   {
@@ -142,10 +143,16 @@ package_end_date: {
     created_at: {
       type: DataTypes.DATE,
       allowNull: true,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: true,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     last_login: {
       type: DataTypes.DATE,

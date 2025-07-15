@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 const MachineRouteProcess = sequelize.define(
   "MachineRouteProcess",
@@ -37,11 +38,17 @@ const MachineRouteProcess = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,

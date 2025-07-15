@@ -2,6 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 
 const PurchaseOrder = sequelize.define('PurchaseOrder', {
@@ -28,10 +29,16 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       },
       po_date: {
         type: DataTypes.DATEONLY,
-        allowNull: false
+        allowNull: false,
+        get() {
+          return formatDateTime(this.getDataValue('po_date'));
+        }
       },
       valid_till: {
-        type: DataTypes.DATEONLY
+        type: DataTypes.DATEONLY,
+        get() {
+          return formatDateTime(this.getDataValue('valid_till'));
+        }
       },
       supplier_id: {
         type: DataTypes.INTEGER,
@@ -117,11 +124,17 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       },
       created_at: {
         type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
+        defaultValue: DataTypes.NOW,
+        get() {
+          return formatDateTime(this.getDataValue('created_at'));
+        }
       },
       updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
+        get() {
+          return formatDateTime(this.getDataValue('updated_at'));
+        }
       },
       deleted_at: {
         type: DataTypes.DATE,

@@ -7,6 +7,8 @@ import GRN from "../grn/grn.model.js"; // If you have this model
 import GRNItem from "../grn/grn_item.model.js"; // If you have this model
 import ItemMaster from "../item.model.js";
 import PurchaseOrderReturn from "./purchase_order_return.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -120,12 +122,18 @@ const PurchaseOrderReturnItem = sequelize.define('PurchaseOrderReturnItem', {
  
   created_at: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+    defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
  
   updated_at: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+    defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
  
   deleted_at: {

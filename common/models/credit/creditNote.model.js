@@ -4,6 +4,7 @@ import User from "../user.model.js";
 import Company from "../company.model.js";
 import Client from "../client.model.js";
 import WorkOrderInvoice from "../salesOrder/workOrderInvoice.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 const CreditNote = sequelize.define(
   "CreditNote",
@@ -93,10 +94,16 @@ const CreditNote = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
   },
   {

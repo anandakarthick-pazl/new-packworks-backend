@@ -5,6 +5,8 @@ import PurchaseOrderItem from "../po/purchase_order_item.model.js";
 import ItemMaster from "../item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const GRNItem = sequelize.define("GRNItem", {
   id: {
@@ -117,10 +119,16 @@ const GRNItem = sequelize.define("GRNItem", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   deleted_at: {
     type: DataTypes.DATE,

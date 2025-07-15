@@ -2,6 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 const Category = sequelize.define("Category", {
   id: {
@@ -39,10 +40,16 @@ const Category = sequelize.define("Category", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,

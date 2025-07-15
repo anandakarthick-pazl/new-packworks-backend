@@ -3,6 +3,8 @@ import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
 import BaseModel from "./base.model.js";
+import { formatDateTime } from '../utils/dateFormatHelper.js';
+import CompanyAddress from "./companyAddress.model.js";
 
 class Client extends BaseModel { }
 
@@ -22,6 +24,15 @@ Client.init(
       allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+     company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -147,10 +158,16 @@ Client.init(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -183,6 +200,9 @@ Client.init(
 // Define the relationship
 Company.hasMany(Client, { foreignKey: "company_id" });
 Client.belongsTo(Company, { foreignKey: "company_id" });
+
+CompanyAddress.hasMany(Client, { foreignKey: "company_branch_id", as: "clients" });
+Client.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "company_address" });
 // Update the Client model associations
 User.hasMany(Client, { foreignKey: "created_by", as: "created_clients" });
 User.hasMany(Client, { foreignKey: "updated_by", as: "updated_clients" });

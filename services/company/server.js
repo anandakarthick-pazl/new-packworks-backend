@@ -39,6 +39,7 @@ const QUEUE_NAME = process.env.COMPANY_QUEUE_NAME;
 const Package = db.Package;
 const CompanyPaymentBill = db.CompanyPaymentBill;
 const Company = db.Company;
+const CompanyAddress = db.CompanyAddress;
 const OfflineRequest = db.OfflineRequest;
 const GlobalSettings = db.GlobalSettings;
 
@@ -1742,6 +1743,7 @@ v1Router.get("/", async (req, res) => {
     });
   }
 });
+
 v1Router.get("/:id", async (req, res) => {
   try {
     const company = await Company.findByPk(req.params.id, {
@@ -1750,6 +1752,11 @@ v1Router.get("/:id", async (req, res) => {
           model: Package,
           as: "package",
           attributes: ["id", "name"], // fetch id and name of package
+        },
+        {
+          model: User,
+          as: "users",
+          attributes: ["name", "email"], // fetch name and email of users
         },
       ],
     });
@@ -1916,7 +1923,6 @@ v1Router.get("/packages/master", async (req, res) => {
 // offline requests
 
 // checking admin status
-
 v1Router.get("/request-type/get", async (req, res) => {
   try {
     // Assuming global_settings has only one row (or you want the first row)
@@ -1944,9 +1950,6 @@ v1Router.get("/request-type/get", async (req, res) => {
     });
   }
 });
-
-
-
 v1Router.post("/offline-request", async (req, res) => {
   const offlineRequestDetails = req.body;
 
@@ -2081,7 +2084,6 @@ v1Router.get("/offline-request/get/:id", async (req, res) => {
       });
   }
 });
-
 v1Router.delete("/offline-request/delete/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -2123,7 +2125,6 @@ v1Router.delete("/offline-request/delete/:id", async (req, res) => {
       });
   }
 });
-
 // PUT update approval status
 v1Router.put("/offline-request/:id/approval", async (req, res) => {
   const { id } = req.params;
@@ -2177,6 +2178,218 @@ v1Router.put("/offline-request/:id/approval", async (req, res) => {
       });
   }
 });
+
+
+
+// company branch apis
+v1Router.get("/branches/get", authenticateJWT, async (req, res) => {
+  try {
+    const company_id = req.user.company_id; 
+    
+    const branches = await CompanyAddress.findAll({
+      where: {
+        company_id: company_id,
+      },
+      order: [["created_at", "DESC"]], 
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "Branches fetched successfully",
+      data: branches,
+    });
+  } catch (error) {
+    logger.error("Error fetching branches:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+v1Router.post("/branches/create", authenticateJWT, async (req, res) => {
+  try {
+    const company_id = req.user.company_id; // Get company_id from JWT token
+    
+    const {
+      country_id,
+      address,
+      tax_number,
+      tax_name,
+      location,
+      latitude,
+      longitude
+    } = req.body;
+
+    // Validate required fields
+    if (!address) {
+      return res.status(400).json({
+        status: false,
+        message: "Address is required",
+        data: null,
+      });
+    }
+
+    // Create new company address
+    const newAddress = await CompanyAddress.create({
+      company_id,
+      country_id,
+      address,
+      tax_number,
+      tax_name,
+      location,
+      latitude,
+      longitude,
+    });
+
+    return res.status(201).json({
+      status: true,
+      message: "Company address created successfully",
+      data: newAddress,
+    });
+  } catch (error) {
+    logger.error("Error creating company address:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+v1Router.delete("/branches/delete/:id", authenticateJWT, async (req, res) => {
+  try {
+    const company_id = req.user.company_id; // Get company_id from JWT token
+    const addressId = req.params.id;
+
+    // Find the address first to check if it exists and belongs to the company
+    const address = await CompanyAddress.findOne({
+      where: {
+        id: addressId,
+        company_id: company_id
+      }
+    });
+
+    if (!address) {
+      return res.status(404).json({
+        status: false,
+        message: "Company address not found",
+        data: null,
+      });
+    }
+
+    // Check if this is the default address and there are other addresses
+    if (address.is_default === 1) {
+      const otherAddresses = await CompanyAddress.findAll({
+        where: {
+          company_id: company_id,
+          id: { [Op.ne]: addressId } // Not equal to current address id
+        }
+      });
+
+      if (otherAddresses.length > 0) {
+        // Make the first other address as default
+        await CompanyAddress.update(
+          { is_default: 1 },
+          { 
+            where: { 
+              id: otherAddresses[0].id 
+            } 
+          }
+        );
+      }
+    }
+
+    // Hard delete the address
+    await CompanyAddress.destroy({
+      where: { 
+        id: addressId,
+        company_id: company_id 
+      }
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "Company address deleted successfully",
+      data: null,
+    });
+  } catch (error) {
+    logger.error("Error deleting company address:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+v1Router.put("/branches/update/:id", authenticateJWT, async (req, res) => {
+  try {
+    const company_id = req.user.company_id; // Get company_id from JWT token
+    const addressId = req.params.id;
+    
+    const {
+      country_id,
+      address,
+      tax_number,
+      tax_name,
+      location,
+      latitude,
+      longitude
+    } = req.body;
+
+    // Find the address first to check if it exists and belongs to the company
+    const existingAddress = await CompanyAddress.findOne({
+      where: {
+        id: addressId,
+        company_id: company_id
+      }
+    });
+
+    if (!existingAddress) {
+      return res.status(404).json({
+        status: false,
+        message: "Company address not found",
+        data: null,
+      });
+    }
+
+    // Update the address
+    await CompanyAddress.update(
+      {
+        country_id,
+        address,
+        tax_number,
+        tax_name,
+        location,
+        latitude,
+        longitude,
+      },
+      { 
+        where: { 
+          id: addressId,
+          company_id: company_id 
+        } 
+      }
+    );
+
+    // Fetch the updated address
+    const updatedAddress = await CompanyAddress.findByPk(addressId);
+
+    return res.status(200).json({
+      status: true,
+      message: "Company address updated successfully",
+      data: updatedAddress,
+    });
+  } catch (error) {
+    logger.error("Error updating company address:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+
 
 // ✅ Static Token for Internal APIs (e.g., Health Check)
 v1Router.get("/health", authenticateStaticToken, (req, res) => {
