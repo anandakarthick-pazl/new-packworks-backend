@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const GlobalInvoices = sequelize.define('GlobalInvoices', {
   id: {
@@ -130,12 +131,18 @@ const GlobalInvoices = sequelize.define('GlobalInvoices', {
   created_at: {
     type: DataTypes.DATE,
     allowNull: true,
-    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE,
     allowNull: true,
-    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   created_by: {
     type: DataTypes.INTEGER,

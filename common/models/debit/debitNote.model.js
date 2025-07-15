@@ -7,6 +7,7 @@ import PurchaseOrderReturn from "../purchase_order_return/purchase_order_return.
 import PurchaseOrderReturnItem from "../purchase_order_return/purchase_order_return_item.model.js";
 import PurchaseOrder from "../po/purchase_order.model.js";
 import InvoiceSetting from "../invoiceSetting.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 const DebitNote = sequelize.define('DebitNote', {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -129,13 +130,19 @@ const DebitNote = sequelize.define('DebitNote', {
 
   created_at: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+    defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
 
   updated_at: {
     type: DataTypes.DATE,
     allowNull: true,
-    defaultValue: null
+    defaultValue: null,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
 
   deleted_at: {

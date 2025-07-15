@@ -1,6 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import User from "./user.model.js";  
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const Module = sequelize.define("Module", {
   id: {
@@ -33,10 +34,16 @@ const Module = sequelize.define("Module", {
   created_at: {
     type: DataTypes.DATE, 
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE, 
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   status: {
     type: DataTypes.ENUM("active", "inactive"),

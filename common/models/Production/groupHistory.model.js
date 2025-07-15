@@ -3,6 +3,8 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import ProductionSchedule from "./productionSchedule.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const GroupHistory = sequelize.define(
   "GroupHistory",
@@ -76,11 +78,17 @@ const GroupHistory = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
   },
   {

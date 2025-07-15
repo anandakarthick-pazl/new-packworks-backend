@@ -3,6 +3,8 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import PurchaseOrder from "./purchase_order.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const PurchaseOrderBilling = sequelize.define(
   "PurchaseOrderBilling",
@@ -52,10 +54,16 @@ const PurchaseOrderBilling = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,

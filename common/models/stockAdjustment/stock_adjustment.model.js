@@ -2,6 +2,8 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
   id: {
@@ -82,11 +84,17 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
   updated_at: {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: null,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
 }, {
   tableName: "stock_adjustments",
