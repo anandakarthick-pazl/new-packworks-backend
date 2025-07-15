@@ -45,6 +45,7 @@ const tables = [
   'group_history',
   'html_templates',
   'inventory',
+  'inventory_type',
   'invoice_settings',
   'item_master',
   'language_settings',
@@ -111,34 +112,52 @@ const tables = [
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    const dbName = queryInterface.sequelize.config.database;
+
     for (const table of tables) {
       try {
-        await queryInterface.addColumn(table, 'company_branch_id', {
-          type: Sequelize.BIGINT.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: 'company_addresses',
-            key: 'id',
-          },
-          onDelete: 'CASCADE',
-          onUpdate: 'CASCADE',
-        });
+        // Check if column already exists
+        const [results] = await queryInterface.sequelize.query(`
+          SELECT COUNT(*) AS count
+          FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = '${dbName}'
+            AND TABLE_NAME = '${table}'
+            AND COLUMN_NAME = 'company_branch_id';
+        `);
 
-        // Set default value to 1 for existing records
-        await queryInterface.sequelize.query(
-          `UPDATE \`${table}\` SET company_branch_id = 1;`
-        );
+        if (results[0].count === 0) {
+          // Add column and update values
+          await queryInterface.addColumn(table, 'company_branch_id', {
+            type: Sequelize.BIGINT.UNSIGNED,
+            allowNull: true,
+            references: {
+              model: 'company_addresses',
+              key: 'id',
+            },
+            onDelete: 'CASCADE',
+            onUpdate: 'CASCADE',
+          });
+
+          await queryInterface.sequelize.query(
+            `UPDATE \`${table}\` SET company_branch_id = 1;`
+          );
+
+          console.log(`✅ Added column to: ${table}`);
+        } else {
+          console.log(`⏭️ Skipped (already exists): ${table}`);
+        }
       } catch (error) {
         console.error(`❌ Failed on table ${table}:`, error.message);
-        throw error; // Stop migration if any table fails
+        throw error;
       }
     }
   },
 
-  down: async (queryInterface, Sequelize) => {
+  down: async (queryInterface) => {
     for (const table of tables) {
       try {
         await queryInterface.removeColumn(table, 'company_branch_id');
+        console.log(`✅ Removed column from: ${table}`);
       } catch (error) {
         console.error(`❌ Rollback failed on table ${table}:`, error.message);
       }
