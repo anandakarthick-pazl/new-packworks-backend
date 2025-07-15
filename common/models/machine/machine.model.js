@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import ProcessName from "./processName.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 
 const Machine = sequelize.define(
   "Machine",
@@ -135,12 +136,18 @@ const Machine = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
       onUpdate: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),

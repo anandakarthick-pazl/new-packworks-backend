@@ -8,6 +8,7 @@ import User from "../user.model.js";
 import Sub_categories from "../category/sub_category.model.js";
 import Categories from "../category/category.model.js";
 import Sku from "../skuModel/sku.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
 const Inventory = sequelize.define("Inventory", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -129,10 +130,16 @@ const Inventory = sequelize.define("Inventory", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('created_at'));
+    }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+    get() {
+      return formatDateTime(this.getDataValue('updated_at'));
+    }
   },
   deleted_at: {
     type: DataTypes.DATE,

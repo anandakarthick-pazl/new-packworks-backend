@@ -2,6 +2,8 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const ProductionGroup = sequelize.define(
   "ProductionGroup",
@@ -83,11 +85,17 @@ const ProductionGroup = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     manufactured_qty: {
       type: DataTypes.INTEGER,

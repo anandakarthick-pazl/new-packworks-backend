@@ -3,6 +3,7 @@ import  sequelize from '../database/database.js';
 import Company from './company.model.js';
 import UserRole from './userRole.model.js';
 import Employee from './employee.model.js';
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const User = sequelize.define('User', {
     id: {
@@ -100,10 +101,16 @@ const User = sequelize.define('User', {
     created_at: {
         type: DataTypes.DATE,
         allowNull: true,
+        get() {
+            return formatDateTime(this.getDataValue('created_at'));
+        }
     },
     updated_at: {
         type: DataTypes.DATE,
         allowNull: true,
+        get() {
+            return formatDateTime(this.getDataValue('updated_at'));
+        }
     }
 }, {
     tableName: 'users',

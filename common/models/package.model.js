@@ -1,6 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Currency from "./currency.model.js"; // 👈 Ensure this import exists
+import { formatDateTime } from '../utils/dateFormatHelper.js';
 
 const Package = sequelize.define(
   "packages",
@@ -126,11 +127,17 @@ const Package = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('created_at'));
+      }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+      get() {
+        return formatDateTime(this.getDataValue('updated_at'));
+      }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
