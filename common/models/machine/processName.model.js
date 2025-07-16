@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const ProcessName = sequelize.define(
   "ProcessName",
@@ -24,6 +25,15 @@ const ProcessName = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+      company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     process_name: {
       type: DataTypes.STRING(255),
@@ -70,6 +80,8 @@ const ProcessName = sequelize.define(
 // Associations
 Company.hasMany(ProcessName, { foreignKey: "company_id" });
 ProcessName.belongsTo(Company, { foreignKey: "company_id" });
+
+ProcessName.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 
 User.hasMany(ProcessName, { foreignKey: "created_by" });
 User.hasMany(ProcessName, { foreignKey: "updated_by" });

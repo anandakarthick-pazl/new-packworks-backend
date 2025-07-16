@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import ProductionSchedule from "./productionSchedule.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const GroupHistory = sequelize.define(
@@ -23,6 +24,15 @@ const GroupHistory = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
    production_schedule_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -99,6 +109,8 @@ const GroupHistory = sequelize.define(
 
 Company.hasMany(GroupHistory, { foreignKey: "company_id" });
 GroupHistory.belongsTo(Company, { foreignKey: "company_id" });
+
+GroupHistory.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 
 GroupHistory.belongsTo(User, {foreignKey: "created_by", as: "creator"});
 GroupHistory.belongsTo(User, { foreignKey: "updated_by", as: "updater"});

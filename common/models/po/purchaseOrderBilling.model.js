@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import PurchaseOrder from "./purchase_order.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const PurchaseOrderBilling = sequelize.define(
@@ -23,6 +24,15 @@ const PurchaseOrderBilling = sequelize.define(
       allowNull: true,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+      company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -93,6 +103,7 @@ PurchaseOrderBilling.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id',
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'created_by', as: 'createdBy' });
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'updated_by', as: 'updatedBy' });
 PurchaseOrderBilling.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+PurchaseOrderBilling.belongsTo(CompanyAddress, { foreignKey: 'company_branch_id', as: 'branch' });
 
 PurchaseOrderBilling.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {

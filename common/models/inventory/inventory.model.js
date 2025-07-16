@@ -9,6 +9,7 @@ import Sub_categories from "../category/sub_category.model.js";
 import Categories from "../category/category.model.js";
 import Sku from "../skuModel/sku.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 const Inventory = sequelize.define("Inventory", {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -28,6 +29,15 @@ const Inventory = sequelize.define("Inventory", {
     },
     onUpdate: "CASCADE",
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   item_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

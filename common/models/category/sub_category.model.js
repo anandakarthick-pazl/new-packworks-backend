@@ -2,78 +2,99 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
-import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import { formatDateTime } from "../../utils/dateFormatHelper.js";
+import CompanyAddress from "../companyAddress.model.js";
 
-const SubCategory = sequelize.define("SubCategory", {
-  id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    autoIncrement: true,
-    primaryKey: true,
-  },
-  sub_category_generate_id: {
-    type: DataTypes.STRING(200),
-    allowNull: true,
-  },
-  company_id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    references: {
-      model: Company,
-      key: "id",
+const SubCategory = sequelize.define(
+  "SubCategory",
+  {
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    onUpdate: "CASCADE",
-  },
-  category_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  sub_category_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-  },
-  status: {
-    type: DataTypes.ENUM("active", "inactive"),
-    allowNull: false,
-    defaultValue: "active",
-  },
-  is_visible: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1,
-  },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('created_at'));
-    }
-  },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('updated_at'));
-    }
-  },
-  created_by: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: true,
-    references: {
-      model: User,
-      key: "id",
+    sub_category_generate_id: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+    },
+    company_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    category_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    sub_category_name: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.ENUM("active", "inactive"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    is_visible: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue("created_at"));
+      },
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+      get() {
+        return formatDateTime(this.getDataValue("updated_at"));
+      },
+    },
+    created_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: User,
+        key: "id",
+      },
+    },
+    updated_by: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: User,
+        key: "id",
+      },
     },
   },
-  updated_by: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: true,
-    references: {
-      model: User,
-      key: "id",
-    },
-  },
-}, {
-  tableName: "product_sub_categories",
-  timestamps: false,
+  {
+    tableName: "product_sub_categories",
+    timestamps: false,
+  }
+);
+
+SubCategory.belongsTo(Company, {
+  foreignKey: "company_id",
+});
+SubCategory.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
 });
 
 export default SubCategory;

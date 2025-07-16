@@ -6,6 +6,7 @@ import ItemMaster from "../item.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const GRNItem = sequelize.define("GRNItem", {
@@ -23,6 +24,15 @@ const GRNItem = sequelize.define("GRNItem", {
     },
     onUpdate: "CASCADE",
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   grn_id: {
     type: DataTypes.INTEGER.UNSIGNED, // Assuming grn_id in GRN is an INTEGER (auto-incremented)
     allowNull: false,
@@ -169,6 +179,7 @@ ItemMaster.hasMany(GRNItem, { foreignKey: "item_id" });
 GRNItem.belongsTo(ItemMaster, { foreignKey: "item_id", as: "item_info" });
 
 GRNItem.belongsTo(Company, { foreignKey: "company_id" });
+GRNItem.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "companyBranch" });
 GRNItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRNItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 GRNItem.belongsTo(GRN, { foreignKey: 'grn_id', as: 'grn' });

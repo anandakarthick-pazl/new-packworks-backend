@@ -7,7 +7,7 @@ const CompanyAddress = sequelize.define(
   "CompanyAddress",
   {
     id: {
-      type: DataTypes.BIGINT.UNSIGNED,
+      type: DataTypes.INTEGER.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },

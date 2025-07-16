@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import Machine from "./machine.model.js"; // Adjust the path as needed
 import ProcessName from "./processName.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const MachineFlow = sequelize.define(
   "MachineFlow",
@@ -22,6 +23,15 @@ const MachineFlow = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     machine_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -92,6 +102,11 @@ const MachineFlow = sequelize.define(
 Company.hasMany(MachineFlow, {
   foreignKey: "company_id",
 });
+
+MachineFlow.belongsTo(CompanyAddress, {
+  foreignKey: "company_id",
+});
+
 MachineFlow.belongsTo(Company, {
   foreignKey: "company_id",
 });

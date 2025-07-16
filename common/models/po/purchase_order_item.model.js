@@ -5,6 +5,7 @@ import User from "../user.model.js";
 import PurchaseOrder from "../po/purchase_order.model.js";
 import ItemMaster from "../item.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
   id: {
@@ -30,6 +31,15 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
     },
     onUpdate: "CASCADE",
   },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   item_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: false,
@@ -140,6 +150,11 @@ const PurchaseOrderItem = sequelize.define("PurchaseOrderItem", {
 });
 
 // Associations
+Company.hasMany(PurchaseOrderItem, { foreignKey: "company_id" });
+PurchaseOrderItem.belongsTo(Company, { foreignKey: "company_id" });
+
+PurchaseOrderItem.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
+
 PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: "po_id" });
 PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: "po_id" });
 
