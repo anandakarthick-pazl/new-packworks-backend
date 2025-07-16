@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import ProcessName from "./processName.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const Machine = sequelize.define(
   "Machine",
@@ -26,6 +27,15 @@ const Machine = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     machine_name: {
       type: DataTypes.STRING,
@@ -183,6 +193,11 @@ Company.hasMany(Machine, {
 Machine.belongsTo(Company, {
   foreignKey: "company_id",
 });
+
+Machine.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
+
 Machine.belongsToMany(ProcessName, {
   through: 'MachineProcess',
   as: 'processes',

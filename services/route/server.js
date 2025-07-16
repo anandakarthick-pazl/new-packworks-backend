@@ -520,6 +520,7 @@ v1Router.post("/route", authenticateJWT, async (req, res) => {
     const newRoute = await Route.create({
       route_generate_id: route_generate_id,
       company_id: req.user.company_id,
+      company_branch_id: routeDetails.company_branch_id,
       route_name: routeDetails.route_name,
       route_process: routeDetails.route_process, // Array of process_ids [1,2,3]
       status: routeDetails.status || "active",

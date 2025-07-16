@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const Route = sequelize.define(
@@ -22,6 +23,15 @@ const Route = sequelize.define(
       allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -82,6 +92,8 @@ const Route = sequelize.define(
 // Associations
 Company.hasMany(Route, { foreignKey: "company_id" });
 Route.belongsTo(Company, { foreignKey: "company_id" });
+
+Route.belongsTo(CompanyAddress, { foreignKey: "company_branch_id" });
 
 User.hasMany(Route, { foreignKey: "created_by" });
 User.hasMany(Route, { foreignKey: "updated_by" });
