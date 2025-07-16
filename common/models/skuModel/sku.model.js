@@ -4,7 +4,6 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
-import CompanyAddress from "../companyAddress.model.js";
 
 const Sku = sequelize.define(
   "SKU",
@@ -23,15 +22,6 @@ const Sku = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
-    },
-    company_branch_id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      references: {
-        model: CompanyAddress,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -129,16 +119,16 @@ const Sku = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('created_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('created_at'));
+      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('updated_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('updated_at'));
+      // }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -171,12 +161,33 @@ const Sku = sequelize.define(
 Company.hasMany(Sku, { foreignKey: "company_id" });
 Sku.belongsTo(Company, { foreignKey: "company_id" });
 
-Sku.belongsTo(CompanyAddress, { foreignKey: "company_branch_id" });
-
 Client.hasMany(Sku, { foreignKey: "client_id" });
 Sku.belongsTo(Client, { foreignKey: "client_id" });
 
 Sku.belongsTo(User, { foreignKey: "created_by", as: "sku_creator" });
 Sku.belongsTo(User, { foreignKey: "updated_by", as: "sku_updater" });
+
+Sku.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default Sku;

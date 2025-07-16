@@ -40,16 +40,16 @@ const Category = sequelize.define("Category", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('created_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('created_at'));
+    // }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('updated_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('updated_at'));
+    // }
   },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -70,6 +70,30 @@ const Category = sequelize.define("Category", {
 }, {
   tableName: "product_categories",
   timestamps: false,
+});
+
+
+Category.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
 });
 
 export default Category;
