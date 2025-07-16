@@ -2,6 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 const HtmlTemplate = sequelize.define(
   "HtmlTemplate",
@@ -19,6 +20,15 @@ const HtmlTemplate = sequelize.define(
         key: "id",
       },
       onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     template: {
       type: DataTypes.STRING(191),
@@ -49,5 +59,8 @@ const HtmlTemplate = sequelize.define(
 );
 
 HtmlTemplate.belongsTo(Company, { foreignKey: "company_id" });
+HtmlTemplate.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 
 export default HtmlTemplate;

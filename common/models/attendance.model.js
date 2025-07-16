@@ -1,6 +1,8 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
 import { formatDateTime } from '../utils/dateFormatHelper.js';
+import Company from './company.model.js';
+import CompanyAddress from './companyAddress.model.js';
 
 const Attendance = sequelize.define('Attendance', {
   id: {
@@ -11,6 +13,15 @@ const Attendance = sequelize.define('Attendance', {
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true
+  },
+  company_branch_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: true,
+    references: {
+      model: CompanyAddress,
+      key: "id",
+    },
+    onUpdate: "CASCADE",
   },
   user_id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -74,6 +85,14 @@ created_by: {
   tableName: 'attendances',
   timestamps: false, // Or true if you want Sequelize to handle createdAt/updatedAt
   
+});
+
+Attendance.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+Attendance.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
 });
   
   export default Attendance;

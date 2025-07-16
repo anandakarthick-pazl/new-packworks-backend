@@ -5,6 +5,7 @@ import User from "./user.model.js";
 import Category from "./category/category.model.js";
 import SubCategory from "./category/sub_category.model.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
+import CompanyAddress from "./companyAddress.model.js";
 
 const ItemMaster = sequelize.define(
   "ItemMaster",
@@ -31,6 +32,15 @@ const ItemMaster = sequelize.define(
         key: "id",
       },
       onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     item_name: {
       type: DataTypes.STRING(255),
@@ -173,6 +183,10 @@ ItemMaster.addHook("afterFind", (result) => {
 });
 
 ItemMaster.belongsTo(Company, { foreignKey: "company_id" });
+
+ItemMaster.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 ItemMaster.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ItemMaster.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 

@@ -1,5 +1,8 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import { not } from "joi";
+import Company from "./company.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 // Define Notification model (if not already defined)
 const notification = sequelize.define('notification', {
@@ -15,6 +18,15 @@ const notification = sequelize.define('notification', {
     company_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     notification_type: {
         type: DataTypes.ENUM('low_stock', 'out_of_stock', 'reorder'),
@@ -49,6 +61,14 @@ const notification = sequelize.define('notification', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at'
+});
+
+notification.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+notification.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
 });
 
 export default notification;

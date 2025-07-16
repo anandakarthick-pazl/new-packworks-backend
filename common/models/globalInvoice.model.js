@@ -1,6 +1,8 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
 import { formatDateTime } from '../utils/dateFormatHelper.js';
+import Company from './company.model.js';
+import CompanyAddress from './companyAddress.model.js';
 
 const GlobalInvoices = sequelize.define('GlobalInvoices', {
   id: {
@@ -12,6 +14,15 @@ const GlobalInvoices = sequelize.define('GlobalInvoices', {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true
   },
+  company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
+    },
   currency_id: {
     type: DataTypes.BIGINT.UNSIGNED,
     allowNull: true,
@@ -157,5 +168,12 @@ const GlobalInvoices = sequelize.define('GlobalInvoices', {
   timestamps: false
 });
 
+GlobalInvoices.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+GlobalInvoices.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
   
 export default GlobalInvoices;
