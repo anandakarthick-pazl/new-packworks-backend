@@ -56,8 +56,7 @@ const Designation = sequelize.define('Designation', {
   });
 
   Designation.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 Designation.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

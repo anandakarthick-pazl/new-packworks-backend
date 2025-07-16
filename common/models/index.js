@@ -31,7 +31,6 @@ import PurchaseOrderItem from "./po/purchase_order_item.model.js";
 import GRN from "./grn/grn.model.js";
 import GRNItem from "./grn/grn_item.model.js";
 import Inventory from "./inventory/inventory.model.js";
-import InventoryType from "./inventory/inventory_type.model.js";
 import Route from "./route/route.model.js";
 import PurchaseOrderReturn from "./purchase_order_return/purchase_order_return.model.js";
 import PurchaseOrderReturnItem from "./purchase_order_return/purchase_order_return_item.model.js";
@@ -77,6 +76,7 @@ const db = {
   sequelize,
   User,
   Company,
+  CompanyAddress,
   UserAuth,
   apiLog,
   Client,
@@ -108,7 +108,6 @@ const db = {
   GRN,
   GRNItem,
   Inventory,
-  InventoryType,
   Route,
   PurchaseOrderReturn,
   PurchaseOrderReturnItem,
@@ -144,7 +143,6 @@ const db = {
   GlobalSettings,
   CompanyPaymentBill,
   OfflineRequest, 
-  CompanyAddress,
 };
 
 export default db;

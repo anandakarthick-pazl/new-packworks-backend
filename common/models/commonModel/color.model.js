@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const Color = sequelize.define(
   "Color",

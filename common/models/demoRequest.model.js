@@ -168,8 +168,7 @@ DemoRequest.init(
 );
 
 DemoRequest.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 DemoRequest.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

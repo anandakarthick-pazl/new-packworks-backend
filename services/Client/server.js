@@ -25,7 +25,7 @@ import {
   branchFilterMiddleware, 
   resetBranchFilter, 
   setupBranchFiltering 
-} from "./middleware/branchFilter.js";
+} from "../../common/helper/branchFilter.js";
 
 dotenv.config();
 

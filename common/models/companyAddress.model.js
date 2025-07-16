@@ -7,19 +7,13 @@ const CompanyAddress = sequelize.define(
   "CompanyAddress",
   {
     id: {
-      type: DataTypes.INTEGER.UNSIGNED,
+      type: DataTypes.BIGINT.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
-      references: {
-        model: Company,
-        key: "id",
-      },
-      onDelete: "CASCADE",
-      onUpdate: "CASCADE",
+      allowNull: false,
     },
     country_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -74,10 +68,5 @@ const CompanyAddress = sequelize.define(
     timestamps: false,
   }
 );
-
-CompanyAddress.belongsTo(Company, {
-  foreignKey: "company_id",
-  as: "company_address",
-});
 
 export default CompanyAddress;

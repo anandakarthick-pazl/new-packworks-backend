@@ -63,8 +63,7 @@ const Role = sequelize.define('Role', {
 });
 
 Role.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 Role.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

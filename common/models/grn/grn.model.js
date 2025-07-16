@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import PurchaseOrder from "../po/purchase_order.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const GRN = sequelize.define("GRN", {
   id: {

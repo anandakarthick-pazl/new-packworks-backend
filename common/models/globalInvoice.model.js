@@ -169,8 +169,7 @@ const GlobalInvoices = sequelize.define('GlobalInvoices', {
 });
 
 GlobalInvoices.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 GlobalInvoices.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

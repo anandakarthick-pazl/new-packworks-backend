@@ -58,8 +58,7 @@ const FileStorage = sequelize.define(
 );
 
 FileStorage.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 FileStorage.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",
