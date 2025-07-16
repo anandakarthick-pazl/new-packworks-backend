@@ -1,5 +1,7 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
+import Company from './company.model.js';
+import CompanyAddress from './companyAddress.model.js';
 
 const Department = sequelize.define('Department', {
     id: {
@@ -12,6 +14,15 @@ const Department = sequelize.define('Department', {
       allowNull: true,
       indexes: [{ unique: false }]
     },
+    company_branch_id: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        references: {
+          model: CompanyAddress,
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+  },
     department_name: {
       type: DataTypes.STRING(191),
       allowNull: false
@@ -43,5 +54,13 @@ const Department = sequelize.define('Department', {
     tableName: 'departments',
     timestamps: false
   });
+
+  Department.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+Department.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
   
   export default Department;

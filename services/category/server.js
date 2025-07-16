@@ -20,7 +20,7 @@ const v1Router = Router();
 v1Router.post("/category", authenticateJWT, async (req, res) => {
   try {
     // Merge user-related fields into the request body before create
-        const category_generate_id = await generateId(req.user.company_id, Categories, "CAT");
+        const category_generate_id = await generateId(req.user.company_id, Categories, "category");
     
     const newCategoryData = {
       ...req.body,

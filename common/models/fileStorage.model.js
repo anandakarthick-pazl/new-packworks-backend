@@ -1,5 +1,7 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import Company from "./company.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 const FileStorage = sequelize.define(
   "FileStorage",
@@ -12,6 +14,15 @@ const FileStorage = sequelize.define(
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     path: {
       type: DataTypes.STRING(191),
@@ -45,5 +56,13 @@ const FileStorage = sequelize.define(
     timestamps: false,
   }
 );
+
+FileStorage.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+FileStorage.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 
 export default FileStorage;

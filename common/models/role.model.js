@@ -1,5 +1,7 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
+import Company from './company.model.js';
+import CompanyAddress from './companyAddress.model.js';
 
 const Role = sequelize.define('Role', {
   id: {
@@ -10,6 +12,15 @@ const Role = sequelize.define('Role', {
   company_id: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true
+  },
+  company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
   },
   name: {
     type: DataTypes.STRING(191),
@@ -49,6 +60,14 @@ const Role = sequelize.define('Role', {
 }, {
   tableName: 'roles',
   timestamps: false
+});
+
+Role.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+Role.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
 });
   
   export default Role;

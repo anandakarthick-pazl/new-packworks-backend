@@ -2,6 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 
 const Taxes = sequelize.define("taxes", {
@@ -19,6 +20,15 @@ const Taxes = sequelize.define("taxes", {
         },
         onUpdate: "CASCADE",
       },
+      company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
+    },
       tax_name: {
         type: DataTypes.STRING(191),
         allowNull: false
@@ -69,6 +79,9 @@ const Taxes = sequelize.define("taxes", {
 Taxes.belongsTo(Company, { foreignKey: "company_id" });
 Taxes.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Taxes.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+Taxes.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 
 export default Taxes;
   

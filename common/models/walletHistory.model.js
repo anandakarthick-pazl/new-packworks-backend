@@ -1,5 +1,8 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import Category from "./category/category.model.js";
+import CompanyAddress from "./companyAddress.model.js";
+import Company from "./company.model.js";
 
 const WalletHistory = sequelize.define("WalletHistory", {
     id: {
@@ -25,6 +28,15 @@ const WalletHistory = sequelize.define("WalletHistory", {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
 
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     refference_number: {
         type: DataTypes.STRING(255),
@@ -52,5 +64,11 @@ const WalletHistory = sequelize.define("WalletHistory", {
     timestamps: false,
 });
 
+WalletHistory.belongsTo(Company, {
+  foreignKey: "company_id",
+});
+WalletHistory.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 
 export default WalletHistory;

@@ -3,6 +3,7 @@ import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
+import CompanyAddress from "./companyAddress.model.js";
 
 const Die = sequelize.define('Die',{
   id: {
@@ -15,6 +16,15 @@ const Die = sequelize.define('Die',{
     allowNull: false,
     references: {
       model: Company,
+      key: "id",
+    },
+    onUpdate: "CASCADE",
+  },
+  company_branch_id: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: true,
+    references: {
+      model: CompanyAddress,
       key: "id",
     },
     onUpdate: "CASCADE",
@@ -91,4 +101,7 @@ const Die = sequelize.define('Die',{
 Die.belongsTo(Company, { foreignKey: "company_id" });
 Die.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Die.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+User.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 export default Die;

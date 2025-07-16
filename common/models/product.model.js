@@ -3,6 +3,7 @@ import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
+import CompanyAddress from "./companyAddress.model.js";
 
 
 const Product = sequelize.define('ItemMaster', {
@@ -20,6 +21,15 @@ const Product = sequelize.define('ItemMaster', {
         },
         onUpdate: "CASCADE",
       },
+      company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
+    },
       product_generate_id:{
         type: DataTypes.STRING(200),
         allowNull: true,
@@ -160,6 +170,9 @@ const Product = sequelize.define('ItemMaster', {
     Product.belongsTo(Company, { foreignKey: "company_id" });
     Product.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     Product.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+    Product.belongsTo(CompanyAddress, {
+      foreignKey: "company_branch_id",
+    });
     
     export default Product;
 

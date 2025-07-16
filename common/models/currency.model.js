@@ -1,5 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
+import Company from "./company.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 const Currency = sequelize.define(
   "Currency",
@@ -12,6 +14,15 @@ const Currency = sequelize.define(
     company_id : {
         type: DataTypes.BIGINT.UNSIGNED,
         allowNull: false,
+    },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
     },
     currency_name: {
       type: DataTypes.STRING(191),
@@ -89,4 +100,12 @@ const Currency = sequelize.define(
   }
 );
 
+
+Currency.belongsTo(Company, {
+    foreignKey: 'company_id',
+    as: 'company',
+});
+Currency.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 export default Currency;
