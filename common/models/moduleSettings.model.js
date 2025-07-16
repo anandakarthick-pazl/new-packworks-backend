@@ -71,8 +71,7 @@ const ModuleSettings = sequelize.define("Module", {
 });
 
 ModuleSettings.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 ModuleSettings.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

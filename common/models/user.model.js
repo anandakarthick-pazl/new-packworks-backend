@@ -133,8 +133,7 @@ Company.hasMany(User, {
 }); 
 
 User.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 User.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

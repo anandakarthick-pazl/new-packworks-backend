@@ -102,7 +102,7 @@ const PurchaseOrderBilling = sequelize.define(
 PurchaseOrderBilling.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id', as: 'purchaseOrder' });
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'created_by', as: 'createdBy' });
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'updated_by', as: 'updatedBy' });
-PurchaseOrderBilling.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+PurchaseOrderBilling.belongsTo(Company, { foreignKey: 'company_id'});
 PurchaseOrderBilling.belongsTo(CompanyAddress, { foreignKey: 'company_branch_id', as: 'branch' });
 
 PurchaseOrderBilling.addHook("afterFind", (result) => {

@@ -151,8 +151,7 @@ const Employee = sequelize.define(
 );
 
 Employee.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 Employee.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

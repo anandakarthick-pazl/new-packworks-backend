@@ -99,13 +99,8 @@ const Currency = sequelize.define(
     timestamps: false, 
   }
 );
-
-
-Currency.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
-});
 Currency.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
+  foreignKey: "company_id",
+  as: "company",
 });
 export default Currency;

@@ -1,6 +1,5 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
-import { not } from "joi";
 import Company from "./company.model.js";
 import CompanyAddress from "./companyAddress.model.js";
 
@@ -16,8 +15,14 @@ const notification = sequelize.define('notification', {
         allowNull: false,
     },
     company_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
+        references: {
+            model: Company,
+            key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
     },
     company_branch_id: {
           type: DataTypes.INTEGER.UNSIGNED,
@@ -64,8 +69,7 @@ const notification = sequelize.define('notification', {
 });
 
 notification.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 notification.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",

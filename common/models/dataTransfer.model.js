@@ -189,8 +189,7 @@ DataTransfer.addHook("afterFind", (result) => {
 });
 
 DataTransfer.belongsTo(Company, {
-    foreignKey: 'company_id',
-    as: 'company',
+    foreignKey: 'company_id'
 });
 DataTransfer.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",
