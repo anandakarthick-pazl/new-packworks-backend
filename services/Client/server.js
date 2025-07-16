@@ -21,13 +21,27 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import { validateClient } from "../../common/inputvalidation/validationClient.js";
 
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering 
+} from "./middleware/branchFilter.js";
+
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
 
-const v1Router = Router();
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
+const v1Router = Router(); 
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 
 const Client = db.Client;
 const Address = db.ClientAddress;
