@@ -8,6 +8,7 @@ import PurchaseOrderReturnItem from "../purchase_order_return/purchase_order_ret
 import PurchaseOrder from "../po/purchase_order.model.js";
 import InvoiceSetting from "../invoiceSetting.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 const DebitNote = sequelize.define('DebitNote', {
   id: {
     type: DataTypes.INTEGER.UNSIGNED,
@@ -44,8 +45,15 @@ const DebitNote = sequelize.define('DebitNote', {
     },
     onUpdate: 'CASCADE'
   },
-
- 
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
 
   reference_id: {
     type: DataTypes.STRING(100),
@@ -155,6 +163,7 @@ const DebitNote = sequelize.define('DebitNote', {
   timestamps: false
 });
 DebitNote.belongsTo(Company, { foreignKey: 'company_id' });
+DebitNote.belongsTo(CompanyAddress, { foreignKey: 'company_branch_id' });
 DebitNote.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 DebitNote.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
 DebitNote.belongsTo(PurchaseOrderReturn, { foreignKey: 'po_return_id' });

@@ -13,9 +13,18 @@ const WorkOrderStatus = sequelize.define(
     },
     company_id: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -63,6 +72,9 @@ const WorkOrderStatus = sequelize.define(
 
 Company.hasMany(WorkOrderStatus, { foreignKey: "company_id", as: "workOrderStatus" });
 WorkOrderStatus.belongsTo(Company, { foreignKey: "company_id", as: "company" });
+
+WorkOrderStatus.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "companyBranch" });
+
 User.hasMany(WorkOrderStatus, { foreignKey: "created_by", as: "createdWorkOrderStatus" });
 User.hasMany(WorkOrderStatus, { foreignKey: "updated_by", as: "updatedWorkOrderStatus" });
 WorkOrderStatus.belongsTo(User, { foreignKey: "created_by", as: "creator" });

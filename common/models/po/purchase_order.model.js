@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const PurchaseOrder = sequelize.define('PurchaseOrder', {
@@ -27,6 +28,15 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
         },
         onUpdate: "CASCADE",
       },
+        company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
       po_date: {
         type: DataTypes.DATEONLY,
         allowNull: false,
@@ -162,6 +172,7 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     });
 
     PurchaseOrder.belongsTo(Company, { foreignKey: "company_id" });
+    PurchaseOrder.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
     PurchaseOrder.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     PurchaseOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 

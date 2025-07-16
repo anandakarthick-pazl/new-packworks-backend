@@ -5,6 +5,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import WorkOrderInvoice from "../salesOrder/workOrderInvoice.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const CreditNote = sequelize.define(
   "CreditNote",
@@ -19,6 +20,15 @@ const CreditNote = sequelize.define(
       allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -115,6 +125,8 @@ const CreditNote = sequelize.define(
 // Associations
 Company.hasMany(CreditNote, { foreignKey: "company_id", as: "creditNotes" });
 CreditNote.belongsTo(Company, { foreignKey: "company_id", as: "company" });
+
+CreditNote.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "companyBranch" });
 
 Client.hasMany(CreditNote, { foreignKey: "client_id", as: "creditNotes" });
 CreditNote.belongsTo(Client, { foreignKey: "client_id", as: "client" });

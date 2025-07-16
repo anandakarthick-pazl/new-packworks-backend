@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import DropdownName from "./dropdown.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const DropdownValue = sequelize.define(
   "DropdownValue",
@@ -20,6 +21,15 @@ const DropdownValue = sequelize.define(
         model: Company,
         key: "id",
       },
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -76,8 +86,14 @@ const DropdownValue = sequelize.define(
   }
 );
 
+DropdownValue.belongsTo(Company, { foreignKey: "company_id" });
+DropdownValue.belongsTo(CompanyAddress, { foreignKey: "company_branch_id" });
+DropdownValue.belongsTo(Client, { foreignKey: "client_id" });
+DropdownValue.belongsTo(User, { foreignKey: "created_by" });
+DropdownValue.belongsTo(User, { foreignKey: "updated_by" });
+
 DropdownName.hasMany(DropdownValue, { foreignKey: "dropdown_id" });
-DropdownValue.belongsTo(DropdownName, {
+DropdownValue.belongsTo(DropdownName, { 
   foreignKey: "dropdown_id",
   as: "dropdownName",
 });

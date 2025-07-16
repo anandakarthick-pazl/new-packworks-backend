@@ -20,12 +20,21 @@ const Color = sequelize.define(
       },
       onUpdate: "CASCADE",
     },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
     color_name: {
       type: DataTypes.STRING(50),
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('active', 'inactive'),
+      type: DataTypes.ENUM("active", "inactive"),
       defaultValue: "active",
     },
     created_by: {

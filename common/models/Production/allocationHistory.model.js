@@ -5,6 +5,7 @@ import User from "../user.model.js";
 import Inventory from "../inventory/inventory.model.js";
 import ProductionGroup from "./productionGroup.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const AllocationHistory = sequelize.define(
@@ -24,6 +25,15 @@ const AllocationHistory = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     inventory_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -95,7 +105,11 @@ const AllocationHistory = sequelize.define(
 // Associations
 Company.hasMany(AllocationHistory, { foreignKey: "company_id" });
 AllocationHistory.belongsTo(Company, { foreignKey: "company_id" });
+
+AllocationHistory.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
+
 ProductionGroup.hasMany(AllocationHistory, { foreignKey: "group_id" });
+
 AllocationHistory.belongsTo(ProductionGroup, { foreignKey: "group_id" });
 Inventory.hasMany(AllocationHistory, { foreignKey: "inventory_id" });
 AllocationHistory.belongsTo(Inventory, { foreignKey: "inventory_id" });

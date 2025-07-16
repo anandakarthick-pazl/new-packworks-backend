@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import PurchaseOrder from "./purchase_order.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const PurchaseOrderPayment = sequelize.define('PurchaseOrderPayment', {
@@ -49,6 +50,15 @@ const PurchaseOrderPayment = sequelize.define('PurchaseOrderPayment', {
         },
         onUpdate: "CASCADE",
     },
+      company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
     created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     allowNull: true,
@@ -78,8 +88,9 @@ const PurchaseOrderPayment = sequelize.define('PurchaseOrderPayment', {
     timestamps: false, 
 });
     
-
+    
     PurchaseOrderPayment.belongsTo(Company, { foreignKey: "company_id" });
+    PurchaseOrderPayment.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
     PurchaseOrderPayment.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     PurchaseOrderPayment.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
     PurchaseOrderPayment.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });

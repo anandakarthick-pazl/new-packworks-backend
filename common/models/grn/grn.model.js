@@ -36,6 +36,15 @@ const GRN = sequelize.define("GRN", {
     },
     onUpdate: "CASCADE",
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   grn_date: {
     type: DataTypes.DATEONLY,
     allowNull: false,
@@ -118,6 +127,7 @@ PurchaseOrder.hasMany(GRN, { foreignKey: "po_id" });
 GRN.belongsTo(PurchaseOrder, { foreignKey: "po_id", as: 'purchase_order'});
 
 GRN.belongsTo(Company, { foreignKey: "company_id" });
+GRN.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 
 GRN.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRN.belongsTo(User, { foreignKey: "updated_by", as: "updater" });

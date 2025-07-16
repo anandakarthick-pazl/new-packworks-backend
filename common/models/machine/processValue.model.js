@@ -4,6 +4,7 @@ import User from "../user.model.js";
 import ProcessName from "./processName.model.js";
 import Company from "../company.model.js";
 import Machine from "./machine.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const MachineProcessValue = sequelize.define(
   "MachineProcessValue",
@@ -22,6 +23,15 @@ const MachineProcessValue = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     process_name_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -90,6 +100,11 @@ Company.hasMany(MachineProcessValue, {
 MachineProcessValue.belongsTo(Company, {
   foreignKey: "company_id",
 });
+
+MachineProcessValue.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
+
 ProcessName.hasMany(MachineProcessValue, {
   foreignKey: "process_name_id",
 });
