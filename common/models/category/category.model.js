@@ -90,7 +90,7 @@ Category.belongsTo(Company, {
   foreignKey: "company_id",
 });
 Category.belongsTo(CompanyAddress, {
-  foreignKey: "company_id",
+  foreignKey: "company_branch_id",
 });
 
 Category.addHook("afterFind", (result) => {

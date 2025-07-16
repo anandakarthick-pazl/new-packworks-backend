@@ -5,6 +5,7 @@ import Client from "../client.model.js";
 import SalesOrder from "./salesOrder.model.js";
 import User from "../user.model.js";
 import Sku from "../skuModel/sku.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const SalesSkuDetails = sequelize.define(
   "SalesSkuDetails",
@@ -23,6 +24,15 @@ const SalesSkuDetails = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -133,6 +143,9 @@ const SalesSkuDetails = sequelize.define(
 // Associations
 Company.hasMany(SalesSkuDetails, { foreignKey: "company_id" });
 SalesSkuDetails.belongsTo(Company, { foreignKey: "company_id" });
+
+CompanyAddress.hasMany(SalesSkuDetails, { foreignKey: "company_branch_id" });
+SalesSkuDetails.belongsTo(CompanyAddress, { foreignKey: "company_branch_id" });
 
 Client.hasMany(SalesSkuDetails, { foreignKey: "client_id" });
 SalesSkuDetails.belongsTo(Client, { foreignKey: "client_id" });

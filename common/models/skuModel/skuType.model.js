@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const SkuType = sequelize.define(
   "SkuType",
@@ -20,6 +21,15 @@ const SkuType = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     sku_type: {
       type: DataTypes.STRING(255),
@@ -64,6 +74,11 @@ const SkuType = sequelize.define(
 // Correcting the association
 Company.hasMany(SkuType, { foreignKey: "company_id" });
 SkuType.belongsTo(Company, { foreignKey: "company_id" });
+
+SkuType.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch", 
+});
 
 // Better naming for associations to prevent conflicts
 User.hasMany(SkuType, { foreignKey: "created_by", as: "creator_sku_types" });

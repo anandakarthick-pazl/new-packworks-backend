@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const StockAdjustment = sequelize.define("StockAdjustment", {
@@ -36,6 +37,15 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
     },
     onUpdate: "CASCADE",
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
    inventory_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -102,6 +112,14 @@ const StockAdjustment = sequelize.define("StockAdjustment", {
 });
 
 StockAdjustment.belongsTo(User, { as: "creator", foreignKey: "created_by" });
+StockAdjustment.belongsTo(User, { as: "updater", foreignKey: "updated_by" }); 
+
+StockAdjustment.belongsTo(Company, { foreignKey: "company_id" });
+Company.hasMany(StockAdjustment, { foreignKey: "company_id" });
+StockAdjustment.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch", 
+});
 
 StockAdjustment.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {
