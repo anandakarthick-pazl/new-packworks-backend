@@ -121,17 +121,17 @@ DemoRequest.init(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('created_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('created_at'));
+      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('updated_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('updated_at'));
+      // }
     },
   },
   {
@@ -155,5 +155,28 @@ DemoRequest.init(
     ],
   }
 );
+
+DemoRequest.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default DemoRequest;

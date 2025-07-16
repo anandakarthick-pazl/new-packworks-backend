@@ -54,16 +54,16 @@ const PurchaseOrderBilling = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('created_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('created_at'));
+      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('updated_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('updated_at'));
+      // }
     },
     created_by: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -93,5 +93,28 @@ PurchaseOrderBilling.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id',
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'created_by', as: 'createdBy' });
 PurchaseOrderBilling.belongsTo(User, { foreignKey: 'updated_by', as: 'updatedBy' });
 PurchaseOrderBilling.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+
+PurchaseOrderBilling.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default PurchaseOrderBilling;

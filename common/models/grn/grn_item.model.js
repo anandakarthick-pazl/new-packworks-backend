@@ -119,16 +119,16 @@ const GRNItem = sequelize.define("GRNItem", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('created_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('created_at'));
+    // }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('updated_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('updated_at'));
+    // }
   },
   deleted_at: {
     type: DataTypes.DATE,
@@ -172,5 +172,28 @@ GRNItem.belongsTo(Company, { foreignKey: "company_id" });
 GRNItem.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 GRNItem.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 GRNItem.belongsTo(GRN, { foreignKey: 'grn_id', as: 'grn' });
+
+GRNItem.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default GRNItem;

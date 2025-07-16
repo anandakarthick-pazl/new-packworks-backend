@@ -30,15 +30,15 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       po_date: {
         type: DataTypes.DATEONLY,
         allowNull: false,
-        get() {
-          return formatDateTime(this.getDataValue('po_date'));
-        }
+        // get() {
+        //   return formatDateTime(this.getDataValue('po_date'));
+        // }
       },
       valid_till: {
         type: DataTypes.DATEONLY,
-        get() {
-          return formatDateTime(this.getDataValue('valid_till'));
-        }
+        // get() {
+        //   return formatDateTime(this.getDataValue('valid_till'));
+        // }
       },
       supplier_id: {
         type: DataTypes.INTEGER,
@@ -164,6 +164,29 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     PurchaseOrder.belongsTo(Company, { foreignKey: "company_id" });
     PurchaseOrder.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     PurchaseOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+    PurchaseOrder.addHook("afterFind", (result) => {
+      const formatRecordDates = (record) => {
+        if (!record || !record.getDataValue) return;
+    
+        const createdAt = record.getDataValue("created_at");
+        const updatedAt = record.getDataValue("updated_at");
+    
+        if (createdAt) {
+          record.dataValues.created_at = formatDateTime(createdAt);
+        }
+    
+        if (updatedAt) {
+          record.dataValues.updated_at = formatDateTime(updatedAt);
+        }
+      };
+    
+      if (Array.isArray(result)) {
+        result.forEach(formatRecordDates);
+      } else if (result) {
+        formatRecordDates(result);
+      }
+    });
     
     export default PurchaseOrder;
   

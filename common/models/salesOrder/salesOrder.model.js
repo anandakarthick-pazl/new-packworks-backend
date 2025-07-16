@@ -103,17 +103,17 @@ const SalesOrder = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('created_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('created_at'));
+      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue('updated_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('updated_at'));
+      // }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -153,5 +153,28 @@ SalesOrder.belongsTo(Client, { foreignKey: "client_id" });
 // User.hasMany(SalesOrder, { foreignKey: "updated_by" });
 SalesOrder.belongsTo(User, { foreignKey: "created_by", as: "creator_sales" });
 SalesOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater_sales" });
+
+SalesOrder.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default SalesOrder;
