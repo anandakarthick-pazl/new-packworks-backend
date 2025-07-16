@@ -127,17 +127,17 @@ const Package = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
-      get() {
-        return formatDateTime(this.getDataValue('created_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('created_at'));
+      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-      get() {
-        return formatDateTime(this.getDataValue('updated_at'));
-      }
+      // get() {
+      //   return formatDateTime(this.getDataValue('updated_at'));
+      // }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),
@@ -163,6 +163,29 @@ const Package = sequelize.define(
 Package.belongsTo(Currency, {
   foreignKey: "currency_id",
   as: "currency",
+});
+
+Package.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
 });
 
 export default Package;
