@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const ProductionGroup = sequelize.define(
@@ -27,6 +28,16 @@ const ProductionGroup = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    
     group_name: {
       type: DataTypes.STRING(100),
       allowNull: true,
@@ -116,6 +127,8 @@ const ProductionGroup = sequelize.define(
 // Associations
 Company.hasMany(ProductionGroup, { foreignKey: "company_id" });
 ProductionGroup.belongsTo(Company, { foreignKey: "company_id" });
+
+ProductionGroup.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 
 ProductionGroup.belongsTo(User, {
   foreignKey: "created_by",

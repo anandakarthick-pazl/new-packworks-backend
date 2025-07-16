@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import Sku from "./sku.model.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const SkuVersion = sequelize.define(
   "SkuVersion",
@@ -18,6 +19,16 @@ const SkuVersion = sequelize.define(
       allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -89,6 +100,11 @@ const SkuVersion = sequelize.define(
 // Associations
 Company.hasMany(SkuVersion, { foreignKey: "company_id" });
 SkuVersion.belongsTo(Company, { foreignKey: "company_id" });
+
+SkuVersion.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch",
+});
 
 Client.hasMany(SkuVersion, { foreignKey: "client_id" });
 SkuVersion.belongsTo(Client, { foreignKey: "client_id" });

@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import User from "../user.model.js";
 import Company from "../company.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const MachineRouteProcess = sequelize.define(
   "MachineRouteProcess",
@@ -17,6 +18,15 @@ const MachineRouteProcess = sequelize.define(
       allowNull: false,
       references: {
         model: Company,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+        company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -77,6 +87,11 @@ const MachineRouteProcess = sequelize.define(
 // Associations
 Company.hasMany(MachineRouteProcess, { foreignKey: "company_id" });
 MachineRouteProcess.belongsTo(Company, { foreignKey: "company_id" });
+
+MachineRouteProcess.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch",
+});
 
 User.hasMany(MachineRouteProcess, { foreignKey: "created_by" });
 User.hasMany(MachineRouteProcess, { foreignKey: "updated_by" });

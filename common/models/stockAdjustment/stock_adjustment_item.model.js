@@ -6,6 +6,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import { Sequelize } from "sequelize";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 
 const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
@@ -69,6 +70,15 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
     },
     
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   created_by: {
     type: DataTypes.INTEGER.UNSIGNED,
     references: {
@@ -113,6 +123,8 @@ const StockAdjustmentItem = sequelize.define("StockAdjustmentItem", {
 
 StockAdjustment.hasMany(StockAdjustmentItem, { foreignKey: "adjustment_id" });
 StockAdjustmentItem.belongsTo(StockAdjustment, { foreignKey: "adjustment_id", as: "adjustment" });
+
+StockAdjustmentItem.belongsTo(ItemMaster, { foreignKey: "item_id", as: "item" });
 
 StockAdjustmentItem.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {

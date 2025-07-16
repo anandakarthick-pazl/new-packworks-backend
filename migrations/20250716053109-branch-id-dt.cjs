@@ -5,8 +5,7 @@ module.exports = {
     await queryInterface.changeColumn("company_addresses", "id", {
       type: Sequelize.INTEGER.UNSIGNED,
       allowNull: false,
-      autoIncrement: true,
-      primaryKey: true,
+      // DO NOT reassign autoIncrement or primaryKey if already set
     });
   },
 
@@ -14,8 +13,6 @@ module.exports = {
     await queryInterface.changeColumn("company_addresses", "id", {
       type: Sequelize.BIGINT.UNSIGNED,
       allowNull: false,
-      autoIncrement: true,
-      primaryKey: true,
     });
   },
 };

@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 // OrderDetails Model
 const SalesOrder = sequelize.define(
@@ -24,6 +25,16 @@ const SalesOrder = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
+    
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -145,6 +156,9 @@ const SalesOrder = sequelize.define(
 
 Company.hasMany(SalesOrder, { foreignKey: "company_id" });
 SalesOrder.belongsTo(Company, { foreignKey: "company_id" });
+
+CompanyAddress.hasMany(SalesOrder, { foreignKey: "company_branch_id", as: "salesOrders" });
+SalesOrder.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 
 Client.hasMany(SalesOrder, { foreignKey: "client_id" });
 SalesOrder.belongsTo(Client, { foreignKey: "client_id" });

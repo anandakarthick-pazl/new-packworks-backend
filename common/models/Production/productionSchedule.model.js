@@ -3,6 +3,7 @@ import sequelize from "../../database/database.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const ProductionSchedule = sequelize.define("ProductionSchedule", {
     id: {
@@ -23,6 +24,15 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
     },
     onUpdate: "CASCADE",
   },
+  company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
   employee_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -113,6 +123,7 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
 });
 
 ProductionSchedule.belongsTo(Company, { foreignKey: "company_id" });
+ProductionSchedule.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 ProductionSchedule.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ProductionSchedule.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 

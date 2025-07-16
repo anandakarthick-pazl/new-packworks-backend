@@ -7,6 +7,7 @@ import User from "../user.model.js";
 import Sku from "../skuModel/sku.model.js";
 import WorkOrder from "./workOrder.model.js";
 import SkuVersion from "../skuModel/skuVersion.js";
+import CompanyAddress from "../companyAddress.model.js";
 
 const WorkOrderInvoice = sequelize.define(
   "WorkOrderInvoice",
@@ -25,6 +26,15 @@ const WorkOrderInvoice = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -206,6 +216,11 @@ const WorkOrderInvoice = sequelize.define(
 // Define associations
 Company.hasMany(WorkOrderInvoice, { foreignKey: "company_id" });
 WorkOrderInvoice.belongsTo(Company, { foreignKey: "company_id" });
+
+WorkOrderInvoice.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch",
+});
 
 Client.hasMany(WorkOrderInvoice, { foreignKey: "client_id" });
 WorkOrderInvoice.belongsTo(Client, { foreignKey: "client_id" });

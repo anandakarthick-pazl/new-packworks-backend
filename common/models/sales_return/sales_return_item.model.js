@@ -1,6 +1,7 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const SalesReturnItem = sequelize.define("SalesReturnItem", {
     id: {
@@ -76,6 +77,15 @@ const SalesReturnItem = sequelize.define("SalesReturnItem", {
         type: DataTypes.INTEGER,
         allowNull: false
     },
+        company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+    },
     created_by: {
         type: DataTypes.INTEGER,
         allowNull: false
@@ -106,5 +116,13 @@ const SalesReturnItem = sequelize.define("SalesReturnItem", {
     tableName: 'sales_return_items',
     timestamps: false
 });
+
+CompanyAddress.hasMany(SalesReturnItem, { foreignKey: "company_branch_id", as: "salesReturnItems" });
+SalesReturnItem.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
+
+SalesReturnItem.belongsTo(sequelize.models.SalesReturn, { foreignKey: "sales_return_id", as: "salesReturn" });
+SalesReturnItem.belongsTo(sequelize.models.ItemMaster, { foreignKey: "item_id", as: "itemInfo" });
+SalesReturnItem.belongsTo(sequelize.models.User, { foreignKey: "created_by", as: "creator" });
+SalesReturnItem.belongsTo(sequelize.models.User, { foreignKey: "updated_by", as: "updater" });
 
 export default SalesReturnItem;

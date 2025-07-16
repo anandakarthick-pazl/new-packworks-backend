@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import Client from "../client.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
+import CompanyAddress from "../companyAddress.model.js";
 
 const Sku = sequelize.define(
   "SKU",
@@ -22,6 +23,15 @@ const Sku = sequelize.define(
       },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
+    },
+    company_branch_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: CompanyAddress,        
+        key: "id",
+      },
+      onUpdate: "CASCADE",
     },
     client_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -160,6 +170,11 @@ const Sku = sequelize.define(
 
 Company.hasMany(Sku, { foreignKey: "company_id" });
 Sku.belongsTo(Company, { foreignKey: "company_id" });
+
+Sku.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+  as: "branch",
+});
 
 Client.hasMany(Sku, { foreignKey: "client_id" });
 Sku.belongsTo(Client, { foreignKey: "client_id" });
