@@ -49,6 +49,8 @@ const SalesSkuDetails = db.SalesSkuDetails;
 
 // 🔹 Create a SKU (POST)
 patchModelForBranchFiltering(Sku);
+patchModelForBranchFiltering(SkuVersion);
+patchModelForBranchFiltering(SkuOptions);
 
 v1Router.post(
   "/sku-details",

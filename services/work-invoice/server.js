@@ -24,11 +24,21 @@ import FormData from "form-data";
 import PDFDocument from 'pdfkit';
 import crypto from 'crypto';
 
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+
 // For ES6 modules, we need to recreate __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+
+
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -47,7 +57,16 @@ const app = express();
 app.use(json());
 app.use(cors());
 
+
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 
 const WorkOrderInvoice = db.WorkOrderInvoice;
 const WorkOrder = db.WorkOrder;
@@ -55,6 +74,11 @@ const SalesOrder = db.SalesOrder;
 const Client = db.Client;
 const WalletHistory = db.WalletHistory;
 const PartialPayment = db.PartialPayment;
+
+patchModelForBranchFiltering(WorkOrderInvoice);
+patchModelForBranchFiltering(WalletHistory);
+patchModelForBranchFiltering(PartialPayment);
+
 
 // POST create new work order invoice
 // v1Router.post("/create", authenticateJWT, async (req, res) => {

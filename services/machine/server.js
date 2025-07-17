@@ -10,13 +10,27 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 
 const Machine = db.Machine;
 const ProcessName = db.ProcessName;
@@ -25,6 +39,9 @@ const MachineProcessField = db.MachineProcessField;
 const MachineFlow = db.MachineFlow;
 const Company = db.Company;
 const User = db.User;
+
+patchModelForBranchFiltering(Machine);
+patchModelForBranchFiltering(ProcessName);  
 
 // Helper function to get process details from machine_route IDs
 const getProcessDetailsByIds = async (processIds) => {

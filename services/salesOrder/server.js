@@ -12,6 +12,18 @@ import ExcelJS from "exceljs";
 import { Readable } from "stream";
 import axios from 'axios';
 import FormData from "form-data";
+// Create a public directory for storing QR code images if needed
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
 
 dotenv.config();
 
@@ -19,12 +31,8 @@ const app = express();
 app.use(json());
 app.use(cors());
 
-
-
-// Create a public directory for storing QR code images if needed
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,49 +48,16 @@ app.use("/qrcodes", express.static(qrCodeDir));
 
 const v1Router = Router();
 
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 const SalesOrder = db.SalesOrder;
 const WorkOrder = db.WorkOrder;
 const SalesSkuDetails = db.SalesSkuDetails;
 const User = db.User;
 
-// async function generateQRCode(workOrder) {
-//   try {
-//     // Create a nicely formatted plain text representation of the work order
-//     const textContent = `
-// Work Order: ${workOrder.work_generate_id}
-// SKU: ${workOrder.sku_name || "N/A"}
-// Quantity: ${workOrder.qty || "N/A"}
-// Manufacture: ${workOrder.manufacture || "N/A"}
-// Status: ${workOrder.status || "N/A"}
-// ${workOrder.description ? `Description: ${workOrder.description}` : ""}
-// ${workOrder.edd
-//         ? `Expected Delivery: ${new Date(workOrder.edd).toLocaleDateString()}`
-//         : ""
-//       }
-// `.trim();
-
-//     // Generate a unique filename
-//     const qrFileName = `wo_${workOrder.work_generate_id.replace(
-//       /[^a-zA-Z0-9]/g,
-//       "_"
-//     )}_${Date.now()}.png`;
-//     const qrFilePath = path.join(qrCodeDir, qrFileName);
-
-//     // Generate QR code with the plain text
-//     await QRCode.toFile(qrFilePath, textContent, {
-//       errorCorrectionLevel: "H",
-//       margin: 1,
-//       width: 300,
-//     });
-
-//     // Return the URL to access the QR code
-//     const baseUrl = `http://localhost:${process.env.PORT || 3006}`;
-//     return `${baseUrl}/qrcodes/${qrFileName}`;
-//   } catch (error) {
-//     logger.error("Error generating QR code:", error);
-//     throw error;
-//   }
-// }
+patchModelForBranchFiltering(SalesOrder);
 
 async function generateQRCode(workOrder, token) {
   try {
