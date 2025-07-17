@@ -174,13 +174,18 @@ SalesOrder.addHook("afterFind", (result) => {
 
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
-
+    const estimatedDate = record.getDataValue("estimated");
+    
     if (createdAt) {
       record.dataValues.created_at = formatDateTime(createdAt);
     }
 
     if (updatedAt) {
       record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+
+    if (estimatedDate) {
+      record.dataValues.estimated = formatDateTime(estimatedDate);
     }
   };
 
@@ -190,5 +195,8 @@ SalesOrder.addHook("afterFind", (result) => {
     formatRecordDates(result);
   }
 });
+
+
+
 
 export default SalesOrder;
