@@ -4,6 +4,7 @@ import PurchaseOrder from "../po/purchase_order.model.js";
 import Company from "../company.model.js";
 import User from "../user.model.js";
 import CompanyAddress from "../companyAddress.model.js";
+import { formatDateTime } from "../../utils/dateFormatHelper.js";
 
 const GRN = sequelize.define("GRN", {
   id: {
@@ -135,4 +136,38 @@ GRN.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
     
 GRN.belongsTo(User, { foreignKey: "created_by", as: "createdBy" });
 GRN.belongsTo(User, { foreignKey: "updated_by", as: "updatedBy" });
+
+GRN.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const grnDate = record.getDataValue("grn_date");
+    const invoiceDate = record.getDataValue("invoice_date");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (grnDate) {
+      record.dataValues.grn_date = formatDateTime(grnDate);
+    }
+
+    if (invoiceDate) {
+      record.dataValues.invoice_date = formatDateTime(invoiceDate);
+    }
+
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 export default GRN;

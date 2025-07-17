@@ -174,6 +174,7 @@ DebitNote.addHook("afterFind", (result) => {
 
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const debitNoteDate = record.getDataValue("debit_note_date");
 
     if (createdAt) {
       record.dataValues.created_at = formatDateTime(createdAt);
@@ -181,6 +182,10 @@ DebitNote.addHook("afterFind", (result) => {
 
     if (updatedAt) {
       record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (debitNoteDate) {
+      record.dataValues.debit_note_date = formatDateTime(debitNoteDate);
     }
   };
 

@@ -135,16 +135,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
       created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
-        get() {
-          return formatDateTime(this.getDataValue('created_at'));
-        }
       },
       updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
-        get() {
-          return formatDateTime(this.getDataValue('updated_at'));
-        }
       },
       deleted_at: {
         type: DataTypes.DATE,
@@ -182,6 +176,7 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     
         const createdAt = record.getDataValue("created_at");
         const updatedAt = record.getDataValue("updated_at");
+        const poDate = record.getDataValue("po_date");
     
         if (createdAt) {
           record.dataValues.created_at = formatDateTime(createdAt);
@@ -189,6 +184,10 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     
         if (updatedAt) {
           record.dataValues.updated_at = formatDateTime(updatedAt);
+        }
+        
+        if (poDate) {
+          record.dataValues.po_date = formatDateTime(poDate);
         }
       };
     

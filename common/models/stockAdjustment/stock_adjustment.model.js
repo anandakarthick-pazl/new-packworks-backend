@@ -127,6 +127,7 @@ StockAdjustment.addHook("afterFind", (result) => {
 
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const adjustmentDate = record.getDataValue("adjustment_date");
 
     if (createdAt) {
       record.dataValues.created_at = formatDateTime(createdAt);
@@ -134,6 +135,10 @@ StockAdjustment.addHook("afterFind", (result) => {
 
     if (updatedAt) {
       record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (adjustmentDate) {
+      record.dataValues.adjustment_date = formatDateTime(adjustmentDate);
     }
   };
 

@@ -9,6 +9,7 @@ import ItemMaster from "../item.model.js";
 import { formatDateTime } from "../../utils/dateFormatHelper.js";
 import CompanyAddress from "../companyAddress.model.js";
 
+
 const PurchaseOrderReturn = sequelize.define(
   "PurchaseOrderReturn",
   {
@@ -110,16 +111,16 @@ const PurchaseOrderReturn = sequelize.define(
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue("created_at"));
-      },
+      // get() {
+      //   return formatDateTime(this.getDataValue("created_at"));
+      // },
     },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-      get() {
-        return formatDateTime(this.getDataValue("updated_at"));
-      },
+      // get() {
+      //   return formatDateTime(this.getDataValue("updated_at"));
+      // },
     },
     deleted_at: {
       type: DataTypes.DATE,
@@ -160,12 +161,41 @@ PurchaseOrderReturn.belongsTo(CompanyAddress, {
 });
 PurchaseOrderReturn.belongsTo(User, {
   foreignKey: "created_by",
-  as: "creator",
+  as: "created_by_user",
 });
 PurchaseOrderReturn.belongsTo(User, {
   foreignKey: "updated_by",
-  as: "updater",
+  as: "updated_by_user",
 });
 PurchaseOrderReturn.belongsTo(GRN, { foreignKey: "grn_id" });
+
+PurchaseOrderReturn.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const returnDate = record.getDataValue("return_date");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (returnDate) {
+      record.dataValues.return_date = formatDateTime(returnDate);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
+
 
 export default PurchaseOrderReturn;

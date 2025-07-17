@@ -15,6 +15,27 @@ import HtmlTemplate from "../../common/models/htmlTemplate.model.js";
 import puppeteer from 'puppeteer';
 import handlebars from 'handlebars';
 import addWalletHistory from "../../common/helper/walletHelper.js";
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+dotenv.config();
+const app = express();
+app.use(json());
+app.use(cors());
+
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
+const v1Router = Router();
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 
 const Company = db.Company;
 const User = db.User;
@@ -33,11 +54,11 @@ const WalletHistory = db.WalletHistory;
 const PurchaseOrderPayment = db.PurchaseOrderPayment;
 
 
-dotenv.config();
-const app = express();
-app.use(json());
-app.use(cors());
-const v1Router = Router();
+patchModelForBranchFiltering(PurchaseOrder);
+patchModelForBranchFiltering(PurchaseOrderItem);
+patchModelForBranchFiltering(PurchaseOrderBilling);
+patchModelForBranchFiltering(PurchaseOrderPayment);
+patchModelForBranchFiltering(WalletHistory);
 
 
 // billings
