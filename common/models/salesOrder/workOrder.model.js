@@ -7,6 +7,8 @@ import User from "../user.model.js";
 import SkuVersion from "../skuModel/skuVersion.js";
 import Sku from "../skuModel/sku.model.js";
 import CompanyAddress from "../companyAddress.model.js";
+import { formatDateTime } from '../../utils/dateFormatHelper.js';
+
 
 const WorkOrder = sequelize.define(
   "WorkOrder",
@@ -252,5 +254,47 @@ WorkOrder.belongsTo(Client, { foreignKey: "client_id" });
 // User.hasMany(WorkOrder, { foreignKey: "updated_by" });
 WorkOrder.belongsTo(User, { foreignKey: "created_by", as: "creator_work" });
 WorkOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater_work" });
+
+
+WorkOrder.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const eddDate = record.getDataValue("edd");
+    const planDate = record.getDataValue("planned_start_date");
+    const endDate = record.getDataValue("planned_end_date");
+    
+
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+
+    if (eddDate) {
+      record.dataValues.edd = formatDateTime(eddDate);
+    }
+
+    if (planDate) {
+      record.dataValues.planned_start_date = formatDateTime(planDate);
+    }
+
+    if (endDate) {
+      record.dataValues.planned_end_date = formatDateTime(endDate);
+    }
+
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default WorkOrder;
