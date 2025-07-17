@@ -2,7 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
 import Company from "./company.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 const Employee = sequelize.define(
   "Employee",
@@ -16,15 +16,15 @@ const Employee = sequelize.define(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     user_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -153,9 +153,9 @@ const Employee = sequelize.define(
 Employee.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-Employee.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// Employee.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 Employee.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {

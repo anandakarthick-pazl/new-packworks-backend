@@ -1,7 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 const ModuleSettings = sequelize.define("Module", {
   id: {
@@ -20,15 +20,15 @@ const ModuleSettings = sequelize.define("Module", {
     onUpdate: "CASCADE",
     onDelete: "SET NULL"
   },
-  company_branch_id: {
-        type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true,
-        references: {
-          model: CompanyAddress,
-          key: "id",
-        },
-        onUpdate: "CASCADE",
-  },
+  // company_branch_id: {
+  //       type: DataTypes.INTEGER.UNSIGNED,
+  //       allowNull: true,
+  //       references: {
+  //         model: CompanyAddress,
+  //         key: "id",
+  //       },
+  //       onUpdate: "CASCADE",
+  // },
   module_name: {
     type: DataTypes.STRING(191),
     allowNull: false
@@ -73,8 +73,8 @@ const ModuleSettings = sequelize.define("Module", {
 ModuleSettings.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-ModuleSettings.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// ModuleSettings.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 export default ModuleSettings;

@@ -15,15 +15,15 @@ const FileStorage = sequelize.define(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     path: {
       type: DataTypes.STRING(191),
       allowNull: false,
@@ -60,8 +60,8 @@ const FileStorage = sequelize.define(
 FileStorage.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-FileStorage.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// FileStorage.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 export default FileStorage;

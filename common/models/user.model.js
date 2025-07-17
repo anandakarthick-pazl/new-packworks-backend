@@ -4,7 +4,7 @@ import Company from './company.model.js';
 import UserRole from './userRole.model.js';
 import Employee from './employee.model.js';
 import { formatDateTime } from '../utils/dateFormatHelper.js';
-import CompanyAddress from './companyAddress.model.js';
+// import CompanyAddress from './companyAddress.model.js';
 
 const User = sequelize.define('User', {
     id: {
@@ -22,15 +22,15 @@ const User = sequelize.define('User', {
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE',
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     user_auth_id: {
         type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
@@ -135,9 +135,9 @@ Company.hasMany(User, {
 User.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-User.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// User.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 
 

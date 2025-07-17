@@ -1,7 +1,7 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import sequelize from '../database/database.js';
 import Company from './company.model.js';
-import CompanyAddress from './companyAddress.model.js';
+// import CompanyAddress from './companyAddress.model.js';
 
 const Designation = sequelize.define('Designation', {
     id: {
@@ -14,15 +14,15 @@ const Designation = sequelize.define('Designation', {
       allowNull: true,
       indexes: [{ unique: false }]
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     name: {
       type: DataTypes.STRING(191),
       allowNull: false
@@ -58,8 +58,8 @@ const Designation = sequelize.define('Designation', {
   Designation.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-Designation.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// Designation.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
   
   export default Designation;

@@ -2,7 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
 import User from "./user.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 const Flute = sequelize.define('Flute',{
   id: {
@@ -19,15 +19,15 @@ const Flute = sequelize.define('Flute',{
     },
     onUpdate: "CASCADE",
   },
-  company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+  // company_branch_id: {
+  //         type: DataTypes.INTEGER.UNSIGNED,
+  //         allowNull: true,
+  //         references: {
+  //           model: CompanyAddress,
+  //           key: "id",
+  //         },
+  //         onUpdate: "CASCADE",
+  //   },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -87,7 +87,7 @@ Flute.belongsTo(Company, { foreignKey: "company_id" });
 Flute.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Flute.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-Flute.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// Flute.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 export default Flute;
