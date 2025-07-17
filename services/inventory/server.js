@@ -5,45 +5,39 @@ import db from "../../common/models/index.js";
 import dotenv from "dotenv";
 import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
-import { generateId } from "../../common/inputvalidation/generateId.js";
 import ExcelJS from "exceljs";
 import nodemailer from "nodemailer";
-// import dotenv from "dotenv";
-// const ItemMaster = db.ItemMaster;
-// const Company = db.Company;
-// const Inventory = db.Inventory;
-// const User =db.User;
-// const InventoryType = db.InventoryType;
-// const GRN = db.GRN;
-// const GRNItem = db.GRNItem;
-
-
-const ItemMaster = db.ItemMaster;
-const Notification = db.Notification;
-const Company = db.Company;
-const User = db.User;
-const GRN = db.GRN;
-const GRNItem = db.GRNItem;
-const Inventory = db.Inventory;
-const PurchaseOrder = db.PurchaseOrder;
-const PurchaseOrderItem = db.PurchaseOrderItem;
-const PurchaseOrderReturn = db.PurchaseOrderReturn;
-const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
-const CreditNote = db.CreditNote;
-const DebitNote = db.DebitNote;
-const stockAdjustment = db.stockAdjustment;
-const stockAdjustmentItem = db.stockAdjustmentItem;
-const Categories = db.Categories;
-const Sub_categories = db.Sub_categories;
-const PurchaseOrderBilling = db.PurchaseOrderBilling;
-const Sku = db.Sku;
-const WorkOrder = db.WorkOrder;
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
 
 dotenv.config();
 const app = express();
 app.use(json());
 app.use(cors());
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
+
+const ItemMaster = db.ItemMaster;
+const Notification = db.Notification;
+const GRN = db.GRN;
+const GRNItem = db.GRNItem;
+const Inventory = db.Inventory;
+const Categories = db.Categories;
+const Sub_categories = db.Sub_categories;
+
+patchModelForBranchFiltering(Inventory);
+
+
 
 //reels 
 v1Router.get("/inventory/reels", authenticateJWT, async (req, res) => {

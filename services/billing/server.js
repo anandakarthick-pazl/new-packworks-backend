@@ -17,7 +17,17 @@ import crypto from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import CompanyPaymentBill from '../../common/models/companyPaymentBill.model.js';
+// import CompanyPaymentBill from '../../common/models/companyPaymentBill.model.js';
+import { QueryTypes } from "sequelize";
+import Billing from "../../common/models/po/purchaseOrderBilling.model.js"
+
+
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
 
 dotenv.config();
 
@@ -25,10 +35,15 @@ const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
 
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
-import { QueryTypes } from "sequelize";
 
 
 // 🔹 Get All billing (GET) with Addresses - Only active billing

@@ -7,18 +7,30 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import "../../common/models/association.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import { Op } from "sequelize";
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+
+dotenv.config();
+const app = express();
+app.use(json());
+app.use(cors());
+setupBranchFiltering(sequelize);
+
+const v1Router = Router();
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 const PurchaseOrder = db.PurchaseOrder;
 const PurchaseOrderReturn = db.PurchaseOrderReturn;
 const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
 const debit_note = db.DebitNote;
 const Inventory = db.Inventory;
-
-dotenv.config();
-const app = express();
-app.use(json());
-app.use(cors());
-const v1Router = Router();
+patchModelForBranchFiltering(debit_note);
 
 
 // Create 
