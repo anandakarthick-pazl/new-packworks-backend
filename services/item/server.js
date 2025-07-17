@@ -14,34 +14,42 @@ import axios from "axios";
 import FormData from "form-data";
 import { fileURLToPath } from "url";
 
-const ItemMaster = db.ItemMaster;
-const Company = db.Company;
-const User =db.User;
-// const GRN = db.GRN;
-// const GRNItem = db.GRNItem;
-const Inventory = db.Inventory;
-// const PurchaseOrder = db.PurchaseOrder;
-// const PurchaseOrderItem = db.PurchaseOrderItem;
-// const PurchaseOrderReturn = db.PurchaseOrderReturn;
-// const PurchaseOrderReturnItem = db.PurchaseOrderReturnItem;
-// const CreditNote = db.CreditNote;
-// const DebitNote = db.DebitNote;
-// const stockAdjustment = db.stockAdjustment;
-// const stockAdjustmentItem = db.stockAdjustmentItem;
-const Sub_categories = db.Sub_categories;
-const Categories = db.Categories;
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
 
 dotenv.config();
+
 const app = express();
 app.use(json());
 app.use(cors());
+
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
 
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
+const ItemMaster = db.ItemMaster;
+const Company = db.Company;
+const User =db.User;
+const Inventory = db.Inventory;
+const Sub_categories = db.Sub_categories;
+const Categories = db.Categories;
+
+patchModelForBranchFiltering(ItemMaster);
+patchModelForBranchFiltering(Sub_categories); 
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 
 // FIX 1: Ensure the public directory structure is correct
 const publicDir = path.join(__dirname, "../../public");
