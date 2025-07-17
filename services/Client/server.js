@@ -12,6 +12,7 @@ import {
   publishToQueue,
   rabbitChannel,
   closeRabbitMQConnection,
+  
 } from "../../common/helper/rabbitmq.js";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
@@ -24,7 +25,8 @@ import { validateClient } from "../../common/inputvalidation/validationClient.js
 import { 
   branchFilterMiddleware, 
   resetBranchFilter, 
-  setupBranchFiltering 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
 } from "../../common/helper/branchFilter.js";
 
 dotenv.config();
@@ -47,6 +49,8 @@ const Client = db.Client;
 const Address = db.ClientAddress;
 const User = db.User;
 const States = db.States; // Import States model
+
+patchModelForBranchFiltering(Client);
 
 // 🔹 Create a Client (POST)
 v1Router.post("/clients", authenticateJWT, validateClient, async (req, res) => {
