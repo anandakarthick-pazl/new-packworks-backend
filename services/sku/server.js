@@ -19,7 +19,8 @@ import { generateId } from "../../common/inputvalidation/generateId.js";
 import { 
   branchFilterMiddleware, 
   resetBranchFilter, 
-  setupBranchFiltering 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
 } from "../../common/helper/branchFilter.js";
 
 
@@ -47,6 +48,7 @@ const SkuOptions = db.SkuOptions;
 const SalesSkuDetails = db.SalesSkuDetails;
 
 // 🔹 Create a SKU (POST)
+patchModelForBranchFiltering(Sku);
 
 v1Router.post(
   "/sku-details",
