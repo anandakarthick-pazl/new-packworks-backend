@@ -16,13 +16,27 @@ import { Readable } from "stream";
 import validateUniqueKey from "../../common/inputvalidation/validteUniquKey.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 const Sku = db.Sku;
 const SkuVersion = db.SkuVersion;
