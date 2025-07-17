@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import BaseModel from "./base.model.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
 import Company from "./company.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 class DemoRequest extends BaseModel {
   // Override init to bypass company_id requirement since this is for public form
@@ -119,15 +119,15 @@ DemoRequest.init(
         key: "id",
       },
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -170,9 +170,9 @@ DemoRequest.init(
 DemoRequest.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-DemoRequest.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// DemoRequest.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 DemoRequest.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {

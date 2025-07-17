@@ -2,7 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
 import Company from "./company.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 const DataTransfer = sequelize.define(
   "DataTransfer",
@@ -16,15 +16,15 @@ const DataTransfer = sequelize.define(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     user_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -191,8 +191,8 @@ DataTransfer.addHook("afterFind", (result) => {
 DataTransfer.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-DataTransfer.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// DataTransfer.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 export default DataTransfer;

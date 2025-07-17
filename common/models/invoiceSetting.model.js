@@ -1,10 +1,10 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import Company from "./company.model.js";
-import CompanyAddress from "./companyAddress.model.js";
+// import CompanyAddress from "./companyAddress.model.js";
 
 const InvoiceSetting = sequelize.define(
-  "SKU",
+  "InvoiceSetting",
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -20,15 +20,15 @@ const InvoiceSetting = sequelize.define(
       },
       onUpdate: "CASCADE",
     },
-    company_branch_id: {
-          type: DataTypes.INTEGER.UNSIGNED,
-          allowNull: true,
-          references: {
-            model: CompanyAddress,
-            key: "id",
-          },
-          onUpdate: "CASCADE",
-    },
+    // company_branch_id: {
+    //       type: DataTypes.INTEGER.UNSIGNED,
+    //       allowNull: true,
+    //       references: {
+    //         model: CompanyAddress,
+    //         key: "id",
+    //       },
+    //       onUpdate: "CASCADE",
+    // },
     invoice_prefix: {
       type: DataTypes.STRING(191),
       allowNull: false,
@@ -554,8 +554,8 @@ const InvoiceSetting = sequelize.define(
 Company.hasOne(InvoiceSetting, { foreignKey: "company_id" });
 InvoiceSetting.belongsTo(Company, { foreignKey: "company_id" });
 
-InvoiceSetting.belongsTo(CompanyAddress, {
-  foreignKey: "company_branch_id",
-});
+// InvoiceSetting.belongsTo(CompanyAddress, {
+//   foreignKey: "company_branch_id",
+// });
 
 export default InvoiceSetting;
