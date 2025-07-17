@@ -8,18 +8,35 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 const Route = db.Route;
 const MachineRouteProcess = db.MachineRouteProcess;
 const ProcessName = db.ProcessName;
 const Machine = db.Machine;
+
+patchModelForBranchFiltering(Route);
 
 // POST create new machine route process
 v1Router.post("/machine-route-process", authenticateJWT, async (req, res) => {

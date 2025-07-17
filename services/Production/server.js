@@ -8,13 +8,28 @@ import sequelize from "../../common/database/database.js";
 import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+
 dotenv.config();
 
 const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 const ProductionGroup = db.ProductionGroup;
 const WorkOrder = db.WorkOrder;
@@ -23,6 +38,8 @@ const AllocationHistory = db.AllocationHistory;
 const stockAdjustment = db.stockAdjustment;
 const User = db.User;
 
+patchModelForBranchFiltering(ProductionGroup);
+patchModelForBranchFiltering(AllocationHistory);
 
 // POST create new work order
 v1Router.post("/production-group", authenticateJWT, async (req, res) => {
