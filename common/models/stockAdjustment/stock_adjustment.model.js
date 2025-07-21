@@ -121,24 +121,77 @@ StockAdjustment.belongsTo(CompanyAddress, {
   as: "branch", 
 });
 
+// StockAdjustment.addHook("afterFind", (result) => {
+//   const formatRecordDates = (record) => {
+//     if (!record || !record.getDataValue) return;
+
+//     const createdAt = record.getDataValue("created_at");
+//     const updatedAt = record.getDataValue("updated_at");
+//     const adjustmentDate = record.getDataValue("adjustment_date");
+
+//     if (createdAt) {
+//       record.dataValues.created_at = formatDateTime(createdAt);
+//     }
+
+//     if (updatedAt) {
+//       record.dataValues.updated_at = formatDateTime(updatedAt);
+//     }
+    
+//     if (adjustmentDate) {
+//       record.dataValues.adjustment_date = formatDateTime(adjustmentDate);
+//     }
+//   };
+
+//   if (Array.isArray(result)) {
+//     result.forEach(formatRecordDates);
+//   } else if (result) {
+//     formatRecordDates(result);
+//   }
+// });
+
+
 StockAdjustment.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {
     if (!record || !record.getDataValue) return;
 
+    // Format main stock adjustment dates
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const deletedAt = record.getDataValue("deleted_at");
     const adjustmentDate = record.getDataValue("adjustment_date");
 
-    if (createdAt) {
-      record.dataValues.created_at = formatDateTime(createdAt);
-    }
+    if (createdAt) record.dataValues.created_at = formatDateTime(createdAt);
+    if (updatedAt) record.dataValues.updated_at = formatDateTime(updatedAt);
+    if (deletedAt) record.dataValues.deleted_at = formatDateTime(deletedAt);
+    if (adjustmentDate) record.dataValues.adjustment_date = formatDateTime(adjustmentDate);
 
-    if (updatedAt) {
-      record.dataValues.updated_at = formatDateTime(updatedAt);
-    }
-    
-    if (adjustmentDate) {
-      record.dataValues.adjustment_date = formatDateTime(adjustmentDate);
+    // Format nested StockAdjustmentItems if included
+    if (record.dataValues.StockAdjustmentItems && Array.isArray(record.dataValues.StockAdjustmentItems)) {
+      record.dataValues.StockAdjustmentItems = record.dataValues.StockAdjustmentItems.map(item => {
+        if (item.dataValues) {
+          if (item.dataValues.created_at) {
+            item.dataValues.created_at = formatDateTime(item.dataValues.created_at);
+          }
+          if (item.dataValues.updated_at) {
+            item.dataValues.updated_at = formatDateTime(item.dataValues.updated_at);
+          }
+          if (item.dataValues.deleted_at) {
+            item.dataValues.deleted_at = formatDateTime(item.dataValues.deleted_at);
+          }
+          return item;
+        } else {
+          if (item.created_at) {
+            item.created_at = formatDateTime(item.created_at);
+          }
+          if (item.updated_at) {
+            item.updated_at = formatDateTime(item.updated_at);
+          }
+          if (item.deleted_at) {
+            item.deleted_at = formatDateTime(item.deleted_at);
+          }
+          return item;
+        }
+      });
     }
   };
 

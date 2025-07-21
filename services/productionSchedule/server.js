@@ -8,6 +8,24 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import moment from "moment-timezone";
 import Employee from "../../common/models/employee.model.js";
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+dotenv.config();
+const app = express();
+app.use(json());
+app.use(cors());
+
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+const v1Router = Router();
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 const Company = db.Company;
 const User =db.User;
@@ -22,11 +40,8 @@ const Machine = db.Machine; // Assuming you have a Machine model
 // const SKU = db.Sku; // Assuming you have a SKU model
 
 
-dotenv.config();
-const app = express();
-app.use(json());
-app.use(cors());
-const v1Router = Router();
+patchModelForBranchFiltering(ProductionSchedule);
+patchModelForBranchFiltering(GroupHistory); 
 
 
 //get group_history

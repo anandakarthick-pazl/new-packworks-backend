@@ -478,7 +478,7 @@ v1Router.get("/inventory/status/:id", authenticateJWT, async (req, res) => {
           include: [
             {
               model: User,
-              as: "creator",
+              as: "created_by_user",
               attributes: ["id", "name", "email"]
             }
           ]

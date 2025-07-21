@@ -168,31 +168,85 @@ SalesOrder.belongsTo(Client, { foreignKey: "client_id" });
 SalesOrder.belongsTo(User, { foreignKey: "created_by", as: "creator_sales" });
 SalesOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater_sales" });
 
+// SalesOrder.addHook("afterFind", (result) => {
+//   const formatRecordDates = (record) => {
+//     if (!record || !record.getDataValue) return;
+
+//     const createdAt = record.getDataValue("created_at");
+//     const updatedAt = record.getDataValue("updated_at");
+//     const estimatedDate = record.getDataValue("estimated");
+    
+//     if (createdAt) {
+//       record.dataValues.created_at = formatDateTime(createdAt);
+//     }
+
+//     if (updatedAt) {
+//       record.dataValues.updated_at = formatDateTime(updatedAt);
+//     }
+
+//     if (estimatedDate) {
+//       record.dataValues.estimated = formatDateTime(estimatedDate);
+//     }
+//   };
+
+//   if (Array.isArray(result)) {
+//     result.forEach(formatRecordDates);
+//   } else if (result) {
+//     formatRecordDates(result);
+//   }
+// });
+
+
+// const { formatDateTime } = require('./dateUtils');
+
 SalesOrder.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {
-    if (!record || !record.getDataValue) return;
+    if (!record) return;
 
-    const createdAt = record.getDataValue("created_at");
-    const updatedAt = record.getDataValue("updated_at");
-    const estimatedDate = record.getDataValue("estimated");
-    
-    if (createdAt) {
-      record.dataValues.created_at = formatDateTime(createdAt);
+    // Handle both Sequelize instances and plain objects
+    const baseRecord = record.dataValues || record;
+
+    // Format main sales order dates
+    const mainDateFields = ['created_at', 'updated_at', 'estimated'];
+    mainDateFields.forEach(field => {
+      if (baseRecord[field]) {
+        baseRecord[field] = formatDateTime(baseRecord[field]);
+      }
+    });
+
+    // Format nested workOrders
+    if (baseRecord.workOrders) {
+      baseRecord.workOrders.forEach(workOrder => {
+        const woDates = ['created_at', 'updated_at', 'edd', 'planned_start_date', 'planned_end_date'];
+        const woData = workOrder.dataValues || workOrder;
+        
+        woDates.forEach(field => {
+          if (woData[field]) {
+            woData[field] = formatDateTime(woData[field]);
+          }
+        });
+      });
     }
 
-    if (updatedAt) {
-      record.dataValues.updated_at = formatDateTime(updatedAt);
-    }
-
-    if (estimatedDate) {
-      record.dataValues.estimated = formatDateTime(estimatedDate);
+    // Format nested SalesSkuDetails
+    if (baseRecord.SalesSkuDetails) {
+      baseRecord.SalesSkuDetails.forEach(sku => {
+        const skuData = sku.dataValues || sku;
+        if (skuData.created_at) skuData.created_at = formatDateTime(skuData.created_at);
+        if (skuData.updated_at) skuData.updated_at = formatDateTime(skuData.updated_at);
+      });
     }
   };
 
-  if (Array.isArray(result)) {
-    result.forEach(formatRecordDates);
-  } else if (result) {
-    formatRecordDates(result);
+  try {
+    if (Array.isArray(result)) {
+      result.forEach(formatRecordDates);
+    } else if (result) {
+      formatRecordDates(result);
+    }
+  } catch (error) {
+    console.error('Error in SalesOrder afterFind hook:', error);
+    // Consider adding error reporting here
   }
 });
 
