@@ -170,33 +170,86 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     PurchaseOrder.belongsTo(User, { foreignKey: "created_by", as: "creator" });
     PurchaseOrder.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
-    PurchaseOrder.addHook("afterFind", (result) => {
-      const formatRecordDates = (record) => {
-        if (!record || !record.getDataValue) return;
+    // PurchaseOrder.addHook("afterFind", (result) => {
+    //   const formatRecordDates = (record) => {
+    //     if (!record || !record.getDataValue) return;
     
-        const createdAt = record.getDataValue("created_at");
-        const updatedAt = record.getDataValue("updated_at");
-        const poDate = record.getDataValue("po_date");
+    //     const createdAt = record.getDataValue("created_at");
+    //     const updatedAt = record.getDataValue("updated_at");
+    //     const poDate = record.getDataValue("po_date");
     
-        if (createdAt) {
-          record.dataValues.created_at = formatDateTime(createdAt);
-        }
+    //     if (createdAt) {
+    //       record.dataValues.created_at = formatDateTime(createdAt);
+    //     }
     
-        if (updatedAt) {
-          record.dataValues.updated_at = formatDateTime(updatedAt);
-        }
+    //     if (updatedAt) {
+    //       record.dataValues.updated_at = formatDateTime(updatedAt);
+    //     }
         
-        if (poDate) {
-          record.dataValues.po_date = formatDateTime(poDate);
-        }
-      };
+    //     if (poDate) {
+    //       record.dataValues.po_date = formatDateTime(poDate);
+    //     }
+    //   };
     
-      if (Array.isArray(result)) {
-        result.forEach(formatRecordDates);
-      } else if (result) {
-        formatRecordDates(result);
-      }
-    });
+    //   if (Array.isArray(result)) {
+    //     result.forEach(formatRecordDates);
+    //   } else if (result) {
+    //     formatRecordDates(result);
+    //   }
+    // });
+
+
+PurchaseOrder.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    // Format parent dates
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const poDate = record.getDataValue("po_date");
+    const validTill = record.getDataValue("valid_till");
+
+    if (createdAt) record.dataValues.created_at = formatDateTime(createdAt);
+    if (updatedAt) record.dataValues.updated_at = formatDateTime(updatedAt);
+    if (poDate) record.dataValues.po_date = formatDateTime(poDate);
+    if (validTill) record.dataValues.valid_till = formatDateTime(validTill);
+
+    // Format included PurchaseOrderItems
+      if (record.dataValues.PurchaseOrderItems && Array.isArray(record.dataValues.PurchaseOrderItems)) {
+        record.dataValues.PurchaseOrderItems = record.dataValues.PurchaseOrderItems.map(item => {
+          if (item.dataValues) {
+            if (item.dataValues.created_at) {
+              item.dataValues.created_at = formatDateTime(item.dataValues.created_at);
+            }
+            if (item.dataValues.updated_at) {
+              item.dataValues.updated_at = formatDateTime(item.dataValues.updated_at);
+            }
+            if (item.dataValues.deleted_at) {
+              item.dataValues.deleted_at = formatDateTime(item.dataValues.deleted_at);
+            }
+            return item;
+          } else {
+            if (item.created_at) {
+              item.created_at = formatDateTime(item.created_at);
+            }
+            if (item.updated_at) {
+              item.updated_at = formatDateTime(item.updated_at);
+            }
+            if (item.deleted_at) {
+              item.deleted_at = formatDateTime(item.deleted_at);
+            }
+            return item;
+          }
+        });
+      } 
+  };
+  
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
     
     export default PurchaseOrder;
   

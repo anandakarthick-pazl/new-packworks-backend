@@ -2,7 +2,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database/database.js";
 import { formatDateTime } from '../utils/dateFormatHelper.js';
 import Company from "./company.model.js";
-// import CompanyAddress from "./companyAddress.model.js";
+import CompanyAddress from "./companyAddress.model.js";
 
 const DataTransfer = sequelize.define(
   "DataTransfer",
@@ -16,15 +16,15 @@ const DataTransfer = sequelize.define(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
     },
-    // company_branch_id: {
-    //       type: DataTypes.INTEGER.UNSIGNED,
-    //       allowNull: true,
-    //       references: {
-    //         model: CompanyAddress,
-    //         key: "id",
-    //       },
-    //       onUpdate: "CASCADE",
-    // },
+    company_branch_id: {
+          type: DataTypes.INTEGER.UNSIGNED,
+          allowNull: true,
+          references: {
+            model: CompanyAddress,
+            key: "id",
+          },
+          onUpdate: "CASCADE",
+    },
     user_id: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
@@ -171,6 +171,8 @@ DataTransfer.addHook("afterFind", (result) => {
 
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const startedAt = record.getDataValue("started_at");
+    const completedAt = record.getDataValue("completed_at");
 
     if (createdAt) {
       record.dataValues.created_at = formatDateTime(createdAt);
@@ -178,6 +180,14 @@ DataTransfer.addHook("afterFind", (result) => {
 
     if (updatedAt) {
       record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+
+    if (startedAt) {
+      record.dataValues.started_at = formatDateTime(startedAt);
+    }
+
+    if (completedAt) {
+      record.dataValues.completed_at = formatDateTime(completedAt);
     }
   };
 
@@ -191,8 +201,8 @@ DataTransfer.addHook("afterFind", (result) => {
 DataTransfer.belongsTo(Company, {
     foreignKey: 'company_id'
 });
-// DataTransfer.belongsTo(CompanyAddress, {
-//   foreignKey: "company_branch_id",
-// });
+DataTransfer.belongsTo(CompanyAddress, {
+  foreignKey: "company_branch_id",
+});
 
 export default DataTransfer;
