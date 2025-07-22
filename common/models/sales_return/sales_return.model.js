@@ -2,6 +2,8 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../database/database.js";
 import CompanyAddress from "../companyAddress.model.js";
 import Company from "../company.model.js";
+import { formatDateTime } from "../../utils/dateFormatHelper.js";
+
 
 const SalesReturn = sequelize.define(
   "SalesReturn",
@@ -112,6 +114,36 @@ SalesReturn.belongsTo(Company, { foreignKey: "company_id", as: "company" });
 SalesReturn.belongsTo(CompanyAddress, {
   foreignKey: "company_branch_id",          
   as: "branch",
+});
+
+
+SalesReturn.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const returnDate = record.getDataValue("return_date");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (returnDate) {
+      record.dataValues.return_date = formatDateTime(returnDate);
+    }
+    
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
 });
 
 export default SalesReturn;

@@ -30,6 +30,12 @@ import { fileURLToPath } from "url";
 import ExcelJS from "exceljs";
 import EmailService from "../../common/services/email/emailService.js";
 import { DataTransferCompletionTemplate } from "../../common/services/email/templates/dataTransferCompletion.js";
+import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
 
 dotenv.config();
 
@@ -40,7 +46,13 @@ const app = express();
 app.use(json());
 app.use(cors());
 
+// SETUP BRANCH FILTERING
+setupBranchFiltering(sequelize);
+
 const v1Router = Router();
+// ADD MIDDLEWARE TO ROUTER
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
 
 // Models
 const DataTransfer = db.DataTransfer;
@@ -56,6 +68,9 @@ const Inventory = db.Inventory;
 const Sku = db.Sku;
 const Categories = db.Categories;
 const Package = db.Package;
+
+patchModelForBranchFiltering(DataTransfer);
+
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), 'uploads', 'data-transfer');

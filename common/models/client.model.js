@@ -210,26 +210,74 @@ Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Client.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
 
 
+// Client.addHook("afterFind", (result) => {
+//   const formatRecordDates = (record) => {
+//     if (!record || !record.getDataValue) return;
+
+//     const createdAt = record.getDataValue("created_at");
+//     const updatedAt = record.getDataValue("updated_at");
+
+//     if (createdAt) {
+//       record.dataValues.created_at = formatDateTime(createdAt);
+//     }
+
+//     if (updatedAt) {
+//       record.dataValues.updated_at = formatDateTime(updatedAt);
+//     }
+//   };
+
+//   if (Array.isArray(result)) {
+//     result.forEach(formatRecordDates);
+//   } else if (result) {
+//     formatRecordDates(result);
+//   }
+// });
+
+
 Client.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {
-    if (!record || !record.getDataValue) return;
+    if (!record) return;
 
-    const createdAt = record.getDataValue("created_at");
-    const updatedAt = record.getDataValue("updated_at");
+    // Debug: Check what we're receiving
+    console.log('Processing client record:', record.client_ui_id);
 
-    if (createdAt) {
-      record.dataValues.created_at = formatDateTime(createdAt);
-    }
+    // Format main client dates (handles both Sequelize instances and plain objects)
+    const dateFields = ['created_at', 'updated_at'];
+    dateFields.forEach(field => {
+      if (record.dataValues?.[field]) {
+        record.dataValues[field] = formatDateTime(record.dataValues[field]);
+      } else if (record[field]) {
+        record[field] = formatDateTime(record[field]);
+      }
+    });
 
-    if (updatedAt) {
-      record.dataValues.updated_at = formatDateTime(updatedAt);
+    console.log(record,"record");
+    
+    // Format nested addresses if included
+     const addresses = record.addresses || (record.dataValues && record.dataValues.addresses);
+    if (Array.isArray(addresses)) {
+      addresses.forEach(address => {
+        const addressData = address.dataValues || address;
+        if (addressData.created_at) {
+          addressData.created_at = formatDateTime(addressData.created_at);
+        }
+        if (addressData.updated_at) {
+          addressData.updated_at = formatDateTime(addressData.updated_at);
+        }
+      });
     }
   };
 
-  if (Array.isArray(result)) {
-    result.forEach(formatRecordDates);
-  } else if (result) {
-    formatRecordDates(result);
+  try {
+    if (Array.isArray(result)) {
+      console.log(`Formatting ${result.length} client records`);
+      result.forEach(formatRecordDates);
+    } else if (result) {
+      console.log('Formatting single client record');
+      formatRecordDates(result);
+    }
+  } catch (error) {
+    console.error('Error in Client afterFind hook:', error);
   }
 });
 

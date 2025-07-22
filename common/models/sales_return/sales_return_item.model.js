@@ -97,16 +97,16 @@ const SalesReturnItem = sequelize.define("SalesReturnItem", {
     created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
-        get() {
-            return formatDateTime(this.getDataValue('created_at'));
-        }
+        // get() {
+        //     return formatDateTime(this.getDataValue('created_at'));
+        // }
     },
     updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
-        get() {
-            return formatDateTime(this.getDataValue('updated_at'));
-        }
+        // get() {
+        //     return formatDateTime(this.getDataValue('updated_at'));
+        // }
     },
     deleted_at: {
         type: DataTypes.DATE,
@@ -124,5 +124,34 @@ SalesReturnItem.belongsTo(sequelize.models.SalesReturn, { foreignKey: "sales_ret
 SalesReturnItem.belongsTo(sequelize.models.ItemMaster, { foreignKey: "item_id", as: "itemInfo" });
 SalesReturnItem.belongsTo(sequelize.models.User, { foreignKey: "created_by", as: "creator" });
 SalesReturnItem.belongsTo(sequelize.models.User, { foreignKey: "updated_by", as: "updater" });
+
+
+SalesReturnItem.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record || !record.getDataValue) return;
+
+    const createdAt = record.getDataValue("created_at");
+    const updatedAt = record.getDataValue("updated_at");
+    const billDate = record.getDataValue("bill_date");
+
+    if (createdAt) {
+      record.dataValues.created_at = formatDateTime(createdAt);
+    }
+
+    if (updatedAt) {
+      record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (billDate) {
+      record.dataValues.bill_date = formatDateTime(billDate);
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
 
 export default SalesReturnItem;

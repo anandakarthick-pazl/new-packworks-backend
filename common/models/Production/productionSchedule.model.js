@@ -4,6 +4,7 @@ import Company from "../company.model.js";
 import User from "../user.model.js";
 import { formatDateTime } from '../../utils/dateFormatHelper.js';
 import CompanyAddress from "../companyAddress.model.js";
+// import { addDateFormatterHook } from '../../utils/dateFormatterHook.js';
 
 const ProductionSchedule = sequelize.define("ProductionSchedule", {
     id: {
@@ -79,16 +80,16 @@ const ProductionSchedule = sequelize.define("ProductionSchedule", {
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('created_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('created_at'));
+    // }
   },
   updated_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
-    get() {
-      return formatDateTime(this.getDataValue('updated_at'));
-    }
+    // get() {
+    //   return formatDateTime(this.getDataValue('updated_at'));
+    // }
   },
  
   group_manufactured_quantity: {
@@ -126,6 +127,67 @@ ProductionSchedule.belongsTo(Company, { foreignKey: "company_id" });
 ProductionSchedule.belongsTo(CompanyAddress, { foreignKey: "company_branch_id", as: "branch" });
 ProductionSchedule.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 ProductionSchedule.belongsTo(User, { foreignKey: "updated_by", as: "updater" });
+
+ProductionSchedule.addHook("afterFind", (result) => {
+  const formatRecordDates = (record) => {
+    if (!record) return;
+
+    // Check if it's a raw query result (plain object) or Sequelize instance
+    const isRawResult = !record.getDataValue;
+    
+    if (isRawResult) {
+      // Handle raw query results (plain objects)
+      if (record.created_at) {
+        record.created_at = formatDateTime(record.created_at);
+      }
+      if (record.updated_at) {
+        record.updated_at = formatDateTime(record.updated_at);
+      }
+      if (record.start_time) {
+        record.start_time = formatDateTime(record.start_time);
+      }
+      if (record.end_time) {
+        record.end_time = formatDateTime(record.end_time);
+      }
+      if (record.date) {
+        record.date = formatDateTime(record.date);
+      }
+    } else {
+      // Handle Sequelize model instances
+      const dataValues = record.dataValues || {};
+      
+      // Only format fields that exist in the dataValues
+      if ('created_at' in dataValues && dataValues.created_at) {
+        record.dataValues.created_at = formatDateTime(dataValues.created_at);
+      }
+      if ('updated_at' in dataValues && dataValues.updated_at) {
+        record.dataValues.updated_at = formatDateTime(dataValues.updated_at);
+      }
+      if ('start_time' in dataValues && dataValues.start_time) {
+        record.dataValues.start_time = formatDateTime(dataValues.start_time);
+      }
+      if ('end_time' in dataValues && dataValues.end_time) {
+        record.dataValues.end_time = formatDateTime(dataValues.end_time);
+      }
+      if ('date' in dataValues && dataValues.date) {
+        record.dataValues.date = formatDateTime(dataValues.date);
+      }
+    }
+  };
+
+  if (Array.isArray(result)) {
+    result.forEach(formatRecordDates);
+  } else if (result) {
+    formatRecordDates(result);
+  }
+});
+
+
+// After defining your model
+// addDateFormatterHook(ProductionSchedule, ['created_at', 'updated_at', 'start_time', 'end_time']);
+
+
+
 
 
 

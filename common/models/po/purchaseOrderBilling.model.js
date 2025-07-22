@@ -111,6 +111,7 @@ PurchaseOrderBilling.addHook("afterFind", (result) => {
 
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const billDate = record.getDataValue("bill_date");
 
     if (createdAt) {
       record.dataValues.created_at = formatDateTime(createdAt);
@@ -118,6 +119,10 @@ PurchaseOrderBilling.addHook("afterFind", (result) => {
 
     if (updatedAt) {
       record.dataValues.updated_at = formatDateTime(updatedAt);
+    }
+    
+    if (billDate) {
+      record.dataValues.bill_date = formatDateTime(billDate);
     }
   };
 

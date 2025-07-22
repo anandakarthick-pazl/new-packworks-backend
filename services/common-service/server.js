@@ -123,6 +123,13 @@ v1Router.put("/system-settings", authenticateJWT, async (req, res) => {
             updated_by: req.userId
         });
 
+         // Update .env values
+          updateEnvValue("DATE_FORMAT", date_format);
+          updateEnvValue("TIME_FORMAT", time_format);
+          updateEnvValue("TIMEZONE", timezone);
+          updateEnvValue("CURRENCY", currency.currency_code); // Assuming currency.code is like "INR"
+          updateEnvValue("LANGUAGE", locale);
+
         res.status(200).json({
             message: "System settings updated successfully",
             data: updatedSettings

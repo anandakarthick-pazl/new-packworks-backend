@@ -8,7 +8,25 @@ import { authenticateJWT } from "../../common/middleware/auth.js";
 import { generateId } from "../../common/inputvalidation/generateId.js";
 import db from "../../common/models/index.js";
 import PurchaseOrderItem from "../../common/models/po/purchase_order_item.model.js";
- 
+ import { 
+  branchFilterMiddleware, 
+  resetBranchFilter, 
+  setupBranchFiltering,
+  patchModelForBranchFiltering 
+} from "../../common/helper/branchFilter.js";
+
+dotenv.config();
+const app = express();
+app.use(json());
+app.use(cors());
+setupBranchFiltering(sequelize);
+
+
+
+const v1Router = Router();
+v1Router.use(branchFilterMiddleware);
+v1Router.use(resetBranchFilter);
+
 const StockAdjustment = db.stockAdjustment;
 const StockAdjustmentItem = db.stockAdjustmentItem;
 const Inventory = db.Inventory;
@@ -18,13 +36,14 @@ const Company = db.Company;
 const PurchaseOrder = db.PurchaseOrder;
 const GRN = db.GRN;
 const GRNItem = db.GRNItem;
- 
-const app = express();
-app.use(json());
-app.use(cors());
-const v1Router = Router();
-dotenv.config();
- 
+
+patchModelForBranchFiltering(StockAdjustment);
+patchModelForBranchFiltering(StockAdjustmentItem);
+patchModelForBranchFiltering(Inventory);
+
+
+
+
 // get all items based on inventory
 v1Router.get("/stock-adjustments/items", authenticateJWT, async (req, res) => {
     try {

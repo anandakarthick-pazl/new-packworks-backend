@@ -211,19 +211,81 @@ Inventory.belongsTo(Sku, {
 });
 
 
+// Inventory.addHook("afterFind", (result) => {
+//   const formatRecordDates = (record) => {
+//     if (!record || !record.getDataValue) return;
+
+//     const createdAt = record.getDataValue("created_at");
+//     const updatedAt = record.getDataValue("updated_at");
+
+//     if (createdAt) {
+//       record.dataValues.created_at = formatDateTime(createdAt);
+//     }
+
+//     if (updatedAt) {
+//       record.dataValues.updated_at = formatDateTime(updatedAt);
+//     }
+//   };
+
+//   if (Array.isArray(result)) {
+//     result.forEach(formatRecordDates);
+//   } else if (result) {
+//     formatRecordDates(result);
+//   }
+// });
+
+
+
 Inventory.addHook("afterFind", (result) => {
   const formatRecordDates = (record) => {
     if (!record || !record.getDataValue) return;
 
+    // Format main inventory/product dates
     const createdAt = record.getDataValue("created_at");
     const updatedAt = record.getDataValue("updated_at");
+    const deletedAt = record.getDataValue("deleted_at");
 
-    if (createdAt) {
-      record.dataValues.created_at = formatDateTime(createdAt);
+    if (createdAt) record.dataValues.created_at = formatDateTime(createdAt);
+    if (updatedAt) record.dataValues.updated_at = formatDateTime(updatedAt);
+    if (deletedAt) record.dataValues.deleted_at = formatDateTime(deletedAt);
+
+    // Format nested purchase orders if included
+    if (record.dataValues.purchaseOrders && Array.isArray(record.dataValues.purchaseOrders)) {
+      record.dataValues.purchaseOrders = record.dataValues.purchaseOrders.map(po => {
+        if (po.created_at) {
+          po.created_at = formatDateTime(po.created_at);
+        }
+        if (po.purchaseOrder && po.purchaseOrder.po_date) {
+          po.purchaseOrder.po_date = formatDateTime(po.purchaseOrder.po_date);
+        }
+        return po;
+      });
     }
 
-    if (updatedAt) {
-      record.dataValues.updated_at = formatDateTime(updatedAt);
+    // Format nested GRNs if included
+    if (record.dataValues.grns && Array.isArray(record.dataValues.grns)) {
+      record.dataValues.grns = record.dataValues.grns.map(grn => {
+        if (grn.created_at) {
+          grn.created_at = formatDateTime(grn.created_at);
+        }
+        if (grn.grn && grn.grn.grn_date) {
+          grn.grn.grn_date = formatDateTime(grn.grn.grn_date);
+        }
+        if (grn.grn && grn.grn.invoice_date) {
+          grn.grn.invoice_date = formatDateTime(grn.grn.invoice_date);
+        }
+        return grn;
+      });
+    }
+
+    // Format stock adjustments if included
+    if (record.dataValues.stockAdjustments && Array.isArray(record.dataValues.stockAdjustments)) {
+      record.dataValues.stockAdjustments = record.dataValues.stockAdjustments.map(adj => {
+        if (adj.adjustment && adj.adjustment.adjustment_date) {
+          adj.adjustment.adjustment_date = formatDateTime(adj.adjustment.adjustment_date);
+        }
+        return adj;
+      });
     }
   };
 
