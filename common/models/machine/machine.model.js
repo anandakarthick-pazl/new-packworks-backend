@@ -146,18 +146,12 @@ const Machine = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      // get() {
-      //   return formatDateTime(this.getDataValue('created_at'));
-      // }
     },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
       onUpdate: DataTypes.NOW,
-      // get() {
-      //   return formatDateTime(this.getDataValue('updated_at'));
-      // }
     },
     status: {
       type: DataTypes.ENUM("active", "inactive"),

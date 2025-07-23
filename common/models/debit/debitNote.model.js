@@ -197,6 +197,66 @@ DebitNote.addHook("afterFind", (result) => {
 });
 
 
+// Date formatting hook
+// DebitNote.addHook("afterFind", (result) => {
+//   const formatRecordDates = (record) => {
+//     if (!record || !record.dataValues) return;
+
+//     console.log("Formatting DebitNote record:", record);
+
+//     // Format DebitNote dates
+//     const formatDates = (obj) => {
+//       if (obj.debit_note_date) obj.debit_note_date = formatDateTime(obj.debit_note_date);
+//       if (obj.created_at) obj.created_at = formatDateTime(obj.created_at);
+//       if (obj.updated_at) obj.updated_at = formatDateTime(obj.updated_at);
+//       if (obj.deleted_at) obj.deleted_at = formatDateTime(obj.deleted_at);
+//     };
+
+//     // Format current record's dates
+//     formatDates(record.dataValues);
+
+//     // Format PurchaseOrderReturn dates if present
+//     if (record.dataValues.PurchaseOrderReturn) {
+//       const poReturn = record.dataValues.PurchaseOrderReturn;
+      
+//       // Format PurchaseOrderReturn dates
+//       if (poReturn.return_date) poReturn.return_date = formatDateTime(poReturn.return_date);
+//       if (poReturn.created_at) poReturn.created_at = formatDateTime(poReturn.created_at);
+//       if (poReturn.updated_at) poReturn.updated_at = formatDateTime(poReturn.updated_at);
+//       if (poReturn.deleted_at) poReturn.deleted_at = formatDateTime(poReturn.deleted_at);
+
+//       // Format PurchaseOrder dates if present
+//       if (poReturn.PurchaseOrder) {
+//         const po = poReturn.PurchaseOrder;
+//         if (po.po_date) po.po_date = formatDateTime(po.po_date);
+//         if (po.valid_till) po.valid_till = formatDateTime(po.valid_till);
+//         if (po.created_at) po.created_at = formatDateTime(po.created_at);
+//         if (po.updated_at) po.updated_at = formatDateTime(po.updated_at);
+//       }
+
+//       // Format items dates if present
+//       if (poReturn.items && Array.isArray(poReturn.items)) {
+//         poReturn.items.forEach(item => {
+//           if (item.created_at) item.created_at = formatDateTime(item.created_at);
+//           if (item.updated_at) item.updated_at = formatDateTime(item.updated_at);
+//           if (item.deleted_at) item.deleted_at = formatDateTime(item.deleted_at);
+//         });
+//       }
+//     }
+//   };
+
+//   if (Array.isArray(result)) {
+//     result.forEach(record => {
+//       if (record) formatRecordDates(record);
+//     });
+//   } else if (result) {
+//     formatRecordDates(result);
+//   }
+// });
+
+
+
+
 
 
 export default DebitNote;

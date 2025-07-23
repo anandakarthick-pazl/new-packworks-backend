@@ -120,27 +120,27 @@ GroupHistory.belongsTo(ProductionSchedule, {
       as: 'production_schedule'
     });
 
-    GroupHistory.addHook("afterFind", (result) => {
-      const formatRecordDates = (record) => {
-        if (!record || !record.getDataValue) return;
+    // GroupHistory.addHook("afterFind", (result) => {
+    //   const formatRecordDates = (record) => {
+    //     if (!record || !record.getDataValue) return;
     
-        const createdAt = record.getDataValue("created_at");
-        const updatedAt = record.getDataValue("updated_at");
+    //     const createdAt = record.getDataValue("created_at");
+    //     const updatedAt = record.getDataValue("updated_at");
     
-        if (createdAt) {
-          record.dataValues.created_at = formatDateTime(createdAt);
-        }
+    //     if (createdAt) {
+    //       record.dataValues.created_at = formatDateTime(createdAt);
+    //     }
     
-        if (updatedAt) {
-          record.dataValues.updated_at = formatDateTime(updatedAt);
-        }
-      };
+    //     if (updatedAt) {
+    //       record.dataValues.updated_at = formatDateTime(updatedAt);
+    //     }
+    //   };
     
-      if (Array.isArray(result)) {
-        result.forEach(formatRecordDates);
-      } else if (result) {
-        formatRecordDates(result);
-      }
-    });
+    //   if (Array.isArray(result)) {
+    //     result.forEach(formatRecordDates);
+    //   } else if (result) {
+    //     formatRecordDates(result);
+    //   }
+    // });
 
 export default GroupHistory;

@@ -415,9 +415,9 @@ v1Router.put("/designations/:id", authenticateJWT, async (req, res) => {
     await DesignationModel.update(
       {
         name,
-        parent_id,
         last_updated_by,
         updated_at: new Date(),
+        parent_id: req.body.hasOwnProperty('parent_id') ? parent_id : undefined,
       },
       {
         where: { id },
