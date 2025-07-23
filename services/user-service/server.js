@@ -1313,18 +1313,39 @@ v1Router.post(
 
 v1Router.get("/employees", authenticateJWT, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", status } = req.query;
+    const { page = 1, limit = 10, search = "", status, department, role } = req.query;
     const offset = (page - 1) * limit;
 
-    let statusCondition = "";
-    let statusReplacement = {};
+    let whereClause = `
+      (u.name LIKE :search OR 
+      u.email LIKE :search OR 
+      d.department_name LIKE :search OR 
+      des.name LIKE :search OR 
+      r.name LIKE :search)
+    `;
+
+    const replacements = {
+      search: `%${search}%`,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    };
 
     if (status) {
-      statusCondition = "AND u.status = :status";
-      statusReplacement = { status: status.toLowerCase() };
+      whereClause += " AND u.status = :status";
+      replacements.status = status.toLowerCase();
     }
 
-    // Get total count of records matching the search criteria
+    if (department) {
+      whereClause += " AND d.department_name = :department";
+      replacements.department = department;
+    }
+
+    if (role) {
+      whereClause += " AND r.name = :role";
+      replacements.role = role;
+    }
+
+    // Total Records Count
     const totalRecordsResult = await sequelize.query(
       `SELECT COUNT(*) AS total FROM employee_details e
       JOIN users u ON e.user_id = u.id
@@ -1333,15 +1354,9 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
       LEFT JOIN role_user ru ON u.id = ru.user_id
       LEFT JOIN roles r ON ru.role_id = r.id
       LEFT JOIN users rm ON e.reporting_to = rm.id
-      WHERE 
-          (u.name LIKE :search OR 
-          u.email LIKE :search OR 
-          d.department_name LIKE :search OR 
-          des.name LIKE :search OR 
-          r.name LIKE :search) 
-          ${statusCondition}`,
+      WHERE ${whereClause}`,
       {
-        replacements: { search: `%${search}%`, ...statusReplacement },
+        replacements,
         type: sequelize.QueryTypes.SELECT,
       }
     );
@@ -1349,7 +1364,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     const totalRecords = totalRecordsResult[0].total;
     const totalPages = Math.ceil(totalRecords / limit);
 
-    // Fetch paginated records
+    // Paginated Employee List
     const employees = await sequelize.query(
       `SELECT 
           e.id,
@@ -1361,8 +1376,8 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
           des.name AS designation,
           r.name AS role,
           CASE
-          WHEN u.status='inactive' THEN 'Inactive'
-          WHEN u.status='active' THEN 'Active'
+            WHEN u.status='inactive' THEN 'Inactive'
+            WHEN u.status='active' THEN 'Active'
           END AS user_status,
           rm.name AS reporting_manager
       FROM employee_details e
@@ -1372,26 +1387,16 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
       LEFT JOIN role_user ru ON u.id = ru.user_id
       LEFT JOIN roles r ON ru.role_id = r.id
       LEFT JOIN users rm ON e.reporting_to = rm.id
-      WHERE 
-          (u.name LIKE :search OR 
-          u.email LIKE :search OR 
-          d.department_name LIKE :search OR 
-          des.name LIKE :search OR 
-          r.name LIKE :search) 
-          ${statusCondition}
+      WHERE ${whereClause}
       ORDER BY e.employee_id
       LIMIT :limit OFFSET :offset`,
       {
-        replacements: {
-          search: `%${search}%`,
-          limit: parseInt(limit),
-          offset: parseInt(offset),
-          ...statusReplacement,
-        },
+        replacements,
         type: sequelize.QueryTypes.SELECT,
       }
     );
 
+    // Status Counts
     const statusCounts = await sequelize.query(
       `SELECT 
           SUM(CASE WHEN u.status = 'active' THEN 1 ELSE 0 END) AS active_count,
@@ -1403,21 +1408,13 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
       LEFT JOIN role_user ru ON u.id = ru.user_id
       LEFT JOIN roles r ON ru.role_id = r.id
       LEFT JOIN users rm ON e.reporting_to = rm.id
-      WHERE 
-          (u.name LIKE :search OR 
-          u.email LIKE :search OR 
-          d.department_name LIKE :search OR 
-          des.name LIKE :search OR 
-          r.name LIKE :search) 
-          ${statusCondition}
-      ORDER BY e.employee_id`,
+      WHERE ${whereClause}`,
       {
-        replacements: { search: `%${search}%`, ...statusReplacement },
+        replacements,
         type: sequelize.QueryTypes.SELECT,
       }
     );
 
-    // Extract active and inactive counts from the query result
     const { active_count = 0, inactive_count = 0 } = statusCounts[0];
 
     res.json({
@@ -1434,6 +1431,7 @@ v1Router.get("/employees", authenticateJWT, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 v1Router.get("/employees/:employeeId", authenticateJWT, async (req, res) => {
   try {

@@ -183,15 +183,39 @@ v1Router.post("/debit-note", authenticateJWT, async (req, res) => {
 
 
 v1Router.get("/debit-note", authenticateJWT, async (req, res) => {
-  try {
+    try {
+      const { search = "", page = "1", limit = "10" } = req.query;
+
+      const pageNumber = Math.max(1, parseInt(page));
+      const limitNumber = Math.max(1, parseInt(limit));
+      const offset = (pageNumber - 1) * limitNumber;
+
+      // Build WHERE condition
+      const whereCondition = {
+        status: "active",
+      };
+
+      if (search.trim() !== "") {
+        whereCondition[Op.or] = [
+          {
+            debit_note_generate_id: {
+              [Op.like]: `%${search}%`,
+            },
+          },
+        ];
+      }
+
     const debitNotes = await debit_note.findAll({
+      where: whereCondition,
+      limit: limitNumber,
+      offset,
       include: [
         {
           model: PurchaseOrderReturn,
           include: [
             {
               model: PurchaseOrderReturnItem,
-              as: "items"
+              as: "items",
             },
             {
               model: PurchaseOrder, // ✅ Include Purchase Order details
@@ -203,11 +227,20 @@ v1Router.get("/debit-note", authenticateJWT, async (req, res) => {
       ],
       order: [['created_at', 'DESC']]
     });
+        const totalCount = await debit_note.count({ where: whereCondition });
+
 
     return res.status(200).json({
       success: true,
       message: "Fetched Debit Notes with related Purchase Order data successfully",
-      data: debitNotes
+      data: debitNotes,
+      totalCount,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages: Math.ceil(totalCount / limitNumber),
+        pageSize: limitNumber,
+        totalRecords: totalCount
+      }
     });
 
   } catch (error) {
